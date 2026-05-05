@@ -1,26 +1,124 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cream: #f4eee5;
+  --cream-soft: #fbf8f2;
+  --milk: #fffaf0;
+  --chocolate: #513530;
+  --chocolate-deep: #2b1a18;
+  --caramel: #b57946;
+  --caramel-soft: #dfbc8b;
+  --sage: #64746a;
+  --sage-soft: #d8dfd4;
+  --ink: #191514;
+  --line: rgba(81, 53, 48, 0.18);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--cream);
+  --color-foreground: var(--chocolate);
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, "SFMono-Regular",
+    Menlo, Monaco, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--cream);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(223, 188, 139, 0.28), transparent 28rem),
+    linear-gradient(180deg, var(--cream-soft), var(--cream));
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: var(--chocolate);
+  color: var(--milk);
+}
+
+.font-display {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.noise {
+  background-image:
+    linear-gradient(rgba(81, 53, 48, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(81, 53, 48, 0.025) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.hero-image {
+  clip-path: inset(0 round 28px);
+}
+
+.soft-shadow {
+  box-shadow: 0 30px 90px rgba(43, 26, 24, 0.14);
+}
+
+.image-shadow {
+  box-shadow: 0 18px 44px rgba(43, 26, 24, 0.13);
+}
+
+.section-pad {
+  padding-inline: clamp(1rem, 4vw, 4.5rem);
+}
+
+.reveal-up {
+  animation: reveal-up 900ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+.reveal-soft {
+  animation: reveal-soft 1100ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+.float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reveal-soft {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
 }

@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FulfillmentMode {
+  PICKUP
+  DELIVERY
+}
+
+model Flavor {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  isActive    Boolean  @default(true)
+  note        String?
+  prices      Price[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Size {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  servings    String
+  diameterCm  Int?
+  grams       Int?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  prices      Price[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Price {
+  id        String   @id @default(cuid())
+  flavorId  String
+  sizeId    String
+  amountArs Int
+  flavor    Flavor   @relation(fields: [flavorId], references: [id], onDelete: Cascade)
+  size      Size     @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([flavorId, sizeId])
+}
+
+model AvailabilityRule {
+  id              String          @id @default(cuid())
+  weekday         Int
+  isOpen          Boolean         @default(true)
+  cutoffHour      Int             @default(10)
+  minLeadTimeDays Int             @default(2)
+  pickupEnabled   Boolean         @default(true)
+  deliveryEnabled Boolean         @default(true)
+  fulfillmentMode FulfillmentMode?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([weekday, fulfillmentMode])
+}
+
+model CapacityOverride {
+  id             String   @id @default(cuid())
+  date           DateTime @unique @db.Date
+  maxUnits       Int
+  isClosed       Boolean  @default(false)
+  internalNote   String?
+  customerNotice String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
