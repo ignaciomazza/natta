@@ -23,13 +23,14 @@ import {
   type SizeId,
 } from "@/lib/catalog";
 
-type StepIndex = 0 | 1 | 2;
+type StepIndex = 0 | 1 | 2 | 3;
 type SizeQuantities = Record<SizeId, number>;
 type OrderQuantities = Record<string, SizeQuantities>;
 
 const steps = [
   { label: "Sabores" },
   { label: "Fecha" },
+  { label: "Entrega" },
   { label: "Pago" },
 ] as const;
 
@@ -154,6 +155,8 @@ export function OrderAssistant() {
       ? productCount > 0
       : step === 1
         ? productCount > 0 && !invalidDate
+        : step === 2
+          ? productCount > 0 && !invalidDate
         : canSubmit;
 
   const canOpenStep = (targetStep: number) => {
@@ -165,7 +168,19 @@ export function OrderAssistant() {
       return productCount > 0;
     }
 
-    return productCount > 0 && !invalidDate;
+    if (targetStep === 2) {
+      return step >= 1 && productCount > 0 && !invalidDate;
+    }
+
+    if (targetStep === 3) {
+      return step >= 2 && productCount > 0 && !invalidDate;
+    }
+
+    if (targetStep > 3) {
+      return false;
+    }
+
+    return step >= 1 && productCount > 0 && !invalidDate;
   };
 
   const updateQuantity = (flavorId: string, sizeId: SizeId, delta: number) => {
@@ -183,7 +198,7 @@ export function OrderAssistant() {
       return;
     }
 
-    setStep((current) => Math.min(current + 1, 2) as StepIndex);
+    setStep((current) => Math.min(current + 1, 3) as StepIndex);
   };
 
   const goToPreviousStep = () => {
@@ -200,7 +215,7 @@ export function OrderAssistant() {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (step < 2) {
+    if (step < 3) {
       goToNextStep();
       return;
     }
@@ -277,7 +292,7 @@ export function OrderAssistant() {
         data-testid="order-assistant"
         onSubmit={handleSubmit}
       >
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           {steps.map((item, index) => (
             <button
               className={`rounded-xl border px-2 py-2 text-left transition sm:rounded-2xl sm:px-4 sm:py-3 ${
@@ -290,7 +305,7 @@ export function OrderAssistant() {
               onClick={() => setStep(index as StepIndex)}
               type="button"
             >
-              <span className="block text-sm font-medium sm:text-base">
+              <span className="block text-xs font-medium sm:text-base">
                 {item.label}
               </span>
             </button>
@@ -435,50 +450,60 @@ export function OrderAssistant() {
                 </button>
               ))}
             </div>
-
-            <fieldset className="space-y-3">
-              <legend className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
-                Entrega
-              </legend>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
-                    mode === "pickup"
-                      ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                      : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
-                  }`}
-                  data-testid="mode-pickup"
-                  onClick={() => setMode("pickup")}
-                  type="button"
-                >
-                  <MapPin className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
-                  <span className="block font-semibold">Retiro Devoto</span>
-                  <span className="mt-1 block text-sm opacity-80">
-                    Seña online del 50%
-                  </span>
-                </button>
-                <button
-                  className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
-                    mode === "delivery"
-                      ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                      : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
-                  }`}
-                  data-testid="mode-delivery"
-                  onClick={() => setMode("delivery")}
-                  type="button"
-                >
-                  <Truck className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
-                  <span className="block font-semibold">Uber / Cabify</span>
-                  <span className="mt-1 block text-sm opacity-80">
-                    Pago online del producto
-                  </span>
-                </button>
-              </div>
-            </fieldset>
           </section>
         ) : null}
 
         {step === 2 ? (
+          <section className="mt-5 space-y-5 sm:mt-7 sm:space-y-7">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
+                <Truck className="h-4 w-4" />
+                Entrega
+              </p>
+              <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
+                Elegí si retirás por Devoto o si coordinamos envío por Uber /
+                Cabify.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                  mode === "pickup"
+                    ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
+                    : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
+                }`}
+                data-testid="mode-pickup"
+                onClick={() => setMode("pickup")}
+                type="button"
+              >
+                <MapPin className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
+                <span className="block font-semibold">Retiro Devoto</span>
+                <span className="mt-1 block text-sm opacity-80">
+                  Seña online del 50%
+                </span>
+              </button>
+              <button
+                className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                  mode === "delivery"
+                    ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
+                    : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
+                }`}
+                data-testid="mode-delivery"
+                onClick={() => setMode("delivery")}
+                type="button"
+              >
+                <Truck className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
+                <span className="block font-semibold">Uber / Cabify</span>
+                <span className="mt-1 block text-sm opacity-80">
+                  Pago online del producto
+                </span>
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {step === 3 ? (
           <section className="mt-5 grid gap-5 sm:mt-7 sm:gap-7 xl:grid-cols-[1fr_0.82fr]">
             <div className="space-y-4 sm:space-y-5">
               <div>
@@ -621,7 +646,7 @@ export function OrderAssistant() {
               disabled={!canAdvance}
               type="submit"
             >
-              {step === 2 ? "Confirmar y pagar" : "Continuar"}
+              {step === 3 ? "Confirmar y pagar" : "Continuar"}
             </button>
           </div>
         </div>

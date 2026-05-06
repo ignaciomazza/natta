@@ -143,13 +143,13 @@ export default function Home() {
         className="section-pad relative min-h-[100svh] bg-[var(--cream-soft)] pt-24 noise"
         id="inicio"
       >
-        <div className="mx-auto grid min-h-[calc(100svh-6rem)] w-full max-w-7xl min-w-0 items-center gap-12 py-12 lg:grid-cols-[0.92fr_1.08fr]">
+        <div className="mx-auto grid min-h-[calc(100svh-6rem)] w-full max-w-7xl min-w-0 items-center gap-12 py-12 lg:grid-cols-[1fr_0.9fr] xl:grid-cols-[0.92fr_1fr]">
           <div className="relative z-10 max-w-2xl min-w-0">
-            <p className="reveal-up mb-6 flex items-center gap-3 text-sm uppercase tracking-[0.28em] text-[var(--sage)]">
+            <p className="reveal-up mb-6 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-[var(--sage)] md:gap-3 md:text-sm md:tracking-[0.28em]">
               <Sparkles className="h-4 w-4" />
               La cremosidad llegó a Devoto.
             </p>
-            <h1 className="reveal-up font-display text-[clamp(5rem,18vw,13rem)] leading-[0.78] tracking-[-0.08em] text-[var(--chocolate-deep)]">
+            <h1 className="reveal-up font-display text-[clamp(5.65rem,23vw,7rem)] leading-[0.78] tracking-[-0.08em] text-[var(--chocolate-deep)] md:text-[clamp(5rem,18vw,13rem)]">
               natta
             </h1>
             <p className="reveal-up mt-8 max-w-xl break-words text-xl leading-8 text-[var(--chocolate)]/82 delay-100 md:text-2xl md:leading-10">
@@ -172,14 +172,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="reveal-soft relative h-[58vh] min-h-[430px] w-full min-w-0 lg:h-[76vh]">
+          <div className="reveal-soft relative h-[58vh] min-h-[430px] w-full min-w-0 lg:h-[64vh] lg:min-h-[460px] xl:h-[70vh]">
             <div className="hero-image image-shadow absolute inset-0 overflow-hidden bg-[var(--chocolate)]">
               <Image
                 alt="Tartas vascas Natta en moldes sobre mesa"
                 className="h-full w-full object-cover"
                 fill
                 priority
-                sizes="(min-width: 1024px) 54vw, 100vw"
+                sizes="(min-width: 1280px) 50vw, (min-width: 1024px) 44vw, 100vw"
                 src={instagramImages.hero}
               />
             </div>
@@ -215,17 +215,25 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mx-auto mt-14 grid max-w-7xl gap-4 md:grid-cols-3">
-          {featuredImages.map((image) => (
+        <div className="mx-auto mt-14 grid max-w-7xl grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+          {featuredImages.map((image, index) => (
             <div
-              className="group image-shadow relative aspect-[4/5] overflow-hidden rounded-[26px] bg-[var(--milk)]"
+              className={`group image-shadow relative overflow-hidden rounded-[20px] bg-[var(--milk)] md:rounded-[26px] ${
+                index === 2
+                  ? "col-span-2 aspect-[2.25/1] md:col-span-1 md:aspect-[4/5]"
+                  : "aspect-[4/5]"
+              }`}
               key={image.src}
             >
               <Image
                 alt={image.alt}
                 className="object-cover transition duration-700 group-hover:scale-105"
                 fill
-                sizes="(min-width: 768px) 33vw, 100vw"
+                sizes={
+                  index === 2
+                    ? "(min-width: 768px) 33vw, 100vw"
+                    : "(min-width: 768px) 33vw, 50vw"
+                }
                 src={image.src}
               />
               <span className="absolute bottom-4 left-4 rounded-full bg-[var(--milk)]/88 px-4 py-2 text-sm lowercase text-[var(--chocolate)] backdrop-blur">
@@ -387,10 +395,10 @@ export default function Home() {
           </div>
           <div className="grid gap-7 sm:grid-cols-3">
             <div className="border-t border-[var(--line)] pt-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--sage)]">
+              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 01
               </p>
-              <p className="mt-3 font-display text-3xl text-[var(--chocolate-deep)]">
+              <p className="font-display text-3xl text-[var(--chocolate-deep)] md:mt-3">
                 Elegís
               </p>
               <p className="mt-3 leading-7 text-[var(--chocolate)]/72">
@@ -398,10 +406,10 @@ export default function Home() {
               </p>
             </div>
             <div className="border-t border-[var(--line)] pt-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--sage)]">
+              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 02
               </p>
-              <p className="mt-3 font-display text-3xl text-[var(--chocolate-deep)]">
+              <p className="font-display text-3xl text-[var(--chocolate-deep)] md:mt-3">
                 Reservás
               </p>
               <p className="mt-3 leading-7 text-[var(--chocolate)]/72">
@@ -409,10 +417,10 @@ export default function Home() {
               </p>
             </div>
             <div className="border-t border-[var(--line)] pt-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--sage)]">
+              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 03
               </p>
-              <p className="mt-3 font-display text-3xl text-[var(--chocolate-deep)]">
+              <p className="font-display text-3xl text-[var(--chocolate-deep)] md:mt-3">
                 Retirás
               </p>
               <p className="mt-3 leading-7 text-[var(--chocolate)]/72">

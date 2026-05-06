@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  CalendarCheck,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { OrderAssistant } from "@/components/order-assistant";
 
 export const metadata: Metadata = {
@@ -58,7 +55,7 @@ export default function PedidoPage() {
       <section className="section-pad noise overflow-hidden bg-[var(--cream-soft)] pb-8 pt-24 md:pb-14 md:pt-28">
         <div className="mx-auto w-full max-w-7xl min-w-0">
           <Link
-            className="inline-flex items-center gap-2 text-sm font-medium text-[var(--chocolate)]/72 transition hover:text-[var(--chocolate)]"
+            className="inline-flex items-center gap-2 text-sm font-medium text-[var(--sage)] transition hover:text-[var(--chocolate)]"
             href="/"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -66,10 +63,6 @@ export default function PedidoPage() {
           </Link>
 
           <div className="mt-7 max-w-[calc(100vw-2rem)] md:mt-10 md:max-w-4xl">
-            <p className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.22em] text-[var(--sage)] md:mb-6 md:text-sm md:tracking-[0.28em]">
-              <CalendarCheck className="h-4 w-4" />
-              Pedido online
-            </p>
             <h1 className="font-display text-[clamp(3.7rem,15vw,9rem)] leading-[0.84] tracking-[-0.06em] text-[var(--chocolate-deep)]">
               pedido
             </h1>
