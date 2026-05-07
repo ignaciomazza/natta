@@ -450,7 +450,7 @@ export default function Home() {
 
       <div className="fixed inset-x-3 bottom-3 z-50 md:hidden">
         <Link
-          className="rose-cta-shadow flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--milk)] bg-[var(--rose)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--rose-deep)]"
+          className="butter-cta-shadow flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--butter)] bg-[var(--milk)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--butter-deep)] transition hover:bg-[var(--butter)] hover:text-[var(--chocolate-deep)]"
           href="/pedido"
         >
           Armar pedido
