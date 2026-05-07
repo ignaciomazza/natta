@@ -14,7 +14,6 @@ export type Flavor = {
   name: string;
   description: string;
   prices: Record<SizeId, number>;
-  note?: string;
 };
 
 export const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
@@ -66,7 +65,6 @@ export const flavors: Flavor[] = [
     name: "Tella",
     description: "Tarta de queso con avellanas.",
     prices: { latta: 13000, chica: 26000, grande: 45000 },
-    note: "Topping de Nutella sin cargo, a pedido.",
   },
   {
     id: "blanca",

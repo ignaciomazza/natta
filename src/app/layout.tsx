@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { BrandLoader } from "@/components/brand-loader";
+import { MotionObserver } from "@/components/motion-observer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,8 +24,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es-AR" className="h-full scroll-smooth">
+    <html
+      lang="es-AR"
+      className="h-full scroll-smooth"
+      data-scroll-behavior="smooth"
+    >
       <body className="min-h-full bg-[var(--cream)] text-[var(--chocolate)] antialiased">
+        <BrandLoader />
+        <MotionObserver />
         {children}
       </body>
     </html>

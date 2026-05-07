@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowDown,
   CalendarDays,
   Check,
   Clock,
@@ -232,7 +233,10 @@ export function OrderAssistant() {
 
   if (submitted) {
     return (
-      <div className="mx-auto max-w-3xl rounded-[24px] border border-white/70 bg-[var(--milk)] p-5 text-[var(--chocolate)] image-shadow md:p-8">
+      <div
+        className="mx-auto max-w-3xl rounded-[24px] border border-white/70 bg-[var(--milk)] p-5 text-[var(--chocolate)] image-shadow md:p-8"
+        data-reveal="subtle"
+      >
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--sage-soft)] text-[var(--chocolate-deep)]">
           <Check className="h-5 w-5" />
         </div>
@@ -248,7 +252,7 @@ export function OrderAssistant() {
           aparte.
         </p>
         <button
-          className="mt-7 inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] md:h-12 md:px-6 md:text-sm"
+          className="motion-button mt-7 inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] md:h-12 md:px-6 md:text-sm"
           onClick={() => {
             setSubmitted(false);
             setStep(0);
@@ -262,8 +266,11 @@ export function OrderAssistant() {
   }
 
   return (
-    <div className="grid w-full min-w-0 max-w-[calc(100vw-2rem)] gap-6 lg:max-w-full lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-      <div className="hidden min-w-0 max-w-[calc(100vw-2rem)] space-y-4 md:block lg:sticky lg:top-24 lg:max-w-full lg:space-y-6">
+    <div className="grid w-full min-w-0 gap-5 md:gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+      <div
+        className="hidden min-w-0 space-y-4 md:block lg:sticky lg:top-24 lg:space-y-6"
+        data-reveal="subtle"
+      >
         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:text-sm md:tracking-[0.24em]">
           <Clock className="h-4 w-4" />
           Pedido asistido
@@ -291,14 +298,14 @@ export function OrderAssistant() {
       </div>
 
       <form
-        className="w-full min-w-0 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[24px] border border-white/70 bg-[var(--milk)] p-3 text-[var(--chocolate)] image-shadow sm:p-6 lg:max-w-full"
+        className="w-full min-w-0 overflow-hidden rounded-[22px] border border-white/70 bg-[var(--milk)] p-4 text-[var(--chocolate)] image-shadow sm:rounded-[24px] sm:p-6 lg:p-7"
         data-testid="order-assistant"
         onSubmit={handleSubmit}
       >
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5">
           {steps.map((item, index) => (
             <button
-              className={`rounded-xl border px-2 py-2 text-left transition sm:rounded-2xl sm:px-4 sm:py-3 ${
+              className={`step-card rounded-xl border px-2 py-2 text-center transition sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${
                 step === index
                   ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
                   : "border-[var(--line)] bg-white/55 text-[var(--chocolate)]/70 hover:border-[var(--caramel)] disabled:opacity-45 disabled:hover:border-[var(--line)]"
@@ -316,7 +323,7 @@ export function OrderAssistant() {
         </div>
 
         {step === 0 ? (
-          <section className="mt-5 sm:mt-7">
+          <section className="step-panel mt-5 sm:mt-7">
             <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
               <div>
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
@@ -327,33 +334,32 @@ export function OrderAssistant() {
                   Sumá unidades por sabor en Latta, Chica o Grande.
                 </p>
               </div>
+              <p className="hidden items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-[var(--sage)]/85 md:flex">
+                Deslizá para ver más sabores
+                <ArrowDown className="h-3.5 w-3.5" />
+              </p>
             </div>
 
             <div className="mt-3 divide-y divide-[var(--line)] sm:mt-5">
               {flavors.map((flavor) => (
                 <article className="py-3 sm:py-5" key={flavor.id}>
-                  <div className="grid gap-2 sm:gap-4 xl:grid-cols-[0.58fr_1.42fr]">
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <div className="grid gap-3 sm:gap-5 xl:grid-cols-[0.52fr_1.48fr] xl:items-stretch">
+                    <div className="flex min-h-full flex-wrap items-baseline gap-x-3 gap-y-1 md:flex-col md:flex-nowrap md:items-start md:justify-center md:gap-0">
                       <h3 className="font-display text-2xl leading-none text-[var(--chocolate-deep)] sm:text-3xl">
                         {flavor.name}
                       </h3>
-                      <p className="text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6">
+                      <p className="min-w-0 flex-1 text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6 md:mt-3 md:max-w-[17rem] md:flex-none">
                         {flavor.description}
                       </p>
-                      {flavor.note ? (
-                        <p className="basis-full text-xs text-[var(--sage)] sm:text-sm">
-                          {flavor.note}
-                        </p>
-                      ) : null}
                     </div>
 
-                    <div className="grid min-w-0 grid-cols-3 gap-1.5 sm:gap-2">
+                    <div className="grid min-w-0 grid-cols-3 gap-2">
                       {cakeSizes.map((size) => {
                         const quantity = quantities[flavor.id][size.id];
 
                         return (
                           <div
-                            className={`rounded-xl border p-1.5 transition sm:rounded-2xl sm:p-3 ${
+                            className={`order-card flex min-h-[5.35rem] flex-col justify-between rounded-xl border p-1.5 transition sm:min-h-36 sm:rounded-2xl sm:p-3 ${
                               quantity > 0
                                 ? "border-[var(--chocolate)] bg-[var(--cream)]"
                                 : "border-[var(--line)] bg-white/55"
@@ -369,34 +375,34 @@ export function OrderAssistant() {
                                   {size.detail}
                                 </p>
                               </div>
-                              <p className="font-mono text-[0.58rem] text-[var(--chocolate)]/72 sm:text-xs">
+                              <p className="font-mono text-[0.56rem] text-[var(--chocolate)]/72 sm:text-xs">
                                 {formatCurrency(flavor.prices[size.id])}
                               </p>
                             </div>
-                            <div className="mt-2 flex h-8 items-center justify-between rounded-full border border-[var(--line)] bg-[var(--milk)] px-1 sm:mt-3 sm:h-10 sm:px-2">
+                            <div className="mt-2 flex h-7 w-full items-center justify-between self-center rounded-full border border-[var(--line)] bg-[var(--milk)] px-1 sm:mt-3 sm:h-10 sm:px-2">
                               <button
                                 aria-label={`Restar ${size.label} ${flavor.name}`}
-                                className="grid h-6 w-6 place-items-center rounded-full transition hover:bg-[var(--sage-soft)] disabled:opacity-35 sm:h-8 sm:w-8"
+                                className="grid h-5 w-5 place-items-center rounded-full transition hover:bg-[var(--sage-soft)] disabled:opacity-35 sm:h-8 sm:w-8"
                                 disabled={quantity === 0}
                                 onClick={() =>
                                   updateQuantity(flavor.id, size.id, -1)
                                 }
                                 type="button"
                               >
-                                <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                               </button>
                               <span className="font-mono text-xs sm:text-sm">
                                 {quantity}
                               </span>
                               <button
                                 aria-label={`Sumar ${size.label} ${flavor.name}`}
-                                className="grid h-6 w-6 place-items-center rounded-full transition hover:bg-[var(--sage-soft)] sm:h-8 sm:w-8"
+                                className="grid h-5 w-5 place-items-center rounded-full transition hover:bg-[var(--sage-soft)] sm:h-8 sm:w-8"
                                 onClick={() =>
                                   updateQuantity(flavor.id, size.id, 1)
                                 }
                                 type="button"
                               >
-                                <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                               </button>
                             </div>
                           </div>
@@ -411,7 +417,7 @@ export function OrderAssistant() {
         ) : null}
 
         {step === 1 ? (
-          <section className="mt-5 space-y-5 sm:mt-7 sm:space-y-7">
+          <section className="step-panel mt-5 space-y-5 sm:mt-7 sm:space-y-7">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                 <CalendarDays className="h-4 w-4" />
@@ -426,7 +432,7 @@ export function OrderAssistant() {
             <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
               {dayOptions.map((day) => (
                 <button
-                  className={`rounded-xl border p-2 text-left transition sm:rounded-2xl sm:p-3 ${
+                  className={`order-card rounded-xl border p-2 text-left transition sm:rounded-2xl sm:p-3 ${
                     date === day.value
                       ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
                       : day.available
@@ -457,7 +463,7 @@ export function OrderAssistant() {
         ) : null}
 
         {step === 2 ? (
-          <section className="mt-5 space-y-5 sm:mt-7 sm:space-y-7">
+          <section className="step-panel mt-5 space-y-5 sm:mt-7 sm:space-y-7">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                 <Truck className="h-4 w-4" />
@@ -471,7 +477,7 @@ export function OrderAssistant() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <button
-                className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                className={`order-card rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
                   mode === "pickup"
                     ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
                     : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
@@ -487,7 +493,7 @@ export function OrderAssistant() {
                 </span>
               </button>
               <button
-                className={`rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                className={`order-card rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
                   mode === "delivery"
                     ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
                     : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
@@ -507,7 +513,7 @@ export function OrderAssistant() {
         ) : null}
 
         {step === 3 ? (
-          <section className="mt-5 grid gap-5 sm:mt-7 sm:gap-7 xl:grid-cols-[1fr_0.82fr]">
+          <section className="step-panel mt-5 grid gap-5 sm:mt-7 sm:gap-7 xl:grid-cols-[1fr_0.82fr]">
             <div className="space-y-4 sm:space-y-5">
               <div>
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
@@ -569,7 +575,7 @@ export function OrderAssistant() {
               </label>
             </div>
 
-            <aside className="rounded-[20px] bg-[var(--cream)] p-4 sm:rounded-[24px] sm:p-5">
+            <aside className="order-card rounded-[20px] bg-[var(--cream)] p-4 sm:rounded-[24px] sm:p-5">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                 <CreditCard className="h-4 w-4" />
                 Resumen y pago
@@ -640,13 +646,13 @@ export function OrderAssistant() {
           </button>
 
           <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            <p className="text-sm text-[var(--chocolate)]/68">
+            <p className="text-center text-sm text-[var(--chocolate)]/68 sm:text-left">
               {productCount > 0
                 ? `${productCount} unidades · ${formatCurrency(total)}`
                 : "Agregá al menos un producto."}
             </p>
             <button
-              className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] disabled:bg-[var(--line)] disabled:text-[var(--chocolate)]/45 sm:h-12 sm:px-6 sm:text-sm"
+              className="motion-button inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] disabled:bg-[var(--line)] disabled:text-[var(--chocolate)]/45 sm:h-12 sm:px-6 sm:text-sm"
               disabled={!canAdvance}
               type="submit"
             >

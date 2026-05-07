@@ -6,6 +6,7 @@ import {
   MessageCircle,
   Sparkles,
 } from "lucide-react";
+import { FaqList } from "@/components/faq-list";
 import { cakeSizes, flavors, formatCurrency } from "@/lib/catalog";
 
 const instagramImages = {
@@ -106,10 +107,10 @@ const faq = [
 export default function Home() {
   return (
     <main className="overflow-hidden">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/35 bg-[var(--cream-soft)]/82 px-4 py-3 backdrop-blur-xl md:px-8">
-        <nav className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/35 bg-[var(--cream-soft)]/82 px-4 py-2.5 backdrop-blur-xl md:px-8 md:py-3">
+        <nav className="content-shell flex items-center justify-between gap-4">
           <a
-            className="shrink-0 font-display text-3xl italic text-[var(--chocolate)]"
+            className="shrink-0 font-display text-3xl leading-none italic text-[var(--chocolate)]"
             href="#inicio"
           >
             natta
@@ -129,7 +130,7 @@ export default function Home() {
             </a>
           </div>
           <Link
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-[var(--chocolate)] px-3 text-sm font-medium text-[var(--milk)] transition hover:bg-[var(--sage)] sm:px-4"
+            className="cta-soft-shadow motion-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--chocolate)] bg-[var(--milk)] px-3 text-sm font-medium text-[var(--chocolate)] transition hover:bg-[var(--chocolate)] hover:text-[var(--milk)] sm:px-4"
             href="/pedido"
           >
             <span className="hidden sm:inline">Armar pedido</span>
@@ -140,31 +141,31 @@ export default function Home() {
       </header>
 
       <section
-        className="section-pad relative min-h-[100svh] bg-[var(--cream-soft)] pt-24 noise"
+        className="section-pad relative min-h-[100svh] bg-[var(--cream-soft)] pt-20 md:pt-24 noise"
         id="inicio"
       >
-        <div className="mx-auto grid min-h-[calc(100svh-6rem)] w-full max-w-7xl min-w-0 items-center gap-12 py-12 lg:grid-cols-[1fr_0.9fr] xl:grid-cols-[0.92fr_1fr]">
-          <div className="relative z-10 max-w-2xl min-w-0">
-            <p className="reveal-up mb-6 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-[var(--sage)] md:gap-3 md:text-sm md:tracking-[0.28em]">
+        <div className="content-shell grid min-h-[calc(100svh-5rem)] min-w-0 items-center gap-10 py-8 md:gap-12 md:py-12 lg:grid-cols-[1fr_0.9fr] xl:grid-cols-[0.92fr_1fr]">
+          <div className="relative z-10 max-w-[39rem] min-w-0">
+            <p className="reveal-up mb-5 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-[var(--sage)] md:mb-6 md:gap-3 md:text-sm md:tracking-[0.28em]">
               <Sparkles className="h-4 w-4" />
               La cremosidad llegó a Devoto.
             </p>
-            <h1 className="reveal-up font-display text-[clamp(5.65rem,23vw,7rem)] leading-[0.78] tracking-[-0.08em] text-[var(--chocolate-deep)] md:text-[clamp(5rem,18vw,13rem)]">
+            <h1 className="reveal-up font-display text-[clamp(5.2rem,22vw,7rem)] leading-[0.8] tracking-[-0.08em] text-[var(--chocolate-deep)] md:text-[clamp(5rem,18vw,13rem)]">
               natta
             </h1>
-            <p className="reveal-up mt-8 max-w-xl break-words text-xl leading-8 text-[var(--chocolate)]/82 delay-100 md:text-2xl md:leading-10">
+            <p className="reveal-up mt-6 max-w-xl break-words text-xl leading-8 text-[var(--chocolate)]/82 delay-100 md:mt-8 md:text-2xl md:leading-10">
               No te lo podemos explicar: <em>tenés que probarlo</em>.
             </p>
-            <div className="reveal-up mt-9 flex flex-col gap-3 sm:flex-row">
+            <div className="reveal-up mt-8 flex flex-col gap-3 sm:flex-row md:mt-9">
               <Link
-                className="inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-full border border-[rgba(43,26,24,0.72)] bg-[rgba(43,26,24,0.05)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] hover:text-[var(--milk)] backdrop-blur-md transition hover:bg-[rgba(43,26,24,0.74)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
+                className="motion-button lift-hover inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-full border border-[rgba(43,26,24,0.72)] bg-[rgba(43,26,24,0.05)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] hover:text-[var(--milk)] backdrop-blur-md transition hover:bg-[rgba(43,26,24,0.74)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
                 href="/pedido"
               >
-                Consultar pedido
+                Armar pedido
                 <MessageCircle className="h-5 w-5" />
               </Link>
               <a
-                className="inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--cream-soft)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
+                className="lift-hover inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--cream-soft)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
                 href="#menu"
               >
                 Ver menú
@@ -172,8 +173,12 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="reveal-soft relative h-[58vh] min-h-[430px] w-full min-w-0 lg:h-[64vh] lg:min-h-[460px] xl:h-[70vh]">
-            <div className="hero-image image-shadow absolute inset-0 overflow-hidden bg-[var(--chocolate)]">
+          <div className="reveal-soft relative h-[52svh] min-h-[350px] w-full min-w-0 md:min-h-[430px] lg:h-[64vh] lg:min-h-[460px] xl:h-[70vh]">
+            <div
+              className="hero-image image-shadow absolute inset-0 overflow-hidden bg-[var(--chocolate)]"
+              data-parallax
+              data-parallax-speed="0.08"
+            >
               <Image
                 alt="Tartas vascas Natta en moldes sobre mesa"
                 className="h-full w-full object-cover"
@@ -183,46 +188,61 @@ export default function Home() {
                 src={instagramImages.hero}
               />
             </div>
-            <div className="float-slow absolute -bottom-6 left-6 rounded-full bg-[var(--milk)] px-5 py-3 text-sm text-[var(--chocolate)] soft-shadow">
+            <div
+              className="float-slow absolute -bottom-6 left-6 rounded-full bg-[var(--milk)] px-5 py-3 text-sm text-[var(--chocolate)] soft-shadow"
+              data-parallax
+              data-parallax-speed="-0.04"
+            >
               48/72 h de anticipación
             </div>
-            <div className="absolute right-5 top-5 rounded-full border border-white/70 bg-[var(--milk)] px-5 py-3 text-sm text-[var(--chocolate)] soft-shadow">
+            <div
+              className="absolute right-5 top-5 rounded-full border border-white/70 bg-[var(--milk)] px-5 py-3 text-sm text-[var(--chocolate)] soft-shadow"
+              data-parallax
+              data-parallax-speed="0.05"
+            >
               Lun a sáb
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section-pad bg-[var(--cream)] py-24" id="historia">
-        <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
-          <div>
-            <p className="mb-5 text-sm uppercase tracking-[0.28em] text-[var(--sage)]">
+      <section className="section-pad section-y bg-[var(--cream)]" id="historia">
+        <div className="content-shell grid gap-10 md:gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+          <div data-reveal="left">
+            <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
               Nosotros
             </p>
             <h2 className="font-display text-5xl leading-[0.95] tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
               Devoto le puso nombre a nuestras tartas.
             </h2>
           </div>
-          <div className="grid gap-8 text-lg leading-8 text-[var(--chocolate)]/80 md:grid-cols-2">
-            <p>
+          <div
+            className="grid gap-5 text-lg leading-8 text-[var(--chocolate)]/80 md:grid-cols-2 md:gap-8"
+            data-stagger
+          >
+            <p data-reveal="right">
               Natta empezó con una tarta vasca que nos dejó pensando: podíamos
               hacer una propia, más nuestra.
             </p>
-            <p>
+            <p data-reveal="right">
               Después llegaron los pedidos, los sabores y el apodo que quedó:
               nattas.
             </p>
           </div>
         </div>
 
-        <div className="mx-auto mt-14 grid max-w-7xl grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <div
+          className="content-shell mt-10 grid grid-cols-2 gap-3 md:mt-14 md:grid-cols-3 md:gap-4"
+          data-stagger
+        >
           {featuredImages.map((image, index) => (
             <div
-              className={`group image-shadow relative overflow-hidden rounded-[20px] bg-[var(--milk)] md:rounded-[26px] ${
+              className={`group image-shadow lift-hover relative overflow-hidden rounded-[20px] bg-[var(--milk)] md:rounded-[26px] ${
                 index === 2
                   ? "col-span-2 aspect-[2.25/1] md:col-span-1 md:aspect-[4/5]"
                   : "aspect-[4/5]"
               }`}
+              data-reveal="scale"
               key={image.src}
             >
               <Image
@@ -236,7 +256,7 @@ export default function Home() {
                 }
                 src={image.src}
               />
-              <span className="absolute bottom-4 left-4 rounded-full bg-[var(--milk)]/88 px-4 py-2 text-sm lowercase text-[var(--chocolate)] backdrop-blur">
+              <span className="absolute bottom-3 left-3 rounded-full bg-[var(--milk)]/88 px-3 py-1.5 text-sm lowercase text-[var(--chocolate)] backdrop-blur md:bottom-4 md:left-4 md:px-4 md:py-2">
                 {image.label}
               </span>
             </div>
@@ -244,32 +264,39 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-[var(--cream-soft)] py-20">
-        <div className="section-pad mx-auto max-w-7xl">
-          <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
-            <div>
-              <p className="mb-5 text-sm uppercase tracking-[0.28em] text-[var(--sage)]">
+      <section className="section-y-tight bg-[var(--cream-soft)]">
+        <div className="section-pad content-shell">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end md:gap-8">
+            <div data-reveal="left">
+              <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
                 Desde Instagram
               </p>
               <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
                 La textura se entiende antes de leer.
               </h2>
             </div>
-            <p className="max-w-md text-lg leading-8 text-[var(--chocolate)]/78">
+            <p
+              className="max-w-md text-lg leading-8 text-[var(--chocolate)]/78 md:pb-1"
+              data-reveal="right"
+            >
               Fotos reales del producto, las cajas y las mesas donde Natta ya
               empezó a formar parte de cumpleaños, antojos y sobremesas.
             </p>
           </div>
         </div>
 
-        <div className="mt-12 flex gap-4 overflow-x-auto px-4 pb-5 md:px-8">
+        <div
+          className="editorial-rail mt-10 flex gap-3 overflow-x-auto px-4 pb-5 md:mt-12 md:gap-4 md:px-8"
+          data-stagger
+        >
           {editorialImages.map((image, index) => (
             <div
-              className={`group image-shadow relative shrink-0 overflow-hidden rounded-[26px] bg-[var(--milk)] ${
+              className={`editorial-card group image-shadow lift-hover relative shrink-0 overflow-hidden rounded-[26px] bg-[var(--milk)] ${
                 index % 3 === 1
                   ? "h-[430px] w-[300px] md:h-[560px] md:w-[380px]"
                   : "h-[390px] w-[270px] md:h-[500px] md:w-[340px]"
               }`}
+              data-reveal="scale"
               key={image.src}
             >
               <Image
@@ -279,7 +306,7 @@ export default function Home() {
                 sizes="(min-width: 768px) 380px, 300px"
                 src={image.src}
               />
-              <span className="absolute bottom-4 left-4 rounded-full bg-[var(--milk)]/88 px-4 py-2 text-sm lowercase text-[var(--chocolate)] backdrop-blur">
+              <span className="absolute bottom-3 left-3 rounded-full bg-[var(--milk)]/88 px-3 py-1.5 text-sm lowercase text-[var(--chocolate)] backdrop-blur md:bottom-4 md:left-4 md:px-4 md:py-2">
                 {image.label}
               </span>
             </div>
@@ -287,10 +314,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-pad bg-[var(--chocolate-deep)] py-24 text-[var(--milk)]">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_1.1fr]">
-          <div>
-            <p className="mb-5 flex items-center gap-3 text-sm uppercase tracking-[0.28em] text-[var(--caramel-soft)]">
+      <section className="section-pad section-y bg-[var(--chocolate-deep)] text-[var(--milk)]">
+        <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+          <div data-reveal="left">
+            <p className="mb-4 flex items-center gap-3 text-sm uppercase tracking-[0.28em] text-[var(--caramel-soft)] md:mb-5">
               <Heart className="h-4 w-4" />
               Textura primero
             </p>
@@ -298,9 +325,13 @@ export default function Home() {
               Cremosa por dentro. Firme por fuera.
             </h2>
           </div>
-          <div className="grid gap-5 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-3" data-stagger>
             {cakeSizes.map((size) => (
-              <div className="border-t border-white/18 pt-5" key={size.id}>
+              <div
+                className="step-card border-t border-white/18 pt-5"
+                data-reveal="subtle"
+                key={size.id}
+              >
                 <p className="font-display text-4xl">{size.label}</p>
                 <p className="mt-3 text-sm uppercase tracking-[0.18em] text-[var(--caramel-soft)]">
                   {size.detail}
@@ -312,11 +343,11 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-pad bg-[var(--cream-soft)] py-24" id="menu">
-        <div className="mx-auto max-w-7xl">
-          <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
-            <div>
-              <p className="mb-5 text-sm uppercase tracking-[0.28em] text-[var(--sage)]">
+      <section className="section-pad section-y bg-[var(--cream-soft)]" id="menu">
+        <div className="content-shell">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end md:gap-8">
+            <div data-reveal="left">
+              <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
                 Menú inicial
               </p>
               <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
@@ -325,8 +356,11 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-14 overflow-hidden rounded-[28px] border border-[var(--line)] bg-[var(--milk)]">
-            <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-[var(--line)] px-4 py-4 text-xs uppercase tracking-[0.18em] text-[var(--sage)] md:px-7">
+          <div
+            className="mt-10 overflow-hidden rounded-[22px] border border-[var(--line)] bg-[var(--milk)] md:mt-14 md:rounded-[28px]"
+            data-reveal="subtle"
+          >
+            <div className="grid grid-cols-[minmax(7rem,1.4fr)_repeat(3,minmax(3.25rem,0.8fr))] items-center gap-2 border-b border-[var(--line)] px-4 py-3 text-[0.66rem] uppercase tracking-[0.14em] text-[var(--sage)] md:gap-3 md:px-7 md:py-4 md:text-xs md:tracking-[0.18em]">
               <span>Sabor</span>
               <span>Latta</span>
               <span>Chica</span>
@@ -334,7 +368,7 @@ export default function Home() {
             </div>
             {flavors.map((flavor) => (
               <div
-                className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-[var(--line)] px-4 py-5 last:border-b-0 md:px-7"
+                className="menu-row grid grid-cols-[minmax(7rem,1.4fr)_repeat(3,minmax(3.25rem,0.8fr))] items-center gap-2 border-b border-[var(--line)] px-4 py-4 last:border-b-0 md:gap-3 md:px-7 md:py-5"
                 key={flavor.id}
               >
                 <div>
@@ -354,36 +388,24 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-pad bg-[var(--cream-soft)] py-24" id="faq">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.8fr_1.2fr]">
-          <div>
-            <p className="mb-5 text-sm uppercase tracking-[0.28em] text-[var(--sage)]">
+      <section className="section-pad section-y bg-[var(--cream-soft)]" id="faq">
+        <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+          <div data-reveal="left">
+            <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
               Preguntas frecuentes
             </p>
             <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
               Lo que suelen preguntar antes de probar.
             </h2>
           </div>
-          <div className="divide-y divide-[var(--line)]">
-            {faq.map((item) => (
-              <details className="group py-6" key={item.question}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-xl font-medium text-[var(--chocolate-deep)]">
-                  {item.question}
-                  <ArrowRight className="h-5 w-5 shrink-0 transition group-open:rotate-90" />
-                </summary>
-                <p className="mt-4 max-w-2xl text-lg leading-8 text-[var(--chocolate)]/76">
-                  {item.answer}
-                </p>
-              </details>
-            ))}
-          </div>
+          <FaqList items={faq} />
         </div>
       </section>
 
-      <section className="section-pad bg-[var(--milk)] py-24">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-          <div className="max-w-2xl">
-            <p className="mb-5 text-sm uppercase tracking-[0.28em] text-[var(--sage)]">
+      <section className="section-pad section-y bg-[var(--milk)]">
+        <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <div className="max-w-2xl" data-reveal="left">
+            <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
               Cómo pedir
             </p>
             <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
@@ -393,8 +415,8 @@ export default function Home() {
               48/72 h de anticipación · Villa Devoto · envío por Uber/Cabify.
             </p>
           </div>
-          <div className="grid gap-7 sm:grid-cols-3">
-            <div className="border-t border-[var(--line)] pt-5">
+          <div className="grid gap-6 sm:grid-cols-3 md:gap-7" data-stagger>
+            <div className="step-card border-t border-[var(--line)] pt-5" data-reveal="subtle">
               <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 01
               </p>
@@ -405,7 +427,7 @@ export default function Home() {
                 Tamaño, sabor y fecha.
               </p>
             </div>
-            <div className="border-t border-[var(--line)] pt-5">
+            <div className="step-card border-t border-[var(--line)] pt-5" data-reveal="subtle">
               <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 02
               </p>
@@ -416,7 +438,7 @@ export default function Home() {
                 Confirmamos cupo y seña.
               </p>
             </div>
-            <div className="border-t border-[var(--line)] pt-5">
+            <div className="step-card border-t border-[var(--line)] pt-5" data-reveal="subtle">
               <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 03
               </p>
@@ -431,8 +453,8 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="section-pad bg-[var(--chocolate-deep)] py-12 text-[var(--milk)]">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-6 md:flex-row md:items-center">
+      <footer className="section-pad bg-[var(--chocolate-deep)] pb-32 pt-12 text-[var(--milk)] md:py-12">
+        <div className="content-shell flex flex-col justify-between gap-6 md:flex-row md:items-center">
           <div>
             <p className="font-display text-5xl italic">natta</p>
             <p className="mt-2 text-sm text-[var(--milk)]/62">
@@ -440,7 +462,7 @@ export default function Home() {
             </p>
           </div>
           <Link
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
+            className="motion-button lift-hover inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
             href="/pedido"
           >
             Armar pedido
@@ -452,7 +474,7 @@ export default function Home() {
 
       <div className="fixed inset-x-3 bottom-3 z-50 md:hidden">
         <Link
-          className="butter-cta-shadow flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--butter)] bg-[var(--milk)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--butter-deep)] transition hover:bg-[var(--butter)] hover:text-[var(--chocolate-deep)]"
+          className="cta-soft-shadow mobile-cta-float motion-button flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--chocolate)] bg-[var(--milk)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] transition hover:bg-[var(--chocolate)] hover:text-[var(--milk)]"
           href="/pedido"
         >
           Armar pedido
@@ -465,7 +487,7 @@ export default function Home() {
 
 function Price({ value }: { value: number }) {
   return (
-    <span className="self-center font-mono text-sm text-[var(--chocolate)] md:text-base">
+    <span className="self-center font-mono text-[0.72rem] text-[var(--chocolate)] md:text-base">
       {formatCurrency(value)}
     </span>
   );
