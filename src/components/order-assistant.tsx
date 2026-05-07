@@ -83,9 +83,9 @@ export function OrderAssistant() {
   const [date, setDate] = useState(getFirstAvailableDate);
   const [mode, setMode] = useState<FulfillmentMode>("pickup");
   const [customer, setCustomer] = useState({
+    address: "",
     name: "",
     phone: "",
-    email: "",
   });
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -149,7 +149,10 @@ export function OrderAssistant() {
   const balance = total - dueNow;
   const invalidDate = !date || isSunday(date);
   const hasContact = Boolean(customer.name.trim() && customer.phone.trim());
-  const canSubmit = productCount > 0 && !invalidDate && hasContact;
+  const hasDeliveryAddress =
+    mode !== "delivery" || Boolean(customer.address.trim());
+  const canSubmit =
+    productCount > 0 && !invalidDate && hasContact && hasDeliveryAddress;
   const canAdvance =
     step === 0
       ? productCount > 0
@@ -541,25 +544,26 @@ export function OrderAssistant() {
                 />
               </label>
 
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">Email</span>
-                <input
-                  className="h-12 w-full rounded-xl border border-[var(--line)] bg-white/70 px-4 outline-none transition focus:border-[var(--chocolate)] sm:h-14 sm:rounded-2xl"
-                  onChange={(event) =>
-                    updateCustomer("email", event.target.value)
-                  }
-                  placeholder="Opcional"
-                  type="email"
-                  value={customer.email}
-                />
-              </label>
+              {mode === "delivery" ? (
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Dirección</span>
+                  <input
+                    className="h-12 w-full rounded-xl border border-[var(--line)] bg-white/70 px-4 outline-none transition focus:border-[var(--chocolate)] sm:h-14 sm:rounded-2xl"
+                    onChange={(event) =>
+                      updateCustomer("address", event.target.value)
+                    }
+                    placeholder="Calle, número, piso/depto"
+                    value={customer.address}
+                  />
+                </label>
+              ) : null}
 
               <label className="block space-y-2">
                 <span className="text-sm font-medium">Notas</span>
                 <textarea
                   className="min-h-20 w-full resize-none rounded-xl border border-[var(--line)] bg-white/70 p-4 outline-none transition focus:border-[var(--chocolate)] sm:min-h-24 sm:rounded-2xl"
                   onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Horario preferido, aclaraciones o dirección si elegís envío."
+                  placeholder="Horario preferido o aclaraciones."
                   value={notes}
                 />
               </label>

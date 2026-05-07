@@ -8,6 +8,8 @@
   --chocolate-deep: #2b1a18;
   --caramel: #b57946;
   --caramel-soft: #dfbc8b;
+  --rose: #d77f94;
+  --rose-deep: #b95a72;
   --sage: #64746a;
   --sage-soft: #d8dfd4;
   --ink: #191514;
@@ -69,6 +71,14 @@ textarea {
 
 .soft-shadow {
   box-shadow: 0 30px 90px rgba(43, 26, 24, 0.14);
+}
+
+.rose-cta-shadow {
+  box-shadow:
+    0 30px 90px rgba(43, 26, 24, 0.14),
+    inset 0 1px 0 rgba(255, 250, 240, 0.55),
+    inset 0 -12px 18px rgba(159, 64, 91, 0.18);
+  text-shadow: 0 1px 2px rgba(43, 26, 24, 0.22);
 }
 
 .image-shadow {

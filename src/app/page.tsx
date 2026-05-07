@@ -130,7 +130,7 @@ export default function Home() {
           </div>
           <Link
             className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-[var(--chocolate)] px-3 text-sm font-medium text-[var(--milk)] transition hover:bg-[var(--sage)] sm:px-4"
-            href="/pedido#armar"
+            href="/pedido"
           >
             <span className="hidden sm:inline">Armar pedido</span>
             <span className="sm:hidden">Pedido</span>
@@ -158,13 +158,13 @@ export default function Home() {
             <div className="reveal-up mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 className="inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-full border border-[rgba(43,26,24,0.72)] bg-[rgba(43,26,24,0.05)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] hover:text-[var(--milk)] backdrop-blur-md transition hover:bg-[rgba(43,26,24,0.74)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
-                href="/pedido#armar"
+                href="/pedido"
               >
                 Consultar pedido
                 <MessageCircle className="h-5 w-5" />
               </Link>
               <a
-                className="inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center rounded-full border border-[var(--line)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
+                className="inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--cream-soft)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
                 href="#menu"
               >
                 Ver menú
@@ -441,7 +441,7 @@ export default function Home() {
           </div>
           <Link
             className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
-            href="/pedido#armar"
+            href="/pedido"
           >
             Armar pedido
           </Link>
@@ -450,8 +450,8 @@ export default function Home() {
 
       <div className="fixed inset-x-3 bottom-3 z-50 md:hidden">
         <Link
-          className="soft-shadow flex h-14 items-center justify-center gap-2 rounded-full bg-[var(--chocolate-deep)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--milk)]"
-          href="/pedido#armar"
+          className="rose-cta-shadow flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--milk)] bg-[var(--rose)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--rose-deep)]"
+          href="/pedido"
         >
           Armar pedido
           <ArrowRight className="h-4 w-4" />
