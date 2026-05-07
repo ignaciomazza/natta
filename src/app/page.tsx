@@ -448,6 +448,8 @@ export default function Home() {
         </div>
       </footer>
 
+      <div className="mobile-cta-gradient pointer-events-none fixed inset-x-0 bottom-0 z-40 h-28 md:hidden" />
+
       <div className="fixed inset-x-3 bottom-3 z-50 md:hidden">
         <Link
           className="butter-cta-shadow flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--butter)] bg-[var(--milk)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--butter-deep)] transition hover:bg-[var(--butter)] hover:text-[var(--chocolate-deep)]"
