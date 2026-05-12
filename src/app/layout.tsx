@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { BrandLoader } from "@/components/brand-loader";
 import { MotionObserver } from "@/components/motion-observer";
 import "./globals.css";
@@ -30,6 +31,21 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body className="min-h-full bg-[var(--cream)] text-[var(--chocolate)] antialiased">
+        <div className="brand-loader-shell" aria-hidden="true">
+          <div className="brand-loader__glow" />
+          <div className="brand-loader__content">
+            <Image
+              alt=""
+              className="brand-loader__logo"
+              height={610}
+              priority
+              sizes="(min-width: 768px) 22rem, 72vw"
+              src="/images/logo/natta-logo-cropped.png"
+              width={1080}
+            />
+            <p className="brand-loader__subtitle">vascas</p>
+          </div>
+        </div>
         <BrandLoader />
         <MotionObserver />
         {children}

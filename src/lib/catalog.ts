@@ -22,8 +22,8 @@ export const cakeSizes: CakeSize[] = [
   {
     id: "latta",
     label: "Latta",
-    detail: "300 g cuchareable",
-    servings: "Individual para cuchara",
+    detail: "300 g",
+    servings: "Cuchareable individual",
   },
   {
     id: "chica",
@@ -35,9 +35,9 @@ export const cakeSizes: CakeSize[] = [
   {
     id: "grande",
     label: "Grande",
-    detail: "24/25 cm",
+    detail: "24 cm",
     servings: "Entre 8 y 12 porciones",
-    diameter: "24/25 cm",
+    diameter: "24 cm",
   },
 ];
 

@@ -31,7 +31,7 @@ Crear una web comercial premium que ordene la primera parte de la demanda. El fo
 | --- | --- | --- |
 | Latta | 300 g cuchareable | Individual |
 | Chica | 15 cm | 4 a 6 porciones |
-| Grande | 24/25 cm | 8 a 12 porciones |
+| Grande | 24 cm | 8 a 12 porciones |
 
 ### Sabores y precios
 

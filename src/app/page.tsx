@@ -1,12 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Heart,
-  MessageCircle,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
 import { FaqList } from "@/components/faq-list";
+import { HeroProductCloud } from "@/components/hero-product-cloud";
 import { cakeSizes, flavors, formatCurrency } from "@/lib/catalog";
 
 const instagramImages = {
@@ -95,7 +91,7 @@ const faq = [
   {
     question: "¿Qué diferencia hay entre chica y grande?",
     answer:
-      "La chica mide 15 cm y rinde entre 4 y 6 porciones. La grande ronda 24/25 cm y rinde entre 8 y 12 porciones.",
+      "La chica mide 15 cm y rinde entre 4 y 6 porciones. La grande ronda 24 cm y rinde entre 8 y 12 porciones.",
   },
   {
     question: "¿Hacen envíos?",
@@ -107,22 +103,31 @@ const faq = [
 export default function Home() {
   return (
     <main className="overflow-hidden">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/35 bg-[var(--cream-soft)]/82 px-4 py-2.5 backdrop-blur-xl md:px-8 md:py-3">
-        <nav className="content-shell flex items-center justify-between gap-4">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-[rgba(81,53,48,0.09)] bg-[var(--cream-soft)]/76 px-4 py-3 backdrop-blur-2xl md:px-8">
+        <nav className="content-shell grid grid-cols-[1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
           <a
-            className="shrink-0 font-display text-3xl leading-none italic text-[var(--chocolate)]"
+            className="shrink-0 justify-self-start font-display text-3xl leading-none italic text-[var(--chocolate)] transition hover:text-[var(--chocolate-deep)]"
             href="#inicio"
           >
             natta
           </a>
-          <div className="hidden items-center gap-7 text-sm text-[var(--chocolate)]/72 md:flex">
-            <a className="transition hover:text-[var(--chocolate)]" href="#historia">
+          <div className="hidden items-center gap-8 justify-self-center text-sm text-[var(--chocolate)]/68 md:flex">
+            <a
+              className="transition hover:text-[var(--chocolate)]"
+              href="#historia"
+            >
               historia
             </a>
-            <a className="transition hover:text-[var(--chocolate)]" href="#menu">
+            <a
+              className="transition hover:text-[var(--chocolate)]"
+              href="#menu"
+            >
               menú
             </a>
-            <Link className="transition hover:text-[var(--chocolate)]" href="/pedido">
+            <Link
+              className="transition hover:text-[var(--chocolate)]"
+              href="/pedido"
+            >
               pedido
             </Link>
             <a className="transition hover:text-[var(--chocolate)]" href="#faq">
@@ -130,7 +135,7 @@ export default function Home() {
             </a>
           </div>
           <Link
-            className="cta-soft-shadow motion-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--chocolate)] bg-[var(--milk)] px-3 text-sm font-medium text-[var(--chocolate)] transition hover:bg-[var(--chocolate)] hover:text-[var(--milk)] sm:px-4"
+            className="cta-soft-shadow motion-button inline-flex h-10 shrink-0 items-center justify-center gap-2 justify-self-end rounded-full border border-[var(--chocolate)] bg-[var(--milk)] px-3 text-sm font-medium text-[var(--chocolate)] transition hover:bg-[var(--chocolate)] hover:text-[var(--milk)] sm:px-4"
             href="/pedido"
           >
             <span className="hidden sm:inline">Armar pedido</span>
@@ -140,73 +145,12 @@ export default function Home() {
         </nav>
       </header>
 
+      <HeroProductCloud />
+
       <section
-        className="section-pad relative min-h-[100svh] bg-[var(--cream-soft)] pt-20 md:pt-24 noise"
-        id="inicio"
+        className="section-pad section-y bg-[var(--cream)]"
+        id="historia"
       >
-        <div className="content-shell grid min-h-[calc(100svh-5rem)] min-w-0 items-center gap-10 py-8 md:gap-12 md:py-12 lg:grid-cols-[1fr_0.9fr] xl:grid-cols-[0.92fr_1fr]">
-          <div className="relative z-10 max-w-[39rem] min-w-0">
-            <p className="reveal-up mb-5 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-[var(--sage)] md:mb-6 md:gap-3 md:text-sm md:tracking-[0.28em]">
-              <Sparkles className="h-4 w-4" />
-              La cremosidad llegó a Devoto.
-            </p>
-            <h1 className="reveal-up font-display text-[clamp(5.2rem,22vw,7rem)] leading-[0.8] tracking-[-0.08em] text-[var(--chocolate-deep)] md:text-[clamp(5rem,18vw,13rem)]">
-              natta
-            </h1>
-            <p className="reveal-up mt-6 max-w-xl break-words text-xl leading-8 text-[var(--chocolate)]/82 delay-100 md:mt-8 md:text-2xl md:leading-10">
-              No te lo podemos explicar: <em>tenés que probarlo</em>.
-            </p>
-            <div className="reveal-up mt-8 flex flex-col gap-3 sm:flex-row md:mt-9">
-              <Link
-                className="motion-button lift-hover inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center gap-2 rounded-full border border-[rgba(43,26,24,0.72)] bg-[rgba(43,26,24,0.05)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] hover:text-[var(--milk)] backdrop-blur-md transition hover:bg-[rgba(43,26,24,0.74)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
-                href="/pedido"
-              >
-                Armar pedido
-                <MessageCircle className="h-5 w-5" />
-              </Link>
-              <a
-                className="lift-hover inline-flex h-14 w-full max-w-full min-w-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--cream-soft)] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:w-auto sm:px-7 sm:text-sm sm:tracking-[0.16em]"
-                href="#menu"
-              >
-                Ver menú
-              </a>
-            </div>
-          </div>
-
-          <div className="reveal-soft relative h-[52svh] min-h-[350px] w-full min-w-0 md:min-h-[430px] lg:h-[64vh] lg:min-h-[460px] xl:h-[70vh]">
-            <div
-              className="hero-image image-shadow absolute inset-0 overflow-hidden bg-[var(--chocolate)]"
-              data-parallax
-              data-parallax-speed="0.08"
-            >
-              <Image
-                alt="Tartas vascas Natta en moldes sobre mesa"
-                className="h-full w-full object-cover"
-                fill
-                priority
-                sizes="(min-width: 1280px) 50vw, (min-width: 1024px) 44vw, 100vw"
-                src={instagramImages.hero}
-              />
-            </div>
-            <div
-              className="float-slow absolute -bottom-6 left-6 rounded-full bg-[var(--milk)] px-5 py-3 text-sm text-[var(--chocolate)] soft-shadow"
-              data-parallax
-              data-parallax-speed="-0.04"
-            >
-              48/72 h de anticipación
-            </div>
-            <div
-              className="absolute right-5 top-5 rounded-full border border-white/70 bg-[var(--milk)] px-5 py-3 text-sm text-[var(--chocolate)] soft-shadow"
-              data-parallax
-              data-parallax-speed="0.05"
-            >
-              Lun a sáb
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section-pad section-y bg-[var(--cream)]" id="historia">
         <div className="content-shell grid gap-10 md:gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
           <div data-reveal="left">
             <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
@@ -321,7 +265,7 @@ export default function Home() {
               <Heart className="h-4 w-4" />
               Textura primero
             </p>
-            <h2 className="font-display text-5xl leading-[0.96] tracking-[-0.04em] md:text-7xl">
+            <h2 className="font-display text-5xl  tracking-[-0.04em] md:text-7xl">
               Cremosa por dentro. Firme por fuera.
             </h2>
           </div>
@@ -343,7 +287,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-pad section-y bg-[var(--cream-soft)]" id="menu">
+      <section
+        className="section-pad section-y bg-[var(--cream-soft)]"
+        id="menu"
+      >
         <div className="content-shell">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end md:gap-8">
             <div data-reveal="left">
@@ -351,7 +298,7 @@ export default function Home() {
                 Menú inicial
               </p>
               <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
-                Pocos tamaños. Sabores con nombre propio.
+                Sabores con nombre propio.
               </h2>
             </div>
           </div>
@@ -388,7 +335,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-pad section-y bg-[var(--cream-soft)]" id="faq">
+      <section
+        className="section-pad section-y bg-[var(--cream-soft)]"
+        id="faq"
+      >
         <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[0.8fr_1.2fr]">
           <div data-reveal="left">
             <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
@@ -402,7 +352,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-pad section-y bg-[var(--milk)]">
+      <section className="section-pad section-y bg-[var(--milk)]" id="como-pedir">
         <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
           <div className="max-w-2xl" data-reveal="left">
             <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
@@ -416,7 +366,10 @@ export default function Home() {
             </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-3 md:gap-7" data-stagger>
-            <div className="step-card border-t border-[var(--line)] pt-5" data-reveal="subtle">
+            <div
+              className="step-card border-t border-[var(--line)] pt-5"
+              data-reveal="subtle"
+            >
               <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 01
               </p>
@@ -427,7 +380,10 @@ export default function Home() {
                 Tamaño, sabor y fecha.
               </p>
             </div>
-            <div className="step-card border-t border-[var(--line)] pt-5" data-reveal="subtle">
+            <div
+              className="step-card border-t border-[var(--line)] pt-5"
+              data-reveal="subtle"
+            >
               <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 02
               </p>
@@ -438,7 +394,10 @@ export default function Home() {
                 Confirmamos cupo y seña.
               </p>
             </div>
-            <div className="step-card border-t border-[var(--line)] pt-5" data-reveal="subtle">
+            <div
+              className="step-card border-t border-[var(--line)] pt-5"
+              data-reveal="subtle"
+            >
               <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
                 03
               </p>

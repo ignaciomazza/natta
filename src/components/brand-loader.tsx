@@ -1,32 +1,33 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const visibleRoutes = new Set(["/", "/pedido"]);
+const logo = {
+  src: "/images/logo/natta-logo-cropped.png",
+  width: 1080,
+  height: 610,
+};
 
 type LoaderVariant = "initial" | "to-order" | "to-home";
 
-const loaderCopy: Record<
-  LoaderVariant,
-  { eyebrow: string; title: string; subtitle: string }
-> = {
-  initial: {
-    eyebrow: "Tortas vascas",
-    subtitle: "vascas",
-    title: "natta",
-  },
-  "to-home": {
-    eyebrow: "Volviendo",
-    subtitle: "inicio",
-    title: "natta",
-  },
-  "to-order": {
-    eyebrow: "Preparando",
-    subtitle: "tu pedido",
-    title: "pedido",
-  },
-};
+const loaderCopy: Record<LoaderVariant, { eyebrow: string; subtitle: string }> =
+  {
+    initial: {
+      eyebrow: "",
+      subtitle: "vascas",
+    },
+    "to-home": {
+      eyebrow: "Volviendo",
+      subtitle: "inicio",
+    },
+    "to-order": {
+      eyebrow: "Preparando",
+      subtitle: "tu pedido",
+    },
+  };
 
 const getRouteVariant = (
   previousPath: string | null,
@@ -54,9 +55,12 @@ const getRouteVariant = (
 
 export function BrandLoader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const expectedPathRef = useRef<string | null>(null);
   const [currentPath, setCurrentPath] = useState(pathname);
   const [loaderRequest, setLoaderRequest] = useState<{
     id: number;
+    navigateTo?: string;
     pathname: string;
     variant: LoaderVariant;
   } | null>(() => {
@@ -71,8 +75,84 @@ export function BrandLoader() {
       : null;
   });
 
+  const completeLoader = useCallback(() => {
+    setLoaderRequest(null);
+  }, []);
+
+  const navigateWithLoader = useCallback(
+    (href: string) => {
+      router.push(href);
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    document.documentElement.classList.add("brand-loader-hydrated");
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const anchor = target.closest("a");
+
+      if (!anchor?.href || anchor.target) {
+        return;
+      }
+
+      const url = new URL(anchor.href);
+
+      if (url.origin !== window.location.origin) {
+        return;
+      }
+
+      const destinationPath = url.pathname;
+      const variant = getRouteVariant(pathname, destinationPath, false);
+
+      if (!variant || destinationPath === pathname) {
+        return;
+      }
+
+      event.preventDefault();
+      expectedPathRef.current = destinationPath;
+      setLoaderRequest({
+        id: Date.now(),
+        navigateTo: `${url.pathname}${url.search}${url.hash}`,
+        pathname: destinationPath,
+        variant,
+      });
+    };
+
+    document.addEventListener("click", handleClick, true);
+
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, [pathname]);
+
   useEffect(() => {
     if (pathname === currentPath) {
+      return;
+    }
+
+    if (pathname === expectedPathRef.current) {
+      expectedPathRef.current = null;
+      setCurrentPath(pathname);
       return;
     }
 
@@ -104,6 +184,9 @@ export function BrandLoader() {
   return (
     <BrandLoaderContent
       key={loaderRequest.id}
+      navigateTo={loaderRequest.navigateTo}
+      onComplete={completeLoader}
+      onNavigate={navigateWithLoader}
       pathname={loaderRequest.pathname}
       variant={loaderRequest.variant}
     />
@@ -111,9 +194,15 @@ export function BrandLoader() {
 }
 
 function BrandLoaderContent({
+  navigateTo,
+  onComplete,
+  onNavigate,
   pathname,
   variant,
 }: {
+  navigateTo?: string;
+  onComplete: () => void;
+  onNavigate: (href: string) => void;
   pathname: string;
   variant: LoaderVariant;
 }) {
@@ -128,24 +217,35 @@ function BrandLoaderContent({
       ? 420
       : variant === "initial"
         ? pathname === "/"
-          ? 1550
-          : 1150
-        : 360;
+          ? 1320
+          : 980
+        : 620;
     const exitMs =
-      prefersReducedMotion ? 120 : variant === "initial" ? 820 : 460;
+      prefersReducedMotion ? 120 : variant === "initial" ? 720 : 500;
+    const navigateMs = prefersReducedMotion ? 80 : 260;
 
+    const navigateTimer = navigateTo
+      ? window.setTimeout(() => {
+          onNavigate(navigateTo);
+        }, navigateMs)
+      : null;
     const leaveTimer = window.setTimeout(() => {
       setLeaving(true);
     }, holdMs);
     const hideTimer = window.setTimeout(() => {
       setVisible(false);
+      onComplete();
     }, holdMs + exitMs);
 
     return () => {
+      if (navigateTimer) {
+        window.clearTimeout(navigateTimer);
+      }
+
       window.clearTimeout(leaveTimer);
       window.clearTimeout(hideTimer);
     };
-  }, [pathname, variant]);
+  }, [navigateTo, onComplete, onNavigate, pathname, variant]);
 
   if (!visible) {
     return null;
@@ -162,8 +262,18 @@ function BrandLoaderContent({
     >
       <div className="brand-loader__glow" />
       <div className="brand-loader__content">
-        <p className="brand-loader__eyebrow">{copy.eyebrow}</p>
-        <p className="brand-loader__title">{copy.title}</p>
+        {copy.eyebrow ? (
+          <p className="brand-loader__eyebrow">{copy.eyebrow}</p>
+        ) : null}
+        <Image
+          alt="Natta"
+          className="brand-loader__logo"
+          height={logo.height}
+          priority
+          sizes="(min-width: 768px) 22rem, 72vw"
+          src={logo.src}
+          width={logo.width}
+        />
         <p className="brand-loader__subtitle">{copy.subtitle}</p>
       </div>
     </div>
