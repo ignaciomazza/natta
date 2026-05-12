@@ -212,6 +212,8 @@ const clamp = (value: number, min: number, max: number) =>
 
 export function HeroProductCloud() {
   const [pointer, setPointer] = useState<PointerState>({ x: 0, y: 0 });
+  const [mobileScrollExpanded, setMobileScrollExpanded] = useState(false);
+  const sectionRef = useRef<HTMLElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const pendingPointerRef = useRef<PointerState>({ x: 0, y: 0 });
 
@@ -219,6 +221,74 @@ export function HeroProductCloud() {
     return () => {
       if (frameRef.current !== null) {
         window.cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let scrollFrame: number | null = null;
+    let lastScrollY = window.scrollY;
+
+    const setCompact = () => setMobileScrollExpanded(false);
+
+    const updateScrollExpansion = () => {
+      scrollFrame = null;
+
+      if (!mobileQuery.matches || reducedMotionQuery.matches) {
+        setCompact();
+        lastScrollY = window.scrollY;
+        return;
+      }
+
+      const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollY;
+
+      if (Math.abs(delta) < 3) {
+        return;
+      }
+
+      const section = sectionRef.current;
+      const bounds = section?.getBoundingClientRect();
+      const isHeroVisible = bounds
+        ? bounds.bottom > window.innerHeight * 0.12 &&
+          bounds.top < window.innerHeight * 0.88
+        : currentScrollY < window.innerHeight;
+
+      if (delta < 0) {
+        setMobileScrollExpanded(false);
+      } else if (isHeroVisible && currentScrollY > 6) {
+        setMobileScrollExpanded(true);
+      }
+
+      lastScrollY = currentScrollY;
+    };
+
+    const requestScrollUpdate = () => {
+      if (scrollFrame !== null) {
+        return;
+      }
+
+      scrollFrame = window.requestAnimationFrame(updateScrollExpansion);
+    };
+
+    const handleMediaChange = () => {
+      lastScrollY = window.scrollY;
+      setCompact();
+    };
+
+    window.addEventListener("scroll", requestScrollUpdate, { passive: true });
+    mobileQuery.addEventListener("change", handleMediaChange);
+    reducedMotionQuery.addEventListener("change", handleMediaChange);
+
+    return () => {
+      window.removeEventListener("scroll", requestScrollUpdate);
+      mobileQuery.removeEventListener("change", handleMediaChange);
+      reducedMotionQuery.removeEventListener("change", handleMediaChange);
+
+      if (scrollFrame !== null) {
+        window.cancelAnimationFrame(scrollFrame);
       }
     };
   }, []);
@@ -237,6 +307,10 @@ export function HeroProductCloud() {
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "mouse") {
+      return;
+    }
+
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - (bounds.left + bounds.width / 2)) / (bounds.width / 2);
     const y =
@@ -254,10 +328,16 @@ export function HeroProductCloud() {
 
   return (
     <section
-      className="hero-product-cloud section-pad relative min-h-[100svh] overflow-hidden bg-[var(--cream-soft)] pt-20 noise md:pt-24"
+      className={[
+        "hero-product-cloud section-pad relative min-h-[100svh] overflow-hidden bg-[var(--cream-soft)] pt-20 noise md:pt-24",
+        mobileScrollExpanded ? "is-mobile-scroll-expanded" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       id="inicio"
       onPointerLeave={resetPointer}
       onPointerMove={handlePointerMove}
+      ref={sectionRef}
     >
       <div className="hero-product-cloud__stage content-shell relative flex min-h-[calc(100svh-5rem)] items-center justify-center py-8 md:min-h-[calc(100svh-6rem)] md:py-12">
         <div aria-hidden="true" className="hero-product-cloud__pieces">
@@ -279,8 +359,13 @@ export function HeroProductCloud() {
               "--piece-rotate": `${rotation.toFixed(2)}deg`,
               "--piece-scale": baseScale.toFixed(3),
               "--piece-scale-expanded": expandedScale.toFixed(3),
+              "--piece-scale-expanded-mobile": (
+                baseScale + (expandedScale - baseScale) * 0.72
+              ).toFixed(3),
               "--piece-opacity": baseOpacity.toFixed(3),
               "--piece-opacity-expanded": expandedOpacity.toFixed(3),
+              "--mobile-hover-x": `${Math.round(piece.expandX * 0.72)}px`,
+              "--mobile-hover-y": `${Math.round(piece.expandY * 0.68)}px`,
               "--float-delay": piece.floatDelay ?? "0s",
               "--float-y": piece.floatY ?? "-9px",
             } as CSSProperties;

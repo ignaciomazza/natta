@@ -105,13 +105,21 @@ textarea {
   will-change: opacity, transform;
 }
 
-.hero-product-cloud:has(.hero-product-cloud__logo:hover) .hero-product-piece,
 .hero-product-cloud:has(.hero-product-cloud__logo:focus-visible)
   .hero-product-piece {
   --hover-x-active: var(--hover-x, 0px);
   --hover-y-active: var(--hover-y, 0px);
   --piece-scale-active: var(--piece-scale-expanded, 1.08);
   --piece-opacity-active: var(--piece-opacity-expanded, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-product-cloud:has(.hero-product-cloud__logo:hover) .hero-product-piece {
+    --hover-x-active: var(--hover-x, 0px);
+    --hover-y-active: var(--hover-y, 0px);
+    --piece-scale-active: var(--piece-scale-expanded, 1.08);
+    --piece-opacity-active: var(--piece-opacity-expanded, 1);
+  }
 }
 
 .hero-product-piece--illustration {
@@ -168,6 +176,42 @@ textarea {
 .hero-product-cloud__logo:focus-visible .hero-product-cloud__logo-image {
   filter: drop-shadow(0 24px 34px rgba(43, 26, 24, 0.11));
   transform: scale(1.035);
+}
+
+@media (max-width: 767px) {
+  .hero-product-cloud__stage {
+    --logo-width: min(75vw, 21rem);
+  }
+
+  .hero-product-cloud__pieces {
+    inset: 0.75rem -0.75rem 1.25rem;
+  }
+
+  .hero-product-piece {
+    filter: drop-shadow(0 13px 18px rgba(43, 26, 24, 0.14));
+    transition:
+      opacity 300ms ease,
+      transform 560ms cubic-bezier(0.2, 0.85, 0.25, 1);
+  }
+
+  .hero-product-cloud.is-mobile-scroll-expanded .hero-product-piece {
+    --hover-x-active: var(--mobile-hover-x, var(--hover-x, 0px));
+    --hover-y-active: var(--mobile-hover-y, var(--hover-y, 0px));
+    --piece-scale-active: var(
+      --piece-scale-expanded-mobile,
+      var(--piece-scale-expanded, 1.08)
+    );
+    --piece-opacity-active: var(--piece-opacity-expanded, 1);
+  }
+
+  .hero-product-cloud.is-mobile-scroll-expanded .hero-product-cloud__logo-image {
+    filter: drop-shadow(0 18px 26px rgba(43, 26, 24, 0.11));
+    transform: scale(1.018);
+  }
+
+  .hero-product-cloud.is-mobile-scroll-expanded .hero-product-cloud__copy::before {
+    background: rgba(255, 250, 240, 0.64);
+  }
 }
 
 .hero-product-cloud__meta {
@@ -501,6 +545,12 @@ html.brand-loader-hydrated .brand-loader-shell {
 
 .section-y-compact {
   padding-block: clamp(2.75rem, 5vw, 4.5rem);
+}
+
+@media (max-width: 767px) {
+  .mobile-section-compact {
+    padding-block: 2.65rem;
+  }
 }
 
 .reveal-up {

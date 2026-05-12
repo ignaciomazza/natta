@@ -148,6 +148,69 @@ export default function Home() {
       <HeroProductCloud />
 
       <section
+        className="mobile-section-compact section-pad section-y bg-[var(--milk)]"
+        id="como-pedir"
+      >
+        <div className="content-shell grid gap-6 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <div className="max-w-2xl" data-reveal="left">
+            <p className="mb-3 text-[0.68rem] uppercase tracking-[0.22em] text-[var(--sage)] md:mb-5 md:text-sm md:tracking-[0.28em]">
+              Cómo pedir
+            </p>
+            <h2 className="font-display text-[2.55rem] leading-[0.95] tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl md:leading-none">
+              Elegís, reservás y coordinamos.
+            </h2>
+            <p className="mt-4 max-w-lg text-base leading-7 text-[var(--chocolate)]/72 md:mt-6 md:text-lg md:leading-8">
+              48/72 h de anticipación · Villa Devoto · envío por Uber/Cabify.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3 md:gap-7" data-stagger>
+            <div
+              className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
+              data-reveal="subtle"
+            >
+              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
+                01
+              </p>
+              <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
+                Elegís
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
+                Tamaño, sabor y fecha.
+              </p>
+            </div>
+            <div
+              className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
+              data-reveal="subtle"
+            >
+              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
+                02
+              </p>
+              <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
+                Reservás
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
+                Confirmamos cupo y seña.
+              </p>
+            </div>
+            <div
+              className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
+              data-reveal="subtle"
+            >
+              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
+                03
+              </p>
+              <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
+                Retirás
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
+                Por Devoto o con envío coordinado.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
         className="section-pad section-y bg-[var(--cream)]"
         id="historia"
       >
@@ -208,6 +271,37 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="mobile-section-compact section-pad section-y bg-[var(--chocolate-deep)] text-[var(--milk)]">
+        <div className="content-shell grid gap-6 md:gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+          <div data-reveal="left">
+            <p className="mb-3 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.22em] text-[var(--caramel-soft)] md:mb-5 md:gap-3 md:text-sm md:tracking-[0.28em]">
+              <Heart className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              Textura primero
+            </p>
+            <h2 className="font-display text-[2.55rem] leading-[0.95] tracking-[-0.04em] md:text-7xl">
+              Cremosa por dentro. Firme por fuera.
+            </h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3 md:gap-6" data-stagger>
+            {cakeSizes.map((size) => (
+              <div
+                className="step-card border-t border-white/18 pt-3 md:pt-5"
+                data-reveal="subtle"
+                key={size.id}
+              >
+                <p className="font-display text-3xl md:text-4xl">{size.label}</p>
+                <p className="mt-2 text-[0.68rem] uppercase leading-5 tracking-[0.16em] text-[var(--caramel-soft)] md:mt-3 md:text-sm md:leading-normal md:tracking-[0.18em]">
+                  {size.detail}
+                </p>
+                <p className="mt-2 text-sm text-[var(--milk)]/72 md:mt-4 md:text-base">
+                  {size.servings}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="section-y-tight bg-[var(--cream-soft)]">
         <div className="section-pad content-shell">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end md:gap-8">
@@ -255,35 +349,6 @@ export default function Home() {
               </span>
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="section-pad section-y bg-[var(--chocolate-deep)] text-[var(--milk)]">
-        <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
-          <div data-reveal="left">
-            <p className="mb-4 flex items-center gap-3 text-sm uppercase tracking-[0.28em] text-[var(--caramel-soft)] md:mb-5">
-              <Heart className="h-4 w-4" />
-              Textura primero
-            </p>
-            <h2 className="font-display text-5xl  tracking-[-0.04em] md:text-7xl">
-              Cremosa por dentro. Firme por fuera.
-            </h2>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3" data-stagger>
-            {cakeSizes.map((size) => (
-              <div
-                className="step-card border-t border-white/18 pt-5"
-                data-reveal="subtle"
-                key={size.id}
-              >
-                <p className="font-display text-4xl">{size.label}</p>
-                <p className="mt-3 text-sm uppercase tracking-[0.18em] text-[var(--caramel-soft)]">
-                  {size.detail}
-                </p>
-                <p className="mt-4 text-[var(--milk)]/72">{size.servings}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -349,66 +414,6 @@ export default function Home() {
             </h2>
           </div>
           <FaqList items={faq} />
-        </div>
-      </section>
-
-      <section className="section-pad section-y bg-[var(--milk)]" id="como-pedir">
-        <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-          <div className="max-w-2xl" data-reveal="left">
-            <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
-              Cómo pedir
-            </p>
-            <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
-              Elegís, reservás y coordinamos.
-            </h2>
-            <p className="mt-6 max-w-lg text-lg leading-8 text-[var(--chocolate)]/72">
-              48/72 h de anticipación · Villa Devoto · envío por Uber/Cabify.
-            </p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3 md:gap-7" data-stagger>
-            <div
-              className="step-card border-t border-[var(--line)] pt-5"
-              data-reveal="subtle"
-            >
-              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
-                01
-              </p>
-              <p className="font-display text-3xl text-[var(--chocolate-deep)] md:mt-3">
-                Elegís
-              </p>
-              <p className="mt-3 leading-7 text-[var(--chocolate)]/72">
-                Tamaño, sabor y fecha.
-              </p>
-            </div>
-            <div
-              className="step-card border-t border-[var(--line)] pt-5"
-              data-reveal="subtle"
-            >
-              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
-                02
-              </p>
-              <p className="font-display text-3xl text-[var(--chocolate-deep)] md:mt-3">
-                Reservás
-              </p>
-              <p className="mt-3 leading-7 text-[var(--chocolate)]/72">
-                Confirmamos cupo y seña.
-              </p>
-            </div>
-            <div
-              className="step-card border-t border-[var(--line)] pt-5"
-              data-reveal="subtle"
-            >
-              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
-                03
-              </p>
-              <p className="font-display text-3xl text-[var(--chocolate-deep)] md:mt-3">
-                Retirás
-              </p>
-              <p className="mt-3 leading-7 text-[var(--chocolate)]/72">
-                Por Devoto o con envío coordinado.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 
