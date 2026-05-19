@@ -85,10 +85,15 @@ textarea {
 .hero-product-piece {
   --hover-x-active: 0px;
   --hover-y-active: 0px;
-  --piece-scale-active: var(--piece-scale, 1);
+  --piece-rotate-active: var(--piece-rotate, 0deg);
+  --piece-scale-base: var(--piece-scale, 1);
+  --piece-scale-active: var(--piece-scale-base);
   --piece-opacity-active: var(--piece-opacity, 0.94);
   position: absolute;
+  left: var(--piece-left);
+  top: var(--piece-top);
   display: block;
+  width: var(--piece-width);
   opacity: var(--piece-opacity-active);
   pointer-events: none;
   filter: drop-shadow(0 18px 24px rgba(43, 26, 24, 0.16));
@@ -97,7 +102,7 @@ textarea {
       calc(-50% + var(--cursor-y, 0px) + var(--hover-y-active)),
       0
     )
-    rotate(var(--piece-rotate, 0deg)) scale(var(--piece-scale-active));
+    rotate(var(--piece-rotate-active)) scale(var(--piece-scale-active));
   transform-origin: center;
   transition:
     opacity 360ms ease,
@@ -109,7 +114,10 @@ textarea {
   .hero-product-piece {
   --hover-x-active: var(--hover-x, 0px);
   --hover-y-active: var(--hover-y, 0px);
-  --piece-scale-active: var(--piece-scale-expanded, 1.08);
+  --piece-scale-active: var(
+    --piece-scale-expanded-active,
+    var(--piece-scale-expanded, 1.08)
+  );
   --piece-opacity-active: var(--piece-opacity-expanded, 1);
 }
 
@@ -117,7 +125,10 @@ textarea {
   .hero-product-cloud:has(.hero-product-cloud__logo:hover) .hero-product-piece {
     --hover-x-active: var(--hover-x, 0px);
     --hover-y-active: var(--hover-y, 0px);
-    --piece-scale-active: var(--piece-scale-expanded, 1.08);
+    --piece-scale-active: var(
+      --piece-scale-expanded-active,
+      var(--piece-scale-expanded, 1.08)
+    );
     --piece-opacity-active: var(--piece-opacity-expanded, 1);
   }
 }
@@ -140,19 +151,6 @@ textarea {
 .hero-product-cloud__copy {
   min-width: 0;
   text-shadow: 0 1px 0 rgba(255, 250, 240, 0.82);
-}
-
-.hero-product-cloud__copy::before {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  z-index: -1;
-  width: min(82vw, 42rem);
-  aspect-ratio: 1.2;
-  border-radius: 999px;
-  background: rgba(255, 250, 240, 0.52);
-  content: "";
-  filter: blur(38px);
-  transform: translate(-50%, -52%);
 }
 
 .hero-product-cloud__logo {
@@ -178,9 +176,38 @@ textarea {
   transform: scale(1.035);
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hero-product-cloud__stage {
+    --logo-width: min(72vw, 34rem);
+  }
+
+  .hero-product-piece {
+    --piece-rotate-active: var(
+      --piece-tablet-rotate,
+      var(--piece-rotate, 0deg)
+    );
+    --piece-scale-base: var(
+      --piece-tablet-scale,
+      var(--piece-scale, 1)
+    );
+    --piece-scale-active: var(--piece-scale-base);
+    --piece-scale-expanded-active: var(
+      --piece-scale-expanded-tablet,
+      var(--piece-scale-expanded, 1.08)
+    );
+    --piece-opacity-active: var(
+      --piece-tablet-opacity,
+      var(--piece-opacity, 0.94)
+    );
+    left: var(--piece-tablet-left, var(--piece-left));
+    top: var(--piece-tablet-top, var(--piece-top));
+    width: var(--piece-tablet-width, var(--piece-width));
+  }
+}
+
 @media (max-width: 767px) {
   .hero-product-cloud__stage {
-    --logo-width: min(75vw, 21rem);
+    --logo-width: min(68vw, 18.8rem);
   }
 
   .hero-product-cloud__pieces {
@@ -188,10 +215,44 @@ textarea {
   }
 
   .hero-product-piece {
+    --piece-rotate-active: var(
+      --piece-mobile-rotate,
+      var(--piece-rotate, 0deg)
+    );
+    --piece-scale-base: var(
+      --piece-mobile-scale,
+      var(--piece-scale, 1)
+    );
+    --piece-scale-active: var(--piece-scale-base);
+    --piece-opacity-active: var(
+      --piece-mobile-opacity,
+      var(--piece-opacity, 0.94)
+    );
+    left: var(--piece-mobile-left, var(--piece-left));
+    top: var(--piece-mobile-top, var(--piece-top));
+    width: var(--piece-mobile-width, var(--piece-width));
     filter: drop-shadow(0 13px 18px rgba(43, 26, 24, 0.14));
     transition:
       opacity 300ms ease,
       transform 560ms cubic-bezier(0.2, 0.85, 0.25, 1);
+  }
+
+  .hero-product-piece--hide-mobile {
+    display: none;
+  }
+
+  .hero-product-cloud__copy {
+    max-width: 23rem;
+  }
+
+  .hero-product-cloud__eyebrow {
+    max-width: min(82vw, 20rem);
+    justify-content: center;
+    text-wrap: balance;
+  }
+
+  .hero-product-cloud__tagline {
+    max-width: min(84vw, 21rem);
   }
 
   .hero-product-cloud.is-mobile-scroll-expanded .hero-product-piece {
@@ -208,14 +269,70 @@ textarea {
     filter: drop-shadow(0 18px 26px rgba(43, 26, 24, 0.11));
     transform: scale(1.018);
   }
-
-  .hero-product-cloud.is-mobile-scroll-expanded .hero-product-cloud__copy::before {
-    background: rgba(255, 250, 240, 0.64);
-  }
 }
 
 .hero-product-cloud__meta {
   text-wrap: balance;
+}
+
+@media (max-width: 389px), (max-width: 767px) and (max-height: 720px) {
+  .hero-product-cloud__stage {
+    --logo-width: min(65vw, 17rem);
+  }
+
+  .hero-product-piece {
+    --piece-rotate-active: var(
+      --piece-small-mobile-rotate,
+      var(--piece-mobile-rotate, var(--piece-rotate, 0deg))
+    );
+    --piece-scale-base: var(
+      --piece-small-mobile-scale,
+      var(--piece-mobile-scale, var(--piece-scale, 1))
+    );
+    --piece-scale-active: var(--piece-scale-base);
+    --piece-opacity-active: var(
+      --piece-small-mobile-opacity,
+      var(--piece-mobile-opacity, var(--piece-opacity, 0.94))
+    );
+    left: var(
+      --piece-small-mobile-left,
+      var(--piece-mobile-left, var(--piece-left))
+    );
+    top: var(
+      --piece-small-mobile-top,
+      var(--piece-mobile-top, var(--piece-top))
+    );
+    width: var(
+      --piece-small-mobile-width,
+      var(--piece-mobile-width, var(--piece-width))
+    );
+  }
+
+  .hero-product-piece--hide-small-mobile {
+    display: none;
+  }
+
+  .hero-product-cloud.is-mobile-scroll-expanded .hero-product-piece {
+    --hover-x-active: var(
+      --small-mobile-hover-x,
+      var(--mobile-hover-x, var(--hover-x, 0px))
+    );
+    --hover-y-active: var(
+      --small-mobile-hover-y,
+      var(--mobile-hover-y, var(--hover-y, 0px))
+    );
+    --piece-scale-active: var(
+      --piece-scale-expanded-small-mobile,
+      var(--piece-scale-expanded-mobile, var(--piece-scale-expanded, 1.08))
+    );
+  }
+
+  .hero-product-cloud__tagline {
+    margin-top: 1rem;
+    max-width: min(82vw, 19rem);
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
 }
 
 .soft-shadow {
@@ -265,8 +382,8 @@ textarea {
   color: var(--chocolate-deep);
   pointer-events: auto;
   transition:
-    opacity 180ms ease,
-    visibility 180ms ease;
+    opacity 220ms ease,
+    visibility 0ms linear 220ms;
 }
 
 html.brand-loader-hydrated .brand-loader-shell {
@@ -301,8 +418,7 @@ html.brand-loader-hydrated .brand-loader-shell {
   background:
     radial-gradient(circle at 50% 48%, rgba(255, 250, 240, 0.84), transparent 15rem),
     linear-gradient(180deg, var(--cream-soft), var(--cream));
-  backdrop-filter: blur(12px);
-  animation: route-loader-enter 180ms ease-out both;
+  animation: route-loader-enter 120ms ease-out both;
 }
 
 .brand-loader--to-order {
@@ -324,8 +440,11 @@ html.brand-loader-hydrated .brand-loader-shell {
   width: min(72vw, 34rem);
   aspect-ratio: 1;
   border-radius: 999px;
-  background: rgba(255, 250, 240, 0.64);
-  filter: blur(28px);
+  background: radial-gradient(
+    circle,
+    rgba(255, 250, 240, 0.7) 0 44%,
+    rgba(255, 250, 240, 0) 72%
+  );
   transform: translateY(2rem) scale(0.92);
   animation: brand-loader-glow 1500ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
 }
@@ -336,6 +455,7 @@ html.brand-loader-hydrated .brand-loader-shell {
   justify-items: center;
   text-align: center;
   transform-origin: center;
+  will-change: opacity, transform;
 }
 
 .brand-loader--initial.is-leaving .brand-loader__content {
@@ -388,6 +508,9 @@ html.brand-loader-hydrated .brand-loader-shell {
   height: auto;
   width: min(72vw, 22rem);
   animation: brand-loader-logo 1180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity, transform;
 }
 
 .brand-loader__subtitle {
@@ -399,8 +522,11 @@ html.brand-loader-hydrated .brand-loader-shell {
 .brand-loader--to-order .brand-loader__glow,
 .brand-loader--to-home .brand-loader__glow {
   width: min(46vw, 17rem);
-  background: rgba(216, 223, 212, 0.58);
-  filter: blur(22px);
+  background: radial-gradient(
+    circle,
+    rgba(216, 223, 212, 0.64) 0 44%,
+    rgba(216, 223, 212, 0) 72%
+  );
   animation: route-loader-glow 560ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
 }
 
@@ -825,12 +951,10 @@ html.brand-loader-hydrated .brand-loader-shell {
 
 @keyframes brand-loader-logo {
   from {
-    filter: blur(14px);
     opacity: 0;
     transform: translateY(1.25rem) scale(0.96);
   }
   to {
-    filter: blur(0);
     opacity: 1;
     transform: translateY(0) scale(1);
   }

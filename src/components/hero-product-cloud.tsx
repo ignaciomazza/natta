@@ -3,12 +3,23 @@
 import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { BrandLoaderLink } from "@/components/brand-loader-link";
 
 type PointerState = {
   x: number;
   y: number;
+};
+
+type HeroPieceOverride = {
+  width?: string;
+  left?: number;
+  top?: number;
+  rotate?: number;
+  expandX?: number;
+  expandY?: number;
+  scale?: number;
+  opacity?: number;
 };
 
 type HeroPiece = {
@@ -27,6 +38,10 @@ type HeroPiece = {
   hoverScale?: number;
   opacity?: number;
   hideOnMobile?: boolean;
+  hideOnSmallMobile?: boolean;
+  tablet?: HeroPieceOverride;
+  mobile?: HeroPieceOverride;
+  smallMobile?: HeroPieceOverride;
   floatDelay?: string;
   floatY?: string;
   className?: string;
@@ -54,6 +69,25 @@ const heroPieces: HeroPiece[] = [
     scale: 0.98,
     hoverScale: 1.12,
     floatDelay: "-1.1s",
+    tablet: {
+      left: 14,
+      top: 32,
+      width: "clamp(5rem, 14vw, 8.4rem)",
+    },
+    mobile: {
+      left: 3,
+      top: 44,
+      width: "clamp(4.8rem, 24vw, 6.4rem)",
+      expandX: -10,
+      expandY: -8,
+      scale: 0.98,
+    },
+    smallMobile: {
+      left: 1,
+      top: 43,
+      width: "4.9rem",
+      scale: 0.92,
+    },
   },
   {
     src: "/images/transparent-images/2.png",
@@ -70,6 +104,25 @@ const heroPieces: HeroPiece[] = [
     scale: 0.92,
     hoverScale: 1.16,
     floatDelay: "-3.5s",
+    tablet: {
+      left: 86,
+      top: 31,
+      width: "clamp(4.4rem, 12vw, 7.5rem)",
+    },
+    mobile: {
+      left: 94,
+      top: 45,
+      width: "clamp(4.55rem, 22vw, 5.8rem)",
+      expandX: 8,
+      expandY: -8,
+      scale: 0.95,
+    },
+    smallMobile: {
+      left: 95,
+      top: 44,
+      width: "4.55rem",
+      scale: 0.9,
+    },
   },
   {
     src: "/images/transparent-images/3.png",
@@ -85,37 +138,59 @@ const heroPieces: HeroPiece[] = [
     expandY: 10,
     hoverScale: 1.1,
     floatDelay: "-2.2s",
-  },
-  {
-    src: "/images/transparent-images/4.png",
-    alt: "Corte de tarta vasca Natta",
-    width: "clamp(5rem, 10vw, 9.8rem)",
-    naturalWidth: 3213,
-    naturalHeight: 5712,
-    left: 88,
-    top: 58,
-    rotate: -12,
-    depth: 22,
-    expandX: 58,
-    expandY: 10,
-    hoverScale: 1.14,
-    hideOnMobile: true,
-    floatDelay: "-4.1s",
+    tablet: {
+      left: 9,
+      top: 62,
+      width: "clamp(5rem, 13vw, 8.4rem)",
+    },
+    mobile: {
+      left: -2,
+      top: 67,
+      width: "clamp(5.2rem, 25vw, 6.4rem)",
+      expandX: -8,
+      expandY: 6,
+      scale: 0.9,
+    },
+    smallMobile: {
+      left: -4,
+      top: 67,
+      width: "4.7rem",
+      scale: 0.84,
+    },
   },
   {
     src: "/images/transparent-images/5.png",
     alt: "Tarta vasca Natta en formato chico",
-    width: "clamp(4.3rem, 8vw, 7.8rem)",
+    width: "clamp(4rem, 7vw, 7rem)",
     naturalWidth: 3213,
     naturalHeight: 5712,
-    left: 28,
-    top: 80,
+    left: 20,
+    top: 86,
     rotate: -24,
     depth: 16,
     expandX: -26,
     expandY: 42,
     hoverScale: 1.18,
     floatDelay: "-0.4s",
+    tablet: {
+      left: 19,
+      top: 85,
+      width: "clamp(4rem, 10vw, 6.4rem)",
+    },
+    mobile: {
+      left: 20,
+      top: 81,
+      width: "clamp(3.75rem, 16vw, 4.65rem)",
+      expandX: -4,
+      expandY: 6,
+      scale: 0.86,
+    },
+    smallMobile: {
+      left: 17,
+      top: 80,
+      width: "3.65rem",
+      scale: 0.8,
+    },
   },
   {
     src: "/images/transparent-images/6.png",
@@ -123,8 +198,8 @@ const heroPieces: HeroPiece[] = [
     width: "clamp(4.8rem, 9vw, 8.7rem)",
     naturalWidth: 4284,
     naturalHeight: 5712,
-    left: 76,
-    top: 83,
+    left: 80,
+    top: 86,
     rotate: 19,
     depth: -18,
     expandX: 34,
@@ -132,6 +207,25 @@ const heroPieces: HeroPiece[] = [
     scale: 0.96,
     hoverScale: 1.13,
     floatDelay: "-2.8s",
+    tablet: {
+      left: 82,
+      top: 85,
+      width: "clamp(4.2rem, 11vw, 7rem)",
+    },
+    mobile: {
+      left: 86,
+      top: 79,
+      width: "clamp(4.5rem, 20vw, 5.6rem)",
+      expandX: 6,
+      expandY: 8,
+      scale: 0.92,
+    },
+    smallMobile: {
+      left: 88,
+      top: 78,
+      width: "4.2rem",
+      scale: 0.84,
+    },
   },
   {
     src: "/images/transparent-images/7.png",
@@ -139,15 +233,34 @@ const heroPieces: HeroPiece[] = [
     width: "clamp(4.1rem, 7vw, 6.8rem)",
     naturalWidth: 4284,
     naturalHeight: 5712,
-    left: 51,
-    top: 16,
+    left: 48,
+    top: 14,
     rotate: 8,
     depth: 10,
     expandX: 0,
     expandY: -44,
     opacity: 0.88,
-    hideOnMobile: true,
     floatDelay: "-5.2s",
+    tablet: {
+      left: 48,
+      top: 16,
+      width: "clamp(3.7rem, 9vw, 5.8rem)",
+    },
+    mobile: {
+      left: 47,
+      top: 26,
+      width: "clamp(3.55rem, 15vw, 4.35rem)",
+      expandX: 0,
+      expandY: -8,
+      opacity: 0.84,
+      scale: 0.86,
+    },
+    smallMobile: {
+      left: 47,
+      top: 25,
+      width: "3.55rem",
+      scale: 0.82,
+    },
   },
   {
     src: "/images/transparent-images/8.png",
@@ -171,8 +284,8 @@ const heroPieces: HeroPiece[] = [
     width: "clamp(3.8rem, 6vw, 5.8rem)",
     naturalWidth: 998,
     naturalHeight: 1157,
-    left: 36,
-    top: 26,
+    left: 59,
+    top: 17,
     rotate: -9,
     depth: -9,
     expandX: -18,
@@ -180,10 +293,28 @@ const heroPieces: HeroPiece[] = [
     scale: 0.9,
     hoverScale: 1.08,
     opacity: 0.58,
-    hideOnMobile: true,
     floatDelay: "-3.1s",
     floatY: "-5px",
     className: "hero-product-piece--illustration",
+    tablet: {
+      left: 59,
+      top: 21,
+    },
+    mobile: {
+      left: 61,
+      top: 29,
+      width: "clamp(2.15rem, 8vw, 2.8rem)",
+      expandX: -4,
+      expandY: -4,
+      opacity: 0.46,
+      scale: 0.72,
+    },
+    smallMobile: {
+      left: 62,
+      top: 29,
+      width: "2.05rem",
+      scale: 0.66,
+    },
   },
   {
     src: "/images/ilustration/IMG_5333.PNG",
@@ -191,8 +322,8 @@ const heroPieces: HeroPiece[] = [
     width: "clamp(3.6rem, 6vw, 5.5rem)",
     naturalWidth: 999,
     naturalHeight: 1157,
-    left: 64,
-    top: 35,
+    left: 50,
+    top: 82,
     rotate: 11,
     depth: 8,
     expandX: 18,
@@ -200,15 +331,67 @@ const heroPieces: HeroPiece[] = [
     scale: 0.88,
     hoverScale: 1.1,
     opacity: 0.52,
-    hideOnMobile: true,
     floatDelay: "-0.7s",
     floatY: "-6px",
     className: "hero-product-piece--illustration",
+    tablet: {
+      left: 50,
+      top: 82,
+    },
+    mobile: {
+      left: 53,
+      top: 80,
+      width: "clamp(2.1rem, 8vw, 2.8rem)",
+      expandX: 4,
+      expandY: -4,
+      opacity: 0.44,
+      scale: 0.7,
+    },
+    smallMobile: {
+      left: 52,
+      top: 80,
+      width: "2.05rem",
+      scale: 0.64,
+    },
   },
 ];
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+const setPieceOverrideVars = (
+  style: CSSProperties & Record<string, string>,
+  prefix: "tablet" | "mobile" | "small-mobile",
+  override?: HeroPieceOverride,
+) => {
+  if (!override) {
+    return;
+  }
+
+  if (override.left !== undefined) {
+    style[`--piece-${prefix}-left`] = `${override.left}%`;
+  }
+
+  if (override.top !== undefined) {
+    style[`--piece-${prefix}-top`] = `${override.top}%`;
+  }
+
+  if (override.width) {
+    style[`--piece-${prefix}-width`] = override.width;
+  }
+
+  if (override.rotate !== undefined) {
+    style[`--piece-${prefix}-rotate`] = `${override.rotate}deg`;
+  }
+
+  if (override.scale !== undefined) {
+    style[`--piece-${prefix}-scale`] = override.scale.toFixed(3);
+  }
+
+  if (override.opacity !== undefined) {
+    style[`--piece-${prefix}-opacity`] = override.opacity.toFixed(3);
+  }
+};
 
 export function HeroProductCloud() {
   const [pointer, setPointer] = useState<PointerState>({ x: 0, y: 0 });
@@ -348,10 +531,19 @@ export function HeroProductCloud() {
             const expandedScale = baseScale * (piece.hoverScale ?? 1.12);
             const baseOpacity = piece.opacity ?? 0.94;
             const expandedOpacity = Math.min(baseOpacity + 0.06, 1);
+            const tabletScale = piece.tablet?.scale ?? baseScale;
+            const mobileScale = piece.mobile?.scale ?? baseScale;
+            const smallMobileScale = piece.smallMobile?.scale ?? mobileScale;
+            const mobileExpandX = piece.mobile?.expandX ?? piece.expandX;
+            const mobileExpandY = piece.mobile?.expandY ?? piece.expandY;
+            const smallMobileExpandX =
+              piece.smallMobile?.expandX ?? mobileExpandX;
+            const smallMobileExpandY =
+              piece.smallMobile?.expandY ?? mobileExpandY;
             const style = {
-              left: `${piece.left}%`,
-              top: `${piece.top}%`,
-              width: piece.width,
+              "--piece-left": `${piece.left}%`,
+              "--piece-top": `${piece.top}%`,
+              "--piece-width": piece.width,
               "--cursor-x": `${(pointer.x * piece.depth).toFixed(2)}px`,
               "--cursor-y": `${(pointer.y * piece.depth).toFixed(2)}px`,
               "--hover-x": `${piece.expandX}px`,
@@ -359,22 +551,41 @@ export function HeroProductCloud() {
               "--piece-rotate": `${rotation.toFixed(2)}deg`,
               "--piece-scale": baseScale.toFixed(3),
               "--piece-scale-expanded": expandedScale.toFixed(3),
+              "--piece-scale-expanded-tablet": (
+                tabletScale + (expandedScale - baseScale) * 0.82
+              ).toFixed(3),
               "--piece-scale-expanded-mobile": (
-                baseScale + (expandedScale - baseScale) * 0.72
+                mobileScale + (expandedScale - baseScale) * 0.52
+              ).toFixed(3),
+              "--piece-scale-expanded-small-mobile": (
+                smallMobileScale + (expandedScale - baseScale) * 0.36
               ).toFixed(3),
               "--piece-opacity": baseOpacity.toFixed(3),
               "--piece-opacity-expanded": expandedOpacity.toFixed(3),
-              "--mobile-hover-x": `${Math.round(piece.expandX * 0.72)}px`,
-              "--mobile-hover-y": `${Math.round(piece.expandY * 0.68)}px`,
+              "--mobile-hover-x": `${Math.round(mobileExpandX * 0.42)}px`,
+              "--mobile-hover-y": `${Math.round(mobileExpandY * 0.38)}px`,
+              "--small-mobile-hover-x": `${Math.round(
+                smallMobileExpandX * 0.3,
+              )}px`,
+              "--small-mobile-hover-y": `${Math.round(
+                smallMobileExpandY * 0.28,
+              )}px`,
               "--float-delay": piece.floatDelay ?? "0s",
               "--float-y": piece.floatY ?? "-9px",
-            } as CSSProperties;
+            } as CSSProperties & Record<string, string>;
+
+            setPieceOverrideVars(style, "tablet", piece.tablet);
+            setPieceOverrideVars(style, "mobile", piece.mobile);
+            setPieceOverrideVars(style, "small-mobile", piece.smallMobile);
 
             return (
               <span
                 className={[
                   "hero-product-piece",
-                  piece.hideOnMobile ? "hidden md:block" : "",
+                  piece.hideOnMobile ? "hero-product-piece--hide-mobile" : "",
+                  piece.hideOnSmallMobile
+                    ? "hero-product-piece--hide-small-mobile"
+                    : "",
                   piece.className ?? "",
                 ]
                   .filter(Boolean)
@@ -386,7 +597,11 @@ export function HeroProductCloud() {
                   alt={piece.alt}
                   className="hero-product-piece__image"
                   height={piece.naturalHeight}
-                  priority={piece.src === "/images/transparent-images/1.png"}
+                  priority={
+                    piece.src === "/images/transparent-images/1.png" ||
+                    piece.src === "/images/transparent-images/5.png" ||
+                    piece.src === "/images/transparent-images/3.png"
+                  }
                   sizes="(min-width: 1024px) 12vw, (min-width: 768px) 16vw, 24vw"
                   src={piece.src}
                   width={piece.naturalWidth}
@@ -397,12 +612,12 @@ export function HeroProductCloud() {
         </div>
 
         <div className="hero-product-cloud__copy relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center">
-          <p className="reveal-up mb-5 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-[var(--sage)] md:mb-6 md:gap-3 md:text-sm md:tracking-[0.28em]">
+          <p className="hero-product-cloud__eyebrow reveal-up mb-5 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.2em] text-[var(--sage)] md:mb-6 md:gap-3 md:text-sm md:tracking-[0.28em]">
             <Sparkles className="h-4 w-4" />
             La cremosidad llegó a Devoto.
           </p>
           <h1 className="sr-only">Natta Vascas</h1>
-          <Link
+          <BrandLoaderLink
             aria-label="Ir al pedido de Natta"
             className="hero-product-cloud__logo reveal-soft"
             href="/pedido"
@@ -416,8 +631,8 @@ export function HeroProductCloud() {
               src={logo.src}
               width={logo.width}
             />
-          </Link>
-          <p className="reveal-up mt-5 max-w-xl break-words text-xl leading-8 text-[var(--chocolate)]/82 delay-100 md:mt-6 md:text-2xl md:leading-10">
+          </BrandLoaderLink>
+          <p className="hero-product-cloud__tagline reveal-up mt-5 max-w-xl break-words text-xl leading-8 text-[var(--chocolate)]/82 delay-100 md:mt-6 md:text-2xl md:leading-10">
             No te lo podemos explicar: <em>tenés que probarlo</em>.
           </p>
         </div>

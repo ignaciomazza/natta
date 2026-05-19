@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { OrderAssistant } from "@/components/order-assistant";
 
 export const metadata: Metadata = {
@@ -32,12 +33,12 @@ export default function PedidoPage() {
     <main className="min-h-screen overflow-hidden bg-[var(--cream-soft)]">
       <header className="fixed inset-x-0 top-0 z-40 border-b border-white/35 bg-[var(--cream-soft)]/86 px-4 py-2.5 backdrop-blur-xl md:px-8 md:py-3">
         <nav className="content-shell flex items-center justify-between gap-4">
-          <Link
+          <BrandLoaderLink
             className="shrink-0 font-display text-3xl leading-none italic text-[var(--chocolate)]"
             href="/"
           >
             natta
-          </Link>
+          </BrandLoaderLink>
           <div className="hidden items-center gap-7 text-sm text-[var(--chocolate)]/72 md:flex">
             <Link className="transition hover:text-[var(--chocolate)]" href="/#menu">
               menú
@@ -45,22 +46,25 @@ export default function PedidoPage() {
             <Link className="transition hover:text-[var(--chocolate)]" href="/#faq">
               dudas
             </Link>
-            <Link className="transition hover:text-[var(--chocolate)]" href="/">
+            <BrandLoaderLink
+              className="transition hover:text-[var(--chocolate)]"
+              href="/"
+            >
               inicio
-            </Link>
+            </BrandLoaderLink>
           </div>
         </nav>
       </header>
 
       <section className="section-pad noise overflow-hidden bg-[var(--cream-soft)] pb-10 pt-[5.5rem] md:pb-14 md:pt-28">
         <div className="content-shell min-w-0" data-reveal="subtle">
-          <Link
+          <BrandLoaderLink
             className="motion-link inline-flex items-center gap-2 text-sm font-medium text-[var(--sage)] transition hover:text-[var(--chocolate)]"
             href="/"
           >
             <ArrowLeft className="h-4 w-4" />
             Volver
-          </Link>
+          </BrandLoaderLink>
 
           <div className="mt-7 max-w-[calc(100vw-2rem)] md:mt-9 md:max-w-4xl">
             <h1 className="font-display text-[clamp(3.7rem,15vw,9rem)] leading-[0.84] tracking-[-0.06em] text-[var(--chocolate-deep)]">
@@ -113,12 +117,12 @@ export default function PedidoPage() {
               Pedidos por encargo · Villa Devoto
             </p>
           </div>
-          <Link
+          <BrandLoaderLink
             className="motion-button lift-hover inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
             href="/"
           >
             Volver al inicio
-          </Link>
+          </BrandLoaderLink>
         </div>
       </section>
     </main>

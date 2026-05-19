@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { BrandLoader } from "@/components/brand-loader";
+import { BrandLoaderProvider } from "@/components/brand-loader";
 import { MotionObserver } from "@/components/motion-observer";
 import "./globals.css";
 
@@ -46,9 +46,10 @@ export default function RootLayout({
             <p className="brand-loader__subtitle">vascas</p>
           </div>
         </div>
-        <BrandLoader />
-        <MotionObserver />
-        {children}
+        <BrandLoaderProvider>
+          <MotionObserver />
+          {children}
+        </BrandLoaderProvider>
       </body>
     </html>
   );

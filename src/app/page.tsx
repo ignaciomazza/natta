@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight, Heart } from "lucide-react";
+import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { FaqList } from "@/components/faq-list";
 import { HeroProductCloud } from "@/components/hero-product-cloud";
 import { cakeSizes, flavors, formatCurrency } from "@/lib/catalog";
@@ -124,24 +124,24 @@ export default function Home() {
             >
               menú
             </a>
-            <Link
+            <BrandLoaderLink
               className="transition hover:text-[var(--chocolate)]"
               href="/pedido"
             >
               pedido
-            </Link>
+            </BrandLoaderLink>
             <a className="transition hover:text-[var(--chocolate)]" href="#faq">
               dudas
             </a>
           </div>
-          <Link
+          <BrandLoaderLink
             className="cta-soft-shadow motion-button inline-flex h-10 shrink-0 items-center justify-center gap-2 justify-self-end rounded-full border border-[var(--chocolate)] bg-[var(--milk)] px-3 text-sm font-medium text-[var(--chocolate)] transition hover:bg-[var(--chocolate)] hover:text-[var(--milk)] sm:px-4"
             href="/pedido"
           >
             <span className="hidden sm:inline">Armar pedido</span>
             <span className="sm:hidden">Pedido</span>
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </BrandLoaderLink>
         </nav>
       </header>
 
@@ -223,17 +223,22 @@ export default function Home() {
               Devoto le puso nombre a nuestras tartas.
             </h2>
           </div>
-          <div
-            className="grid gap-5 text-lg leading-8 text-[var(--chocolate)]/80 md:grid-cols-2 md:gap-8"
-            data-stagger
-          >
+          <div className="max-w-3xl space-y-5 text-lg leading-8 text-[var(--chocolate)]/80 md:text-xl md:leading-9">
             <p data-reveal="right">
-              Natta empezó con una tarta vasca que nos dejó pensando: podíamos
-              hacer una propia, más nuestra.
+              Natta nació de una pasión que compartimos desde hace 12 años: la
+              cocina y la búsqueda constante de nuevas experiencias
+              gastronómicas.
             </p>
             <p data-reveal="right">
-              Después llegaron los pedidos, los sabores y el apodo que quedó:
-              nattas.
+              Con el tiempo, esa curiosidad por explorar sabores y texturas se
+              convirtió también en una búsqueda cada vez más precisa: entender
+              los detalles, perfeccionar procesos y encontrar ese equilibrio
+              entre intensidad, suavidad y cremosidad que define cada creación.
+            </p>
+            <p data-reveal="right">
+              Un proyecto creado para compartir, acompañar encuentros y
+              transformar el sabor en experiencia. Porque creemos que muchas
+              veces los mejores recuerdos empiezan alrededor de una mesa.
             </p>
           </div>
         </div>
@@ -425,25 +430,25 @@ export default function Home() {
               Amantes de las tartas de queso · Villa Devoto
             </p>
           </div>
-          <Link
+          <BrandLoaderLink
             className="motion-button lift-hover inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
             href="/pedido"
           >
             Armar pedido
-          </Link>
+          </BrandLoaderLink>
         </div>
       </footer>
 
       <div className="mobile-cta-gradient pointer-events-none fixed inset-x-0 bottom-0 z-40 h-28 md:hidden" />
 
       <div className="fixed inset-x-3 bottom-3 z-50 md:hidden">
-        <Link
+        <BrandLoaderLink
           className="cta-soft-shadow mobile-cta-float motion-button flex h-14 items-center justify-center gap-2 rounded-full border border-[var(--chocolate)] bg-[var(--milk)] px-5 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] transition hover:bg-[var(--chocolate)] hover:text-[var(--milk)]"
           href="/pedido"
         >
           Armar pedido
           <ArrowRight className="h-4 w-4" />
-        </Link>
+        </BrandLoaderLink>
       </div>
     </main>
   );

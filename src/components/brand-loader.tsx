@@ -2,7 +2,20 @@
 
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  BRAND_LOADER_NAVIGATE_EVENT,
+  type BrandLoaderNavigate,
+  type BrandLoaderNavigateDetail,
+} from "@/lib/brand-loader-navigation";
 
 const visibleRoutes = new Set(["/", "/pedido"]);
 const logo = {
@@ -53,7 +66,20 @@ const getRouteVariant = (
   return null;
 };
 
-export function BrandLoader() {
+const isLoaderNavigationEvent = (
+  event: Event,
+): event is CustomEvent<BrandLoaderNavigateDetail> =>
+  "detail" in event &&
+  typeof (event as CustomEvent<BrandLoaderNavigateDetail>).detail?.href ===
+    "string";
+
+const BrandLoaderNavigationContext =
+  createContext<BrandLoaderNavigate | null>(null);
+
+export const useBrandLoaderNavigation = () =>
+  useContext(BrandLoaderNavigationContext);
+
+export function BrandLoaderProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const expectedPathRef = useRef<string | null>(null);
@@ -86,49 +112,21 @@ export function BrandLoader() {
     [router],
   );
 
-  useEffect(() => {
-    document.documentElement.classList.add("brand-loader-hydrated");
-  }, []);
-
-  useEffect(() => {
-    const handleClick = (event: MouseEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      ) {
-        return;
-      }
-
-      const target = event.target;
-
-      if (!(target instanceof Element)) {
-        return;
-      }
-
-      const anchor = target.closest("a");
-
-      if (!anchor?.href || anchor.target) {
-        return;
-      }
-
-      const url = new URL(anchor.href);
+  const requestLoaderNavigation = useCallback(
+    (href: string) => {
+      const url = new URL(href, window.location.origin);
 
       if (url.origin !== window.location.origin) {
-        return;
+        return false;
       }
 
       const destinationPath = url.pathname;
       const variant = getRouteVariant(pathname, destinationPath, false);
 
       if (!variant || destinationPath === pathname) {
-        return;
+        return false;
       }
 
-      event.preventDefault();
       expectedPathRef.current = destinationPath;
       setLoaderRequest({
         id: Date.now(),
@@ -136,14 +134,48 @@ export function BrandLoader() {
         pathname: destinationPath,
         variant,
       });
-    };
 
-    document.addEventListener("click", handleClick, true);
+      return true;
+    },
+    [pathname],
+  );
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      document.documentElement.classList.add("brand-loader-hydrated");
+    });
 
     return () => {
-      document.removeEventListener("click", handleClick, true);
+      window.cancelAnimationFrame(frame);
     };
-  }, [pathname]);
+  }, []);
+
+  useEffect(() => {
+    window.__nattaNavigateWithLoader = requestLoaderNavigation;
+
+    const handleNavigationRequest = (event: Event) => {
+      if (!isLoaderNavigationEvent(event)) {
+        return;
+      }
+
+      if (requestLoaderNavigation(event.detail.href)) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener(BRAND_LOADER_NAVIGATE_EVENT, handleNavigationRequest);
+
+    return () => {
+      if (window.__nattaNavigateWithLoader === requestLoaderNavigation) {
+        delete window.__nattaNavigateWithLoader;
+      }
+
+      window.removeEventListener(
+        BRAND_LOADER_NAVIGATE_EVENT,
+        handleNavigationRequest,
+      );
+    };
+  }, [requestLoaderNavigation]);
 
   useEffect(() => {
     if (pathname === currentPath) {
@@ -177,19 +209,20 @@ export function BrandLoader() {
     };
   }, [currentPath, pathname]);
 
-  if (!loaderRequest) {
-    return null;
-  }
-
   return (
-    <BrandLoaderContent
-      key={loaderRequest.id}
-      navigateTo={loaderRequest.navigateTo}
-      onComplete={completeLoader}
-      onNavigate={navigateWithLoader}
-      pathname={loaderRequest.pathname}
-      variant={loaderRequest.variant}
-    />
+    <BrandLoaderNavigationContext.Provider value={requestLoaderNavigation}>
+      {loaderRequest ? (
+        <BrandLoaderContent
+          key={loaderRequest.id}
+          navigateTo={loaderRequest.navigateTo}
+          onComplete={completeLoader}
+          onNavigate={navigateWithLoader}
+          pathname={loaderRequest.pathname}
+          variant={loaderRequest.variant}
+        />
+      ) : null}
+      {children}
+    </BrandLoaderNavigationContext.Provider>
   );
 }
 
@@ -219,10 +252,14 @@ function BrandLoaderContent({
         ? pathname === "/"
           ? 1320
           : 980
-        : 620;
+        : 820;
     const exitMs =
-      prefersReducedMotion ? 120 : variant === "initial" ? 720 : 500;
-    const navigateMs = prefersReducedMotion ? 80 : 260;
+      prefersReducedMotion ? 120 : variant === "initial" ? 720 : 420;
+    const navigateMs = prefersReducedMotion
+      ? 80
+      : variant === "initial"
+        ? 0
+        : 360;
 
     const navigateTimer = navigateTo
       ? window.setTimeout(() => {
