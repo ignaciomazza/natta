@@ -1,3 +1,5 @@
+import { applyPriceMultiplier } from "@/lib/price-adjustments";
+
 export type SizeId = "latta" | "chica" | "grande";
 export type FulfillmentMode = "pickup" | "delivery";
 
@@ -41,66 +43,74 @@ export const cakeSizes: CakeSize[] = [
   },
 ];
 
+function buildPrices(latta: number, chica: number, grande: number): Record<SizeId, number> {
+  return {
+    latta: applyPriceMultiplier(latta),
+    chica: applyPriceMultiplier(chica),
+    grande: applyPriceMultiplier(grande),
+  };
+}
+
 export const flavors: Flavor[] = [
   {
     id: "natta",
     name: "Natta",
     description: "Clásica de queso.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "limu",
     name: "Limu",
     description: "Tarta de queso sabor lima.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "choco",
     name: "Choco",
     description: "Tarta de queso sabor 60% cacao.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "tella",
     name: "Tella",
     description: "Tarta de queso con avellanas.",
-    prices: { latta: 13000, chica: 26000, grande: 45000 },
+    prices: buildPrices(13000, 26000, 45000),
   },
   {
     id: "blanca",
     name: "Blanca",
     description: "Tarta de queso sabor chocolate blanco.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "tachio",
     name: "Tachio",
     description: "Tarta de queso con pistachos.",
-    prices: { latta: 13000, chica: 29000, grande: 50000 },
+    prices: buildPrices(13000, 29000, 50000),
   },
   {
     id: "duo",
     name: "Duo",
     description: "Tarta de queso sabor chocolate blanco y Oreos.",
-    prices: { latta: 13000, chica: 29000, grande: 50000 },
+    prices: buildPrices(13000, 29000, 50000),
   },
   {
     id: "argenta",
     name: "Argenta",
     description: "Tarta de queso sabor dulce de leche.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "mocha",
     name: "Mocha",
     description: "Tarta de queso sabor café con base de chocolate.",
-    prices: { latta: 13000, chica: 26000, grande: 45000 },
+    prices: buildPrices(13000, 26000, 45000),
   },
   {
     id: "brulee",
     name: "Brulée",
     description: "Tarta de queso sabor crème brûlée con crocante de caramelo.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    prices: buildPrices(13000, 23000, 40000),
   },
 ];
 

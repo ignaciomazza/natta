@@ -1,0 +1,411 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Coins } from "lucide-react";
+import { MoneyInput } from "@/components/internal/money-input";
+import {
+  Disclosure,
+  Pill,
+  SectionTitle,
+  SelectField,
+  Toggle,
+  buttonSoftClassName,
+  controlRowClassName,
+  fieldLabelClassName,
+  inputClassName,
+  tableShellClassName,
+} from "@/components/internal/ui";
+
+type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "REFUNDED";
+type PaymentMethod = "MERCADO_PAGO" | "TRANSFER" | "CASH" | "MANUAL";
+type PaymentKind = "DEPOSIT" | "BALANCE" | "FULL";
+
+type Payment = {
+  id: string;
+  orderId: string | null;
+  amountArs: number;
+  status: PaymentStatus;
+  method: PaymentMethod;
+  kind: PaymentKind;
+  customerName: string | null;
+  customerPhone: string | null;
+  referenceNote: string | null;
+  createdAt: string;
+  order: {
+    id: string;
+    publicReceiptCode: string;
+    status: string;
+  } | null;
+};
+
+const statusOptions: PaymentStatus[] = [
+  "APPROVED",
+  "PENDING",
+  "REJECTED",
+  "CANCELLED",
+  "REFUNDED",
+];
+const methodOptions: PaymentMethod[] = ["MANUAL", "TRANSFER", "CASH", "MERCADO_PAGO"];
+const kindOptions: PaymentKind[] = ["FULL", "DEPOSIT", "BALANCE"];
+
+const statusLabel: Record<PaymentStatus, string> = {
+  APPROVED: "Aprobado",
+  PENDING: "Pendiente",
+  REJECTED: "Rechazado",
+  CANCELLED: "Cancelado",
+  REFUNDED: "Reintegrado",
+};
+
+const methodLabel: Record<PaymentMethod, string> = {
+  MANUAL: "Manual",
+  TRANSFER: "Transferencia",
+  CASH: "Efectivo",
+  MERCADO_PAGO: "Mercado Pago",
+};
+
+const kindLabel: Record<PaymentKind, string> = {
+  FULL: "Total",
+  DEPOSIT: "Seña",
+  BALANCE: "Saldo",
+};
+
+const formatMoney = (value: number) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(value);
+
+function statusTone(status: PaymentStatus) {
+  if (status === "APPROVED") return "success" as const;
+  if (status === "PENDING") return "warning" as const;
+  if (status === "REJECTED" || status === "CANCELLED") return "danger" as const;
+  return "info" as const;
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+export function CollectionsAdmin() {
+  const [items, setItems] = useState<Payment[]>([]);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [amountArs, setAmountArs] = useState(0);
+  const [amountInput, setAmountInput] = useState("");
+  const [referenceNote, setReferenceNote] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("MANUAL");
+  const [kind, setKind] = useState<PaymentKind>("FULL");
+  const [status, setStatus] = useState<PaymentStatus>("APPROVED");
+  const [onlyWithOrder, setOnlyWithOrder] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>("ALL");
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    const response = await fetch("/api/collections", { cache: "no-store" });
+    if (!response.ok) throw new Error("No se pudieron cargar cobros");
+    const payload = (await response.json()) as { items: Payment[] };
+    setItems(payload.items);
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load().catch((loadError) => {
+      setError(loadError instanceof Error ? loadError.message : "Error");
+    });
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      if (statusFilter !== "ALL" && item.status !== statusFilter) return false;
+      if (onlyWithOrder && !item.order) return false;
+      return true;
+    });
+  }, [items, onlyWithOrder, statusFilter]);
+
+  const totals = useMemo(() => {
+    let amount = 0;
+    let approved = 0;
+    for (const item of items) {
+      amount += item.amountArs;
+      if (item.status === "APPROVED") approved += 1;
+    }
+    return { amount, approved };
+  }, [items]);
+
+  const createManualCollection = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    if (amountArs < 1) {
+      setError("Ingresá un monto válido");
+      return;
+    }
+
+    const response = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerName,
+        customerPhone,
+        amountArs,
+        status,
+        method,
+        kind,
+        referenceNote,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      setError(payload?.error ?? "No se pudo crear cobro");
+      return;
+    }
+
+    setCustomerName("");
+    setCustomerPhone("");
+    setAmountArs(0);
+    setAmountInput("");
+    setReferenceNote("");
+    await load();
+  };
+
+  return (
+    <section className="space-y-5">
+      <SectionTitle
+        description="Cobros online y manuales en una sola vista."
+        icon={Coins}
+        title="Cobros"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Pill>Total: {items.length}</Pill>
+        <Pill tone="success">Aprobados: {totals.approved}</Pill>
+        <Pill tone="info">Monto total: {formatMoney(totals.amount)}</Pill>
+      </div>
+
+      <Disclosure
+        description="Filtrá por estado o mostrá solo cobros vinculados a pedido."
+        title="Filtros de cobros"
+        variant="dashed"
+      >
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <label className={`${fieldLabelClassName} w-full sm:w-52`}>
+            Estado
+            <SelectField
+              onChange={(value) => setStatusFilter(value as "ALL" | PaymentStatus)}
+              value={statusFilter}
+            >
+              <option value="ALL">Todos los estados</option>
+              {statusOptions.map((option) => (
+                <option key={option} value={option}>
+                  {statusLabel[option]}
+                </option>
+              ))}
+            </SelectField>
+          </label>
+          <div className={controlRowClassName}>
+            <Toggle
+              checked={onlyWithOrder}
+              label="Solo con pedido"
+              mini
+              onChange={setOnlyWithOrder}
+            />
+          </div>
+        </div>
+      </Disclosure>
+
+      <Disclosure
+        description="Si no está asociado a pedido, queda como cobro manual."
+        title="Registrar cobro manual"
+        variant="dashed"
+      >
+        <form className="grid gap-3 md:grid-cols-2 md:items-end" onSubmit={createManualCollection}>
+          <label className={fieldLabelClassName}>
+            Cliente
+            <input
+              className={inputClassName}
+              onChange={(event) => setCustomerName(event.target.value)}
+              placeholder="Cliente"
+              required
+              value={customerName}
+            />
+          </label>
+          <label className={fieldLabelClassName}>
+            Teléfono
+            <input
+              className={inputClassName}
+              onChange={(event) => setCustomerPhone(event.target.value)}
+              placeholder="Teléfono"
+              required
+              value={customerPhone}
+            />
+          </label>
+          <label className={fieldLabelClassName}>
+            Monto (ARS)
+            <MoneyInput
+              onChange={(next) => {
+                setAmountArs(next.amount);
+                setAmountInput(next.display);
+              }}
+              placeholder="Monto ARS"
+              required
+              value={amountInput}
+            />
+          </label>
+          <label className={fieldLabelClassName}>
+            Nota de referencia
+            <input
+              className={inputClassName}
+              onChange={(event) => setReferenceNote(event.target.value)}
+              placeholder="Nota de referencia"
+              value={referenceNote}
+            />
+          </label>
+          <label className={fieldLabelClassName}>
+            Tipo
+            <SelectField onChange={(value) => setKind(value as PaymentKind)} value={kind}>
+              {kindOptions.map((option) => (
+                <option key={option} value={option}>
+                  {kindLabel[option]}
+                </option>
+              ))}
+            </SelectField>
+          </label>
+          <label className={fieldLabelClassName}>
+            Método
+            <SelectField onChange={(value) => setMethod(value as PaymentMethod)} value={method}>
+              {methodOptions.map((option) => (
+                <option key={option} value={option}>
+                  {methodLabel[option]}
+                </option>
+              ))}
+            </SelectField>
+          </label>
+          <label className={`${fieldLabelClassName} md:col-span-2`}>
+            Estado inicial
+            <SelectField onChange={(value) => setStatus(value as PaymentStatus)} value={status}>
+              {statusOptions.map((option) => (
+                <option key={option} value={option}>
+                  {statusLabel[option]}
+                </option>
+              ))}
+            </SelectField>
+          </label>
+
+          <button className={`${buttonSoftClassName} md:col-span-2`} type="submit">
+            Registrar cobro
+          </button>
+        </form>
+      </Disclosure>
+
+      {error ? (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 px-3 md:hidden">
+        {visibleItems.map((item) => (
+          <article className="py-3" key={item.id}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                {item.customerName || "Cobro manual"}
+              </p>
+              <Pill mini tone={statusTone(item.status)}>
+                {statusLabel[item.status]}
+              </Pill>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">{formatDateTime(item.createdAt)}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700">
+              <Pill mini>{kindLabel[item.kind]}</Pill>
+              <Pill mini tone="info">
+                {methodLabel[item.method]}
+              </Pill>
+            </div>
+            <p className="mt-3 font-medium text-zinc-900">{formatMoney(item.amountArs)}</p>
+            {item.referenceNote ? (
+              <p className="mt-2 rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--surface-soft)]/75 px-2.5 py-2 text-xs text-zinc-600">
+                {item.referenceNote}
+              </p>
+            ) : null}
+            {item.order ? (
+              <a
+                className="mt-2 inline-flex text-xs text-zinc-700 underline underline-offset-2"
+                href={`/comprobante/${item.order.publicReceiptCode}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Pedido: {item.order.publicReceiptCode}
+              </a>
+            ) : null}
+          </article>
+        ))}
+      </div>
+
+      <div className={tableShellClassName}>
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
+              <th className="px-3 py-3">Fecha</th>
+              <th className="px-3 py-3">Cliente</th>
+              <th className="px-3 py-3">Pedido</th>
+              <th className="px-3 py-3">Tipo</th>
+              <th className="px-3 py-3">Método</th>
+              <th className="px-3 py-3">Estado</th>
+              <th className="px-3 py-3">Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleItems.map((item) => (
+              <tr className="border-b border-[#e2ddd9] transition" key={item.id}>
+                <td className="px-3 py-3">{formatDateTime(item.createdAt)}</td>
+                <td className="px-3 py-3">
+                  <p>{item.customerName || "-"}</p>
+                  <p className="text-xs text-zinc-500">{item.customerPhone || "-"}</p>
+                </td>
+                <td className="px-3 py-3">
+                  {item.order ? (
+                    <a
+                      className="text-zinc-700 underline underline-offset-2"
+                      href={`/comprobante/${item.order.publicReceiptCode}`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {item.order.publicReceiptCode}
+                    </a>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+                <td className="px-3 py-3">
+                  <Pill mini>{kindLabel[item.kind]}</Pill>
+                </td>
+                <td className="px-3 py-3">
+                  <Pill mini tone="info">
+                    {methodLabel[item.method]}
+                  </Pill>
+                </td>
+                <td className="px-3 py-3">
+                  <Pill mini tone={statusTone(item.status)}>
+                    {statusLabel[item.status]}
+                  </Pill>
+                </td>
+                <td className="px-3 py-3 font-medium text-zinc-900">
+                  {formatMoney(item.amountArs)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

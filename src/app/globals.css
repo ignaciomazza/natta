@@ -1,17 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --cream: #f4eee5;
-  --cream-soft: #fbf8f2;
-  --milk: #fffaf0;
-  --chocolate: #513530;
-  --chocolate-deep: #2b1a18;
-  --caramel: #b57946;
-  --caramel-soft: #dfbc8b;
+  --cream: #f5f3f1;
+  --cream-soft: #faf9f8;
+  --milk: #ffffff;
+  --chocolate: #403a37;
+  --chocolate-deep: #262321;
+  --caramel: #8e8179;
+  --caramel-soft: #d8d1cb;
   --sage: #64746a;
   --sage-soft: #d8dfd4;
   --ink: #191514;
-  --line: rgba(81, 53, 48, 0.18);
+  --line: rgba(64, 58, 55, 0.16);
+  --accent: #6f6560;
+  --accent-strong: #524a46;
+  --accent-soft: #ede9e6;
+  --surface-soft: #f3efec;
 }
 
 @theme inline {
@@ -35,7 +39,7 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   background:
-    radial-gradient(circle at 15% 10%, rgba(223, 188, 139, 0.28), transparent 28rem),
+    radial-gradient(circle at 14% 10%, rgba(92, 83, 78, 0.09), transparent 28rem),
     linear-gradient(180deg, var(--cream-soft), var(--cream));
   overflow-x: hidden;
 }
@@ -45,6 +49,13 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+a[href],
+summary,
+[role="button"] {
+  cursor: pointer;
 }
 
 ::selection {
@@ -58,8 +69,8 @@ textarea {
 
 .noise {
   background-image:
-    linear-gradient(rgba(81, 53, 48, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(81, 53, 48, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(64, 58, 55, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(64, 58, 55, 0.022) 1px, transparent 1px);
   background-size: 42px 42px;
 }
 
@@ -1021,5 +1032,35 @@ html.brand-loader-hydrated .brand-loader-shell {
   }
   50% {
     transform: translateY(-2px) scale(1.01);
+  }
+}
+
+.mp-secure-field {
+  height: 3.5rem;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  border-radius: 18px;
+  border: 1px solid rgba(64, 58, 55, 0.18);
+  background: #fff;
+  padding: 0 1rem;
+  transition: border-color 180ms ease;
+}
+
+.mp-secure-field:focus-within {
+  border-color: #403a37;
+}
+
+.mp-secure-field > div,
+.mp-secure-field iframe {
+  height: 100% !important;
+  width: 100%;
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .mp-secure-field {
+    height: 3.6rem;
   }
 }

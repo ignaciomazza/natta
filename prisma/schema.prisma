@@ -12,31 +12,86 @@ enum FulfillmentMode {
   DELIVERY
 }
 
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MERCADO_PAGO
+  TRANSFER
+  CASH
+  MANUAL
+}
+
+enum PaymentKind {
+  DEPOSIT
+  BALANCE
+  FULL
+}
+
+enum ExpenseCategory {
+  INGREDIENTS
+  OPERATIONS
+  MARKETING
+  LOGISTICS
+  OTHER
+}
+
+enum MercadoPagoWebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  ERROR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Flavor {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String      @id @default(cuid())
+  slug        String      @unique
   name        String
   description String
-  isActive    Boolean  @default(true)
+  isActive    Boolean     @default(true)
   note        String?
   prices      Price[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 model Size {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String      @id @default(cuid())
+  slug        String      @unique
   name        String
   description String
   servings    String
   diameterCm  Int?
   grams       Int?
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
+  sortOrder   Int         @default(0)
+  isActive    Boolean     @default(true)
   prices      Price[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 model Price {
@@ -52,28 +107,187 @@ model Price {
   @@unique([flavorId, sizeId])
 }
 
-model AvailabilityRule {
-  id              String          @id @default(cuid())
+model WeekdayCapacityRule {
+  id              String   @id @default(cuid())
   weekday         Int
-  isOpen          Boolean         @default(true)
-  cutoffHour      Int             @default(10)
-  minLeadTimeDays Int             @default(2)
-  pickupEnabled   Boolean         @default(true)
-  deliveryEnabled Boolean         @default(true)
-  fulfillmentMode FulfillmentMode?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  isOpen          Boolean  @default(true)
+  maxUnits        Int      @default(20)
+  minLeadTimeDays Int      @default(2)
+  cutoffHour      Int      @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@unique([weekday, fulfillmentMode])
+  @@unique([weekday])
 }
 
-model CapacityOverride {
-  id             String   @id @default(cuid())
-  date           DateTime @unique @db.Date
-  maxUnits       Int
-  isClosed       Boolean  @default(false)
-  internalNote   String?
-  customerNotice String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model DateCapacityOverride {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  maxUnits  Int?
+  isClosed  Boolean  @default(false)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  orders    Order[]
+  payments  Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([phone])
+  @@index([name])
+  @@index([phone])
+}
+
+model Order {
+  id                           String          @id @default(cuid())
+  customerId                   String
+  fulfillmentMode              FulfillmentMode
+  deliveryDate                 DateTime        @db.Date
+  deliveryAddress              String?
+  notes                        String?
+  status                       OrderStatus     @default(PENDING)
+  subtotalArs                  Int
+  amountDueNowArs              Int
+  amountPaidArs                Int             @default(0)
+  amountBalanceArs             Int
+  publicReceiptCode            String          @unique
+  mercadoPagoExternalReference String?         @unique
+  mercadoPagoPreferenceId      String?
+  mercadoPagoCheckoutUrl       String?
+  confirmedAt                  DateTime?
+  deliveredAt                  DateTime?
+  cancelledAt                  DateTime?
+  createdAt                    DateTime        @default(now())
+  updatedAt                    DateTime        @updatedAt
+  customer                     Customer        @relation(fields: [customerId], references: [id])
+  items                        OrderItem[]
+  payments                     Payment[]
+
+  @@index([deliveryDate])
+  @@index([status])
+  @@index([fulfillmentMode])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  flavorId     String
+  sizeId       String
+  quantity     Int
+  unitPriceArs Int
+  subtotalArs  Int
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  flavor       Flavor   @relation(fields: [flavorId], references: [id])
+  size         Size     @relation(fields: [sizeId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orderId])
+}
+
+model Payment {
+  id                  String        @id @default(cuid())
+  orderId             String?
+  customerId          String?
+  kind                PaymentKind
+  status              PaymentStatus @default(PENDING)
+  method              PaymentMethod @default(MANUAL)
+  amountArs           Int
+  paidAt              DateTime?
+  customerName        String?
+  customerPhone       String?
+  referenceNote       String?
+  provider            String?
+  externalReference   String?
+  providerPreferenceId String?
+  providerPaymentId   String?
+  providerPayload     Json?
+  statusDetail        String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  order               Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  customer            Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+  @@index([externalReference])
+}
+
+model Supplier {
+  id          String     @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  notes       String?
+  isActive    Boolean    @default(true)
+  purchases   Purchase[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([name])
+}
+
+model Purchase {
+  id            String        @id @default(cuid())
+  supplierId    String?
+  purchasedAt   DateTime      @default(now())
+  description   String
+  amountArs     Int
+  paymentMethod PaymentMethod @default(MANUAL)
+  status        PaymentStatus @default(PENDING)
+  notes         String?
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([purchasedAt])
+  @@index([status])
+}
+
+model Expense {
+  id            String        @id @default(cuid())
+  occurredAt    DateTime      @default(now())
+  description   String
+  category      ExpenseCategory @default(OTHER)
+  amountArs     Int
+  paymentMethod PaymentMethod @default(MANUAL)
+  status        PaymentStatus @default(APPROVED)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([occurredAt])
+  @@index([category])
+}
+
+model MercadoPagoWebhookEvent {
+  id           String                 @id @default(cuid())
+  eventId      String?                @unique
+  topic        String?
+  action       String?
+  resourceId   String?
+  requestId    String?
+  signature    String?
+  payload      Json
+  status       MercadoPagoWebhookStatus @default(RECEIVED)
+  errorMessage String?
+  processedAt  DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([topic, resourceId])
+  @@index([status])
+  @@index([createdAt])
 }
