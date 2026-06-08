@@ -32,6 +32,8 @@ El flujo de `/pedido` usa un checkout embebido con:
 Variables requeridas en `.env`:
 
 ```bash
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
 NEXT_PUBLIC_APP_URL="https://tu-dominio-o-tunnel.ngrok-free.app"
 MERCADOPAGO_ENV="test"
 NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_TEST="APP_USR-..."
@@ -46,11 +48,14 @@ NEXT_PUBLIC_PRICE_MULTIPLIER="1"
 
 Notas:
 
+- `DATABASE_URL` debería usar pool en producción.
+- `DIRECT_URL` debería usar conexión directa del cluster para Prisma.
 - `MERCADOPAGO_ENV` define qué credenciales usa la app en ese entorno (`test` o `production`).
 - `NEXT_PUBLIC_APP_URL` no debería ser `localhost` si querés probar el retorno desde wallet/QR.
 - `MERCADOPAGO_TICKET_EXPIRATION_DAYS` controla el vencimiento de Rapipago/Pago Fácil.
 - `NEXT_PUBLIC_PRICE_MULTIPLIER` permite bajar temporalmente todos los importes sin tocar la base. Ejemplo: `0.1` deja una Latta de `$ 13.000` en `$ 1.300`.
 - La guía operativa para crear la app y cargar credenciales quedó en `docs/mercadopago-checkout.md`.
+- La guía para dejar PostgreSQL bien armada en producción quedó en `docs/database-production.md`.
 
 ## Base de datos local
 

@@ -104,6 +104,17 @@ export function getMercadoPagoPublicKey() {
   return key;
 }
 
+export function getMercadoPagoCheckoutUrl(
+  preference: MercadoPagoPreferenceResponse,
+  environment = getMercadoPagoEnvironment(),
+) {
+  if (environment === "production") {
+    return preference.init_point ?? preference.sandbox_init_point ?? null;
+  }
+
+  return preference.sandbox_init_point ?? preference.init_point ?? null;
+}
+
 async function mercadoPagoRequest<T>(path: string, init: RequestInit = {}) {
   const response = await fetch(`${MERCADOPAGO_API_BASE}${path}`, {
     ...init,

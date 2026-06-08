@@ -706,7 +706,7 @@ try {
     preferCSSPageSize: true,
   });
   await browser.close();
-} catch (error) {
+} catch {
   const chromePath =
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   const userDataDir = path.join(

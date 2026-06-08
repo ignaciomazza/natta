@@ -4,6 +4,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
   createMercadoPagoPreference,
+  getMercadoPagoCheckoutUrl,
+  getMercadoPagoEnvironment,
   getMercadoPagoPublicKey,
   getMercadoPagoTicketExpirationDays,
   MercadoPagoConfigError,
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No hay cobro pendiente" }, { status: 409 });
     }
 
+    const mercadoPagoEnvironment = getMercadoPagoEnvironment();
+
     const preference = await createMercadoPagoPreference({
       orderId: order.id,
       externalReference: pendingPayment.externalReference ?? `natta_${order.id}`,
@@ -57,15 +61,19 @@ export async function POST(req: NextRequest) {
       amountArs: pendingPayment.amountArs,
       customerName: order.customer.name,
       customerEmail: order.customer.email,
+      environment: mercadoPagoEnvironment,
     });
+    const checkoutUrl = getMercadoPagoCheckoutUrl(
+      preference,
+      mercadoPagoEnvironment,
+    );
 
     await prisma.$transaction([
       prisma.order.update({
         where: { id: order.id },
         data: {
           mercadoPagoPreferenceId: preference.id,
-          mercadoPagoCheckoutUrl:
-            preference.sandbox_init_point ?? preference.init_point ?? null,
+          mercadoPagoCheckoutUrl: checkoutUrl,
         },
       }),
       prisma.payment.update({
@@ -86,7 +94,7 @@ export async function POST(req: NextRequest) {
       publicKey: getMercadoPagoPublicKey(),
       receiptCode: order.publicReceiptCode,
       ticketExpirationDays: getMercadoPagoTicketExpirationDays(),
-      walletInitPoint: preference.sandbox_init_point ?? preference.init_point ?? null,
+      walletInitPoint: checkoutUrl,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

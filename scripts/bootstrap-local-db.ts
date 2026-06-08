@@ -157,6 +157,7 @@ function main() {
 
   envContent = ensureLineBreak(envContent);
   envContent = upsertEnv(envContent, "DATABASE_URL", databaseUrl);
+  envContent = upsertEnv(envContent, "DIRECT_URL", databaseUrl);
   envContent = upsertEnv(envContent, "JWT_SECRET", jwtSecret);
   envContent = upsertEnv(envContent, "NEXT_PUBLIC_APP_URL", "http://localhost:3000");
 
@@ -185,6 +186,7 @@ function main() {
   console.log(`DB_PASSWORD=${dbPassword}`);
   console.log(`DB_NAME=${dbName}`);
   console.log(`DATABASE_URL=${databaseUrl}`);
+  console.log(`DIRECT_URL=${databaseUrl}`);
   console.log(`JWT_SECRET=${jwtSecret}`);
   console.log("Archivo .env actualizado.");
 }
