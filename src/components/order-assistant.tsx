@@ -296,6 +296,17 @@ function getReturnStateMessage(returnState: string | null) {
   return null;
 }
 
+function getMercadoPagoReturnPaymentId() {
+  if (typeof window === "undefined") return null;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return (
+    searchParams.get("payment_id") ??
+    searchParams.get("collection_id") ??
+    null
+  );
+}
+
 function sanitizeUiMessage(message: string) {
   return message.replace(/checkout/gi, "cobro");
 }
@@ -344,6 +355,9 @@ export function OrderAssistant() {
     if (typeof window === "undefined") return null;
     return new URLSearchParams(window.location.search).get("payment");
   });
+  const [returnPaymentId, setReturnPaymentId] = useState<string | null>(() =>
+    getMercadoPagoReturnPaymentId(),
+  );
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("wallet");
 
   useEffect(() => {
@@ -380,12 +394,25 @@ export function OrderAssistant() {
     void (async () => {
       setLoadingPaymentView(true);
       try {
-        const snapshot = await refreshPaymentSnapshot(createdOrderId);
+        const snapshot = await refreshPaymentSnapshot(createdOrderId, {
+          syncPaymentId: returnPaymentId,
+        });
         if (cancelled) return;
 
         const hasApprovedPayment = snapshot.payments.some(
           (payment) => payment.status === "APPROVED",
         );
+
+        if (
+          returnPaymentState === "success" &&
+          hasApprovedPayment &&
+          snapshot.order.publicReceiptCode
+        ) {
+          window.location.replace(
+            `/comprobante/${snapshot.order.publicReceiptCode}`,
+          );
+          return;
+        }
 
         if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
           await refreshCheckoutSession(createdOrderId);
@@ -407,7 +434,7 @@ export function OrderAssistant() {
     return () => {
       cancelled = true;
     };
-  }, [createdOrderId]);
+  }, [createdOrderId, returnPaymentId, returnPaymentState]);
 
   const sizeLookup = useMemo(
     () => new Map((catalog?.sizes ?? []).map((size) => [size.id, size])),
@@ -621,8 +648,22 @@ export function OrderAssistant() {
     return checkoutResult;
   }
 
-  async function refreshPaymentSnapshot(orderId: string) {
-    const response = await fetch(`/api/payments/order/${orderId}`, {
+  async function refreshPaymentSnapshot(
+    orderId: string,
+    options?: {
+      syncPaymentId?: string | null;
+    },
+  ) {
+    const searchParams = new URLSearchParams();
+    if (options?.syncPaymentId) {
+      searchParams.set("syncPaymentId", options.syncPaymentId);
+    }
+
+    const requestPath = searchParams.size
+      ? `/api/payments/order/${orderId}?${searchParams.toString()}`
+      : `/api/payments/order/${orderId}`;
+
+    const response = await fetch(requestPath, {
       cache: "no-store",
     });
     const payload = (await response.json().catch(() => null)) as
@@ -663,6 +704,7 @@ export function OrderAssistant() {
     setPaymentResult(null);
     setSubmittedCode(null);
     setReturnPaymentState(null);
+    setReturnPaymentId(null);
     setLoadingPaymentView(false);
     setCheckingStatus(false);
     setPaymentChoice("wallet");
@@ -672,6 +714,13 @@ export function OrderAssistant() {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("order");
     nextUrl.searchParams.delete("payment");
+    nextUrl.searchParams.delete("payment_id");
+    nextUrl.searchParams.delete("collection_id");
+    nextUrl.searchParams.delete("collection_status");
+    nextUrl.searchParams.delete("status");
+    nextUrl.searchParams.delete("external_reference");
+    nextUrl.searchParams.delete("merchant_order_id");
+    nextUrl.searchParams.delete("preference_id");
     window.history.replaceState({}, "", nextUrl);
 
     requestAnimationFrame(() => {
@@ -820,10 +869,23 @@ export function OrderAssistant() {
     setCheckingStatus(true);
     setSubmitError(null);
     try {
-      const snapshot = await refreshPaymentSnapshot(createdOrderId);
+      const snapshot = await refreshPaymentSnapshot(createdOrderId, {
+        syncPaymentId: returnPaymentId,
+      });
       const hasApprovedPayment = snapshot.payments.some(
         (payment) => payment.status === "APPROVED",
       );
+
+      if (
+        returnPaymentState === "success" &&
+        hasApprovedPayment &&
+        snapshot.order.publicReceiptCode
+      ) {
+        window.location.replace(
+          `/comprobante/${snapshot.order.publicReceiptCode}`,
+        );
+        return;
+      }
 
       if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
         await refreshCheckoutSession(createdOrderId);
@@ -853,7 +915,9 @@ export function OrderAssistant() {
     if (!createdOrderId) return;
 
     try {
-      await refreshPaymentSnapshot(createdOrderId);
+      await refreshPaymentSnapshot(createdOrderId, {
+        syncPaymentId: result.payment.providerPaymentId,
+      });
     } catch (error) {
       setSubmitError(
         sanitizeUiMessage(
@@ -1469,8 +1533,6 @@ export function OrderAssistant() {
                       <a
                         className="font-semibold underline underline-offset-4"
                         href={`/comprobante/${receiptCode}`}
-                        rel="noreferrer"
-                        target="_blank"
                       >
                         Ver comprobante
                       </a>
@@ -1479,8 +1541,6 @@ export function OrderAssistant() {
                       <a
                         className="font-semibold underline underline-offset-4"
                         href={paymentReceiptUrl}
-                        rel="noreferrer"
-                        target="_blank"
                       >
                         Ver constancia del pago
                       </a>
@@ -1597,8 +1657,6 @@ export function OrderAssistant() {
                   <a
                     className="motion-button inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] sm:h-12 sm:text-sm"
                     href={`/comprobante/${receiptCode}`}
-                    rel="noreferrer"
-                    target="_blank"
                   >
                     Ver comprobante
                   </a>
@@ -1607,8 +1665,6 @@ export function OrderAssistant() {
                   <a
                     className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--line)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:h-12 sm:text-sm"
                     href={paymentReceiptUrl}
-                    rel="noreferrer"
-                    target="_blank"
                   >
                     Ver constancia del pago
                   </a>

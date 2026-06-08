@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMercadoPagoWebhookResourceId, getMercadoPagoWebhookTopic, syncMercadoPagoPayment } from "@/lib/payments/sync";
-import { verifyMercadoPagoWebhookSignature } from "@/lib/payments/mercadopago";
+import {
+  getMercadoPagoEnvironment,
+  verifyMercadoPagoWebhookSignature,
+} from "@/lib/payments/mercadopago";
 import { logServerError } from "@/lib/server/log";
 
 export const runtime = "nodejs";
@@ -25,6 +28,12 @@ export async function POST(req: NextRequest) {
     const topic = getMercadoPagoWebhookTopic(payload);
     const requestId = req.headers.get("x-request-id");
     const signature = req.headers.get("x-signature");
+    const webhookEnvironment =
+      payload.live_mode === true
+        ? "production"
+        : payload.live_mode === false
+          ? "test"
+          : getMercadoPagoEnvironment();
 
     eventId = payload.id ?? (requestId && resourceId ? `${requestId}:${resourceId}` : null);
 
@@ -32,7 +41,7 @@ export async function POST(req: NextRequest) {
       signature,
       requestId,
       dataId: resourceId,
-      environment: payload.live_mode ? "production" : "test",
+      environment: webhookEnvironment,
     });
 
     const webhookEvent = await prisma.mercadoPagoWebhookEvent.upsert({
@@ -68,10 +77,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (topic === "payment") {
-      await syncMercadoPagoPayment(
-        resourceId,
-        payload.live_mode ? "production" : "test",
-      );
+      await syncMercadoPagoPayment(resourceId, webhookEnvironment);
       await prisma.mercadoPagoWebhookEvent.update({
         where: { id: webhookEvent.id },
         data: {

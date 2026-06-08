@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncMercadoPagoPayment } from "@/lib/payments/sync";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ orderId: string }> },
 ) {
   const { orderId } = await params;
+  const syncPaymentId = req.nextUrl.searchParams.get("syncPaymentId")?.trim();
+
+  if (syncPaymentId) {
+    try {
+      await syncMercadoPagoPayment(syncPaymentId);
+    } catch (error) {
+      console.error("No se pudo sincronizar el pago de Mercado Pago", {
+        error,
+        orderId,
+        syncPaymentId,
+      });
+    }
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
