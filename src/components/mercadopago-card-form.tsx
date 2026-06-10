@@ -414,6 +414,12 @@ export function MercadoPagoCardForm({
       lastBinRef.current = bin;
 
       try {
+        const mp = mpRef.current;
+        if (!mp) {
+          resetDerivedData();
+          return;
+        }
+
         const paymentMethod = await fetchPaymentMethodByBin(bin);
 
         if (lookupVersionRef.current !== lookupVersion) {
