@@ -75,18 +75,18 @@ const heroPieces: HeroPiece[] = [
       width: "clamp(5rem, 14vw, 8.4rem)",
     },
     mobile: {
-      left: 3,
-      top: 44,
-      width: "clamp(4.8rem, 24vw, 6.4rem)",
+      left: 0,
+      top: 2,
+      width: "clamp(8.15rem, 47vw, 10.6rem)",
       expandX: -10,
       expandY: -8,
-      scale: 0.98,
+      scale: 1.08,
     },
     smallMobile: {
-      left: 1,
-      top: 43,
-      width: "4.9rem",
-      scale: 0.92,
+      left: -1,
+      top: 3,
+      width: "8rem",
+      scale: 1.04,
     },
   },
   {
@@ -104,24 +104,26 @@ const heroPieces: HeroPiece[] = [
     scale: 0.92,
     hoverScale: 1.16,
     floatDelay: "-3.5s",
+    floatY: "0px",
+    className: "hero-product-piece--bottom-safe",
     tablet: {
       left: 86,
       top: 31,
       width: "clamp(4.4rem, 12vw, 7.5rem)",
     },
     mobile: {
-      left: 94,
-      top: 45,
-      width: "clamp(4.55rem, 22vw, 5.8rem)",
+      left: 26,
+      top: 75,
+      width: "clamp(5.15rem, 27vw, 6.4rem)",
       expandX: 8,
       expandY: -8,
-      scale: 0.95,
+      scale: 0.98,
     },
     smallMobile: {
-      left: 95,
-      top: 44,
-      width: "4.55rem",
-      scale: 0.9,
+      left: 25,
+      top: 75,
+      width: "5.05rem",
+      scale: 0.92,
     },
   },
   {
@@ -137,6 +139,7 @@ const heroPieces: HeroPiece[] = [
     expandX: -56,
     expandY: 10,
     hoverScale: 1.1,
+    hideOnMobile: true,
     floatDelay: "-2.2s",
     tablet: {
       left: 9,
@@ -171,6 +174,7 @@ const heroPieces: HeroPiece[] = [
     expandX: -26,
     expandY: 42,
     hoverScale: 1.18,
+    hideOnMobile: true,
     floatDelay: "-0.4s",
     tablet: {
       left: 19,
@@ -206,6 +210,7 @@ const heroPieces: HeroPiece[] = [
     expandY: 48,
     scale: 0.96,
     hoverScale: 1.13,
+    hideOnMobile: true,
     floatDelay: "-2.8s",
     tablet: {
       left: 82,
@@ -213,18 +218,18 @@ const heroPieces: HeroPiece[] = [
       width: "clamp(4.2rem, 11vw, 7rem)",
     },
     mobile: {
-      left: 86,
-      top: 79,
-      width: "clamp(4.5rem, 20vw, 5.6rem)",
+      left: 27,
+      top: 61,
+      width: "clamp(5.2rem, 27vw, 6.6rem)",
       expandX: 6,
       expandY: 8,
-      scale: 0.92,
+      scale: 0.96,
     },
     smallMobile: {
-      left: 88,
-      top: 78,
-      width: "4.2rem",
-      scale: 0.84,
+      left: 26,
+      top: 61,
+      width: "5.05rem",
+      scale: 0.9,
     },
   },
   {
@@ -247,19 +252,19 @@ const heroPieces: HeroPiece[] = [
       width: "clamp(3.7rem, 9vw, 5.8rem)",
     },
     mobile: {
-      left: 47,
-      top: 26,
-      width: "clamp(3.55rem, 15vw, 4.35rem)",
+      left: 100.5,
+      top: 41,
+      width: "clamp(6rem, 27vw, 7rem)",
       expandX: 0,
       expandY: -8,
       opacity: 0.84,
-      scale: 0.86,
+      scale: 1,
     },
     smallMobile: {
-      left: 47,
-      top: 25,
-      width: "3.55rem",
-      scale: 0.82,
+      left: 100.5,
+      top: 41,
+      width: "5.35rem",
+      scale: 0.96,
     },
   },
   {
@@ -293,6 +298,7 @@ const heroPieces: HeroPiece[] = [
     scale: 0.9,
     hoverScale: 1.08,
     opacity: 0.58,
+    hideOnMobile: true,
     floatDelay: "-3.1s",
     floatY: "-5px",
     className: "hero-product-piece--illustration",
@@ -331,6 +337,7 @@ const heroPieces: HeroPiece[] = [
     scale: 0.88,
     hoverScale: 1.1,
     opacity: 0.52,
+    hideOnMobile: true,
     floatDelay: "-0.7s",
     floatY: "-6px",
     className: "hero-product-piece--illustration",
@@ -599,6 +606,8 @@ export function HeroProductCloud() {
                   height={piece.naturalHeight}
                   priority={
                     piece.src === "/images/transparent-images/1.png" ||
+                    piece.src === "/images/transparent-images/2.png" ||
+                    piece.src === "/images/transparent-images/7.png" ||
                     piece.src === "/images/transparent-images/5.png" ||
                     piece.src === "/images/transparent-images/3.png"
                   }

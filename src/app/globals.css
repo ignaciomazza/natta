@@ -219,10 +219,14 @@ summary,
 @media (max-width: 767px) {
   .hero-product-cloud__stage {
     --logo-width: min(68vw, 18.8rem);
+    align-items: flex-start;
+    min-height: max(calc(100svh - 5rem), 51.5rem);
+    padding-top: clamp(8.75rem, 22svh, 10.5rem);
+    padding-bottom: 8.5rem;
   }
 
   .hero-product-cloud__pieces {
-    inset: 0.75rem -0.75rem 1.25rem;
+    inset: 0 -0.75rem 1.25rem;
   }
 
   .hero-product-piece {
@@ -266,14 +270,29 @@ summary,
     max-width: min(84vw, 21rem);
   }
 
+  .hero-product-cloud:has(.hero-product-cloud__logo:focus-visible)
+    .hero-product-piece {
+    --hover-x-active: 0px;
+    --hover-y-active: 0px;
+    --piece-scale-active: var(--piece-scale-base);
+    --piece-opacity-active: var(--piece-opacity, 0.94);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hero-product-cloud:has(.hero-product-cloud__logo:hover)
+      .hero-product-piece {
+      --hover-x-active: 0px;
+      --hover-y-active: 0px;
+      --piece-scale-active: var(--piece-scale-base);
+      --piece-opacity-active: var(--piece-opacity, 0.94);
+    }
+  }
+
   .hero-product-cloud.is-mobile-scroll-expanded .hero-product-piece {
-    --hover-x-active: var(--mobile-hover-x, var(--hover-x, 0px));
-    --hover-y-active: var(--mobile-hover-y, var(--hover-y, 0px));
-    --piece-scale-active: var(
-      --piece-scale-expanded-mobile,
-      var(--piece-scale-expanded, 1.08)
-    );
-    --piece-opacity-active: var(--piece-opacity-expanded, 1);
+    --hover-x-active: 0px;
+    --hover-y-active: 0px;
+    --piece-scale-active: var(--piece-scale-base);
+    --piece-opacity-active: var(--piece-opacity, 0.94);
   }
 
   .hero-product-cloud.is-mobile-scroll-expanded .hero-product-cloud__logo-image {
@@ -324,18 +343,9 @@ summary,
   }
 
   .hero-product-cloud.is-mobile-scroll-expanded .hero-product-piece {
-    --hover-x-active: var(
-      --small-mobile-hover-x,
-      var(--mobile-hover-x, var(--hover-x, 0px))
-    );
-    --hover-y-active: var(
-      --small-mobile-hover-y,
-      var(--mobile-hover-y, var(--hover-y, 0px))
-    );
-    --piece-scale-active: var(
-      --piece-scale-expanded-small-mobile,
-      var(--piece-scale-expanded-mobile, var(--piece-scale-expanded, 1.08))
-    );
+    --hover-x-active: 0px;
+    --hover-y-active: 0px;
+    --piece-scale-active: var(--piece-scale-base);
   }
 
   .hero-product-cloud__tagline {
@@ -343,6 +353,24 @@ summary,
     max-width: min(82vw, 19rem);
     font-size: 1.0625rem;
     line-height: 1.55;
+  }
+}
+
+@media (max-width: 767px) and (max-height: 860px) {
+  .hero-product-piece--bottom-safe {
+    --piece-scale-base: 0.9;
+    --piece-scale-active: var(--piece-scale-base);
+    top: calc(100svh - 14rem);
+    width: 5rem;
+  }
+}
+
+@media (max-width: 767px) and (max-height: 720px) {
+  .hero-product-piece--bottom-safe {
+    --piece-scale-base: 0.88;
+    --piece-scale-active: var(--piece-scale-base);
+    top: calc(100svh - 13.8rem);
+    width: 4.75rem;
   }
 }
 

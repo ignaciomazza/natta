@@ -38,6 +38,11 @@ type SelectOption = {
   helper?: string;
 };
 
+const singleInstallmentFallback: SelectOption = {
+  value: "1",
+  label: "1 pago",
+};
+
 type IdentificationType = {
   id: string;
   name: string;
@@ -383,11 +388,18 @@ export function MercadoPagoCardForm({
     }
   }, []);
 
+  const fetchPaymentMethodByBin = useCallback(async (bin: string) => {
+    const mp = mpRef.current;
+    if (!mp || !bin) {
+      return null;
+    }
+
+    const paymentMethodsResponse = await mp.getPaymentMethods({ bin });
+    return paymentMethodsResponse.results?.[0] ?? null;
+  }, []);
+
   const updateCardMetadata = useCallback(
     async (bin: string) => {
-      const mp = mpRef.current;
-      if (!mp) return;
-
       if (!bin) {
         resetDerivedData();
         return;
@@ -402,8 +414,7 @@ export function MercadoPagoCardForm({
       lastBinRef.current = bin;
 
       try {
-        const paymentMethodsResponse = await mp.getPaymentMethods({ bin });
-        const paymentMethod = paymentMethodsResponse.results?.[0];
+        const paymentMethod = await fetchPaymentMethodByBin(bin);
 
         if (lookupVersionRef.current !== lookupVersion) {
           return;
@@ -418,53 +429,71 @@ export function MercadoPagoCardForm({
         setSelectedPaymentMethod(paymentMethod.id);
         setSelectedPaymentType(paymentMethod.payment_type_id ?? "credit_card");
 
-        const issuerResults =
-          paymentMethod.additional_info_needed?.includes("issuer_id")
-            ? await mp.getIssuers({
-                paymentMethodId: paymentMethod.id,
-                bin,
-              })
-            : paymentMethod.issuer
-              ? [paymentMethod.issuer]
-              : [];
+        try {
+          const issuerResults =
+            paymentMethod.additional_info_needed?.includes("issuer_id")
+              ? await mp.getIssuers({
+                  paymentMethodId: paymentMethod.id,
+                  bin,
+                })
+              : paymentMethod.issuer
+                ? [paymentMethod.issuer]
+                : [];
 
-        if (lookupVersionRef.current !== lookupVersion) {
-          return;
+          if (lookupVersionRef.current !== lookupVersion) {
+            return;
+          }
+
+          const nextIssuerOptions = issuerResults.map((issuer) => ({
+            value: `${issuer.id}`,
+            label: issuer.name,
+          }));
+          setIssuerOptions(nextIssuerOptions);
+          setSelectedIssuer(
+            nextIssuerOptions.length === 1 ? nextIssuerOptions[0].value : "",
+          );
+        } catch {
+          if (lookupVersionRef.current !== lookupVersion) {
+            return;
+          }
+
+          setIssuerOptions([]);
+          setSelectedIssuer("");
         }
 
-        const nextIssuerOptions = issuerResults.map((issuer) => ({
-          value: `${issuer.id}`,
-          label: issuer.name,
-        }));
-        setIssuerOptions(nextIssuerOptions);
-        setSelectedIssuer(
-          nextIssuerOptions.length === 1 ? nextIssuerOptions[0].value : "",
-        );
+        try {
+          const installmentsResponse = await mp.getInstallments({
+            amount: checkout.amountArs,
+            bin,
+            paymentTypeId: paymentMethod.payment_type_id ?? "credit_card",
+          });
 
-        const installmentsResponse = await mp.getInstallments({
-          amount: checkout.amountArs,
-          bin,
-          paymentTypeId: paymentMethod.payment_type_id ?? "credit_card",
-        });
+          if (lookupVersionRef.current !== lookupVersion) {
+            return;
+          }
 
-        if (lookupVersionRef.current !== lookupVersion) {
-          return;
+          const payerCosts = Array.isArray(installmentsResponse)
+            ? installmentsResponse[0]?.payer_costs ?? []
+            : [];
+          const nextInstallmentOptions = payerCosts.length
+            ? payerCosts.map((option) => ({
+                value: `${option.installments}`,
+                label: option.recommended_message,
+              }))
+            : [singleInstallmentFallback];
+          setInstallmentOptions(nextInstallmentOptions);
+          setSelectedInstallments(nextInstallmentOptions[0]?.value ?? "1");
+        } catch {
+          if (lookupVersionRef.current !== lookupVersion) {
+            return;
+          }
+
+          setInstallmentOptions([singleInstallmentFallback]);
+          setSelectedInstallments(singleInstallmentFallback.value);
         }
 
-        const payerCosts = Array.isArray(installmentsResponse)
-          ? installmentsResponse[0]?.payer_costs ?? []
-          : [];
-        const nextInstallmentOptions = payerCosts.map((option) => ({
-          value: `${option.installments}`,
-          label: option.recommended_message,
-        }));
-        setInstallmentOptions(nextInstallmentOptions);
-        setSelectedInstallments(
-          nextInstallmentOptions[0]?.value ?? "1",
-        );
         setError(null);
       } catch (lookupError) {
-        resetDerivedData();
         setError(
           normalizeMpError(
             toMessage(
@@ -475,7 +504,7 @@ export function MercadoPagoCardForm({
         );
       }
     },
-    [checkout.amountArs, resetDerivedData, updateCardSettings],
+    [checkout.amountArs, fetchPaymentMethodByBin, resetDerivedData, updateCardSettings],
   );
 
   useEffect(() => {
@@ -584,6 +613,8 @@ export function MercadoPagoCardForm({
 
   const submitPayment = useCallback(async () => {
     const mp = mpRef.current;
+    let paymentMethodId = selectedPaymentMethod;
+    let paymentTypeId = selectedPaymentType || undefined;
 
     if (!mp) {
       setError("Todavía no se pudo preparar el pago con tarjeta.");
@@ -605,8 +636,22 @@ export function MercadoPagoCardForm({
       return;
     }
 
-    if (!selectedPaymentMethod) {
-      setError("Completá el número de la tarjeta para reconocer el medio de pago.");
+    if (!paymentMethodId && lastBinRef.current) {
+      try {
+        const paymentMethod = await fetchPaymentMethodByBin(lastBinRef.current);
+        if (paymentMethod) {
+          paymentMethodId = paymentMethod.id;
+          paymentTypeId = paymentMethod.payment_type_id ?? "credit_card";
+          setSelectedPaymentMethod(paymentMethod.id);
+          setSelectedPaymentType(paymentTypeId);
+        }
+      } catch {
+        // Retry stays silent here; we surface a single clear message below.
+      }
+    }
+
+    if (!paymentMethodId) {
+      setError("No se pudo identificar la tarjeta. Probá de nuevo.");
       return;
     }
 
@@ -640,7 +685,7 @@ export function MercadoPagoCardForm({
           selectedPaymentMethod: "card",
           formData: {
             token,
-            payment_method_id: selectedPaymentMethod,
+            payment_method_id: paymentMethodId,
             issuer_id: selectedIssuer || undefined,
             installments: Number(selectedInstallments),
             email: email.trim(),
@@ -653,7 +698,7 @@ export function MercadoPagoCardForm({
             },
           },
           additionalData: {
-            paymentTypeId: selectedPaymentType || undefined,
+            paymentTypeId,
           },
         }),
       });
@@ -687,6 +732,7 @@ export function MercadoPagoCardForm({
     selectedIssuer,
     selectedPaymentMethod,
     selectedPaymentType,
+    fetchPaymentMethodByBin,
   ]);
 
   return (

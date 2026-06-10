@@ -121,6 +121,8 @@ export function OrdersAdmin() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("ALL");
   const [modeFilter, setModeFilter] = useState<"ALL" | "pickup" | "delivery">("ALL");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -130,6 +132,8 @@ export function OrdersAdmin() {
       if (query.trim()) params.set("q", query.trim());
       if (statusFilter !== "ALL") params.set("status", statusFilter.toLowerCase());
       if (modeFilter !== "ALL") params.set("mode", modeFilter);
+      if (fromDate) params.set("from", fromDate);
+      if (toDate) params.set("to", toDate);
 
       const response = await fetch(`/api/orders?${params.toString()}`, {
         cache: "no-store",
@@ -207,11 +211,11 @@ export function OrdersAdmin() {
       </div>
 
       <Disclosure
-        description="Buscá por cliente o código y filtrá por estado/modo."
+        description="Buscá por código, nombre o teléfono y acotá por fecha, estado o modalidad."
         title="Filtros de pedidos"
         variant="dashed"
       >
-        <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[1.45fr_1fr_1fr_1fr_1fr_auto] md:items-end">
           <label className={fieldLabelClassName}>
             Buscar
             <div className="relative">
@@ -250,6 +254,26 @@ export function OrdersAdmin() {
               <option value="pickup">Retiro</option>
               <option value="delivery">Envío</option>
             </SelectField>
+          </label>
+
+          <label className={fieldLabelClassName}>
+            Desde
+            <input
+              className={inputClassName}
+              onChange={(event) => setFromDate(event.target.value)}
+              type="date"
+              value={fromDate}
+            />
+          </label>
+
+          <label className={fieldLabelClassName}>
+            Hasta
+            <input
+              className={inputClassName}
+              onChange={(event) => setToDate(event.target.value)}
+              type="date"
+              value={toDate}
+            />
           </label>
 
           <div className={controlRowClassName}>

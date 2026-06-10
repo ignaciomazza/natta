@@ -403,17 +403,6 @@ export function OrderAssistant() {
           (payment) => payment.status === "APPROVED",
         );
 
-        if (
-          returnPaymentState === "success" &&
-          hasApprovedPayment &&
-          snapshot.order.publicReceiptCode
-        ) {
-          window.location.replace(
-            `/comprobante/${snapshot.order.publicReceiptCode}`,
-          );
-          return;
-        }
-
         if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
           await refreshCheckoutSession(createdOrderId);
         }
@@ -491,6 +480,8 @@ export function OrderAssistant() {
   const hasApprovedPayment =
     paymentResult?.status === "APPROVED" ||
     Boolean(paymentSnapshot?.payments.some((payment) => payment.status === "APPROVED"));
+  const returnedFromSuccessfulPayment =
+    Boolean(createdOrderId) && returnPaymentState === "success";
 
   const summaryItems = paymentSnapshot?.order.items.length
     ? paymentSnapshot.order.items.map((item) => ({
@@ -515,7 +506,7 @@ export function OrderAssistant() {
     paymentSnapshot?.order.amountPaidArs ??
     (paymentResult?.status === "APPROVED" ? paymentResult.amountArs : 0);
   const currentView: AssistantView = createdOrderId
-    ? hasApprovedPayment
+    ? hasApprovedPayment || returnedFromSuccessfulPayment
       ? "success"
       : "payment"
     : "builder";
@@ -875,17 +866,6 @@ export function OrderAssistant() {
       const hasApprovedPayment = snapshot.payments.some(
         (payment) => payment.status === "APPROVED",
       );
-
-      if (
-        returnPaymentState === "success" &&
-        hasApprovedPayment &&
-        snapshot.order.publicReceiptCode
-      ) {
-        window.location.replace(
-          `/comprobante/${snapshot.order.publicReceiptCode}`,
-        );
-        return;
-      }
 
       if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
         await refreshCheckoutSession(createdOrderId);

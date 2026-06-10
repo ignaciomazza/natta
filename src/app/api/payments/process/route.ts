@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
   createMercadoPagoPayment,
+  getMercadoPagoEnvironment,
   getMercadoPagoTicketExpirationDate,
   mapMercadoPagoPaymentStatus,
   MercadoPagoConfigError,
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
       selectedMethod === "ticket" ||
       paymentMethodId === "rapipago" ||
       paymentMethodId === "pagofacil";
+    const mercadoPagoEnvironment = getMercadoPagoEnvironment();
 
     if (!isTicketPayment && !token) {
       return NextResponse.json(
@@ -195,6 +197,7 @@ export async function POST(req: NextRequest) {
       dateOfExpiration: isTicketPayment
         ? getMercadoPagoTicketExpirationDate().toISOString()
         : undefined,
+      environment: mercadoPagoEnvironment,
       idempotencyKey: buildIdempotencyKey([
         pendingPayment.id,
         paymentMethodId,
