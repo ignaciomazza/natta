@@ -716,6 +716,12 @@ html.brand-loader-hydrated .brand-loader-shell {
   .mobile-section-compact {
     padding-block: 2.65rem;
   }
+
+  .hero-followup-section {
+    position: relative;
+    z-index: 2;
+    margin-top: -7.25rem;
+  }
 }
 
 .reveal-up {

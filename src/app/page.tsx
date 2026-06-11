@@ -148,7 +148,7 @@ export default function Home() {
       <HeroProductCloud />
 
       <section
-        className="mobile-section-compact section-pad section-y bg-[var(--milk)]"
+        className="hero-followup-section mobile-section-compact section-pad section-y bg-[var(--milk)]"
         id="como-pedir"
       >
         <div className="content-shell grid gap-6 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
