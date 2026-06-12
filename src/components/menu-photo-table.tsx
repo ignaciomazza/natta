@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   type KeyboardEvent,
   useCallback,
@@ -28,53 +27,99 @@ const sizeLabels: Record<SizeId, string> = {
   grande: "Grande",
 };
 
+const menuPhotoVersion = "20260612-menu-grade";
+const getMenuPhotoSrc = (slug: string) =>
+  `/images/menu/optimized/${slug}.jpg?v=${menuPhotoVersion}`;
+
 const productPhotos: Record<string, ProductPhoto> = {
   natta: {
-    src: "/images/Instagram_files/633114726_18560669452017460_185298347140133489_n.jpg",
+    src: getMenuPhotoSrc("natta"),
     alt: "Tartas Natta vistas desde arriba en sus moldes",
   },
   limu: {
-    src: "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    src: getMenuPhotoSrc("limu"),
     alt: "Porcion cremosa de tarta Natta sobre plato negro",
   },
   choco: {
-    src: "/images/Instagram_files/520535978_753804793969988_6114112854840394034_n.jpg",
+    src: getMenuPhotoSrc("choco"),
     alt: "Porcion de tarta Natta con cucharita dorada",
   },
   tella: {
-    src: "/images/Instagram_files/519650611_18516525010017460_3007151048163527603_n.jpg",
+    src: getMenuPhotoSrc("tella"),
     alt: "Porcion de tarta Natta con frutos secos",
   },
   blanca: {
-    src: "/images/Instagram_files/521939553_18517831567017460_4398237793762632065_n.jpg",
+    src: getMenuPhotoSrc("blanca"),
     alt: "Tarta Natta entera sobre plato negro",
   },
   tachio: {
-    src: "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    src: getMenuPhotoSrc("tachio"),
     alt: "Porcion de tarta Natta con pistachos",
   },
   duo: {
-    src: "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    src: getMenuPhotoSrc("duo"),
     alt: "Lattas Natta con etiquetas de sabores",
   },
   argenta: {
-    src: "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    src: getMenuPhotoSrc("argenta"),
     alt: "Tarta Natta caramelizada en molde",
   },
   mocha: {
-    src: "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    src: getMenuPhotoSrc("mocha"),
     alt: "Lattas Natta listas para entregar",
   },
   brulee: {
-    src: "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    src: getMenuPhotoSrc("brulee"),
     alt: "Tarta Natta creme brulee con superficie caramelizada",
   },
 };
 
 const wrapIndex = (index: number) => (index + flavors.length) % flavors.length;
 
+const getCenteredIndexes = (centerIndex: number, radius: number) =>
+  Array.from({ length: radius * 2 + 1 }, (_, index) =>
+    wrapIndex(centerIndex - radius + index),
+  );
+
+const getSlidingIndexes = ({
+  activeIndex,
+  direction,
+  radius,
+  targetIndex,
+}: {
+  activeIndex: number;
+  direction: SlideDirection;
+  radius: number;
+  targetIndex: number;
+}) => {
+  if (direction === "previous") {
+    return [
+      ...Array.from({ length: radius - 1 }, (_, index) =>
+        wrapIndex(targetIndex - (radius - 1) + index),
+      ),
+      targetIndex,
+      activeIndex,
+      ...Array.from({ length: radius }, (_, index) =>
+        wrapIndex(activeIndex + index + 1),
+      ),
+    ];
+  }
+
+  return [
+    ...Array.from({ length: radius }, (_, index) =>
+      wrapIndex(activeIndex - radius + index),
+    ),
+    activeIndex,
+    targetIndex,
+    ...Array.from({ length: radius - 1 }, (_, index) =>
+      wrapIndex(targetIndex + index + 1),
+    ),
+  ];
+};
+
 export function MenuPhotoTable() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isDesktopCarousel, setIsDesktopCarousel] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
   const [slideOffset, setSlideOffset] = useState<SlideOffset>("center");
@@ -83,15 +128,32 @@ export function MenuPhotoTable() {
   const targetIndexRef = useRef<number | null>(null);
   const finishTimeoutRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const updateDesktopState = () => setIsDesktopCarousel(desktopQuery.matches);
+
+    updateDesktopState();
+    desktopQuery.addEventListener("change", updateDesktopState);
+
+    return () => {
+      desktopQuery.removeEventListener("change", updateDesktopState);
+    };
+  }, []);
+
+  const preloadRadius = isDesktopCarousel ? 2 : 1;
+
   const visibleIndexes = useMemo(() => {
     if (isAnimating && targetIndex !== null) {
-      return slideOffset === "previous"
-        ? [targetIndex, activeIndex, wrapIndex(activeIndex + 1)]
-        : [wrapIndex(activeIndex - 1), activeIndex, targetIndex];
+      return getSlidingIndexes({
+        activeIndex,
+        direction: slideOffset === "previous" ? "previous" : "next",
+        radius: preloadRadius,
+        targetIndex,
+      });
     }
 
-    return [wrapIndex(activeIndex - 1), activeIndex, wrapIndex(activeIndex + 1)];
-  }, [activeIndex, isAnimating, slideOffset, targetIndex]);
+    return getCenteredIndexes(activeIndex, preloadRadius);
+  }, [activeIndex, isAnimating, preloadRadius, slideOffset, targetIndex]);
 
   const visualActiveIndex =
     isAnimating && targetIndex !== null ? targetIndex : activeIndex;
@@ -175,7 +237,7 @@ export function MenuPhotoTable() {
     <div
       aria-label="Sabores de Natta"
       aria-roledescription="carousel"
-      className="mt-8 md:mt-10"
+      className="mt-6 md:mt-8 lg:mt-11"
       data-reveal="subtle"
       onBlur={(event) => {
         const nextFocusedElement = event.relatedTarget;
@@ -197,9 +259,10 @@ export function MenuPhotoTable() {
         {activeFlavor.name}: {activeFlavor.description}
       </p>
 
-      <div className="menu-carousel-viewport py-6">
+      <div className="menu-carousel-viewport py-6 md:py-8 lg:py-10">
         <div
           className={`menu-carousel-track ${isAnimating ? "is-sliding" : ""}`}
+          data-preload-radius={preloadRadius}
           data-slide-offset={slideOffset}
           onTransitionEnd={(event) => {
             if (
@@ -221,7 +284,7 @@ export function MenuPhotoTable() {
         </div>
       </div>
 
-      <div className="mx-auto mt-5 flex max-w-[28rem] items-center justify-between gap-3">
+      <div className="mx-auto mt-5 flex max-w-[28rem] items-center justify-between gap-3 lg:mt-7">
         <div className="flex items-center gap-1.5">
           {flavors.map((flavor, index) => (
             <button
@@ -286,7 +349,7 @@ function MenuSlideCard({
     <article
       aria-current={isActive ? "true" : undefined}
       aria-label={`${flavor.name}: ${flavor.description}`}
-      className={`menu-slide-card image-shadow rounded-[24px] bg-[var(--milk)] p-2 ${
+      className={`menu-slide-card image-shadow rounded-[24px] border border-white/70 bg-[var(--milk)] p-2 ${
         isActive ? "is-active" : ""
       }`}
       onClick={isActive ? undefined : onSelect}
@@ -294,27 +357,26 @@ function MenuSlideCard({
       role={isActive ? undefined : "button"}
       tabIndex={isActive ? -1 : 0}
     >
-      <div className="px-3 pb-3 pt-3 md:px-4 md:pt-4">
+      <div className="menu-slide-card__copy px-3 py-1 md:px-4 md:py-1.5">
         <h3 className="font-display text-5xl leading-none text-[var(--chocolate-deep)] md:text-6xl">
           {flavor.name}
         </h3>
-        <p className="mt-2 min-h-6 text-base leading-6 text-[var(--chocolate)]/72">
+        <p className="mb-1 mt-0.5 min-h-5 text-base leading-5 text-[var(--chocolate)]/72">
           {flavor.description}
         </p>
       </div>
 
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[20px] bg-[var(--cream)]">
-        <Image
+      <div className="menu-slide-card__media relative aspect-[9/10] overflow-hidden rounded-[20px] bg-[var(--cream)]">
+        <img
           alt={photo.alt}
-          className="object-cover"
-          fill
+          className="absolute inset-0 h-full w-full object-cover"
+          decoding="async"
           loading="eager"
-          sizes="(min-width: 768px) 28rem, 88vw"
           src={photo.src}
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 px-2 py-3 md:gap-5 md:px-3 md:py-4">
+      <div className="menu-slide-card__prices grid grid-cols-3 gap-4 px-2 pb-[2px] pt-2 md:gap-5 md:px-3 md:pb-[2px] md:pt-2">
         {sizeColumns.map((size) => (
           <Price
             key={size}
@@ -332,7 +394,7 @@ function Price({ label, value }: { label: string; value: number | null }) {
     return (
       <div
         aria-label="No disponible"
-        className="px-1 py-1 text-center text-[var(--chocolate)]/34"
+        className="px-1 pb-0 pt-0.5 text-center text-[var(--chocolate)]/34"
       >
         <span className="block text-[0.62rem] uppercase tracking-[0.14em]">
           {label}
@@ -343,7 +405,7 @@ function Price({ label, value }: { label: string; value: number | null }) {
   }
 
   return (
-    <div className="px-1 py-1 text-center text-[var(--chocolate)]">
+    <div className="px-1 pb-0 pt-0.5 text-center text-[var(--chocolate)]">
       <span className="block text-[0.62rem] uppercase tracking-[0.14em] text-[var(--sage)]">
         {label}
       </span>

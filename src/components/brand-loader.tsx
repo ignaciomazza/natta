@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
@@ -302,12 +301,12 @@ function BrandLoaderContent({
         {copy.eyebrow ? (
           <p className="brand-loader__eyebrow">{copy.eyebrow}</p>
         ) : null}
-        <Image
+        <img
           alt="Natta"
           className="brand-loader__logo"
+          decoding="async"
+          fetchPriority="high"
           height={logo.height}
-          priority
-          sizes="(min-width: 768px) 22rem, 72vw"
           src={logo.src}
           width={logo.width}
         />

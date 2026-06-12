@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { BrandLoaderProvider } from "@/components/brand-loader";
 import { MotionObserver } from "@/components/motion-observer";
 import "./globals.css";
@@ -14,7 +13,7 @@ export const metadata: Metadata = {
     description:
       "Tartas vascas de queso, lattas y pedidos por encargo en Villa Devoto.",
     images: [
-      "/images/Instagram_files/633114726_18560669452017460_185298347140133489_n.jpg",
+      "/images/optimized/instagram/633114726_18560669452017460_185298347140133489_n.jpg",
     ],
   },
 };
@@ -34,12 +33,12 @@ export default function RootLayout({
         <div className="brand-loader-shell" aria-hidden="true">
           <div className="brand-loader__glow" />
           <div className="brand-loader__content">
-            <Image
+            <img
               alt=""
               className="brand-loader__logo"
+              decoding="async"
+              fetchPriority="high"
               height={610}
-              priority
-              sizes="(min-width: 768px) 22rem, 72vw"
               src="/images/logo/natta-logo-cropped.png"
               width={1080}
             />

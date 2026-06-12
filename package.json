@@ -12,6 +12,7 @@
     "prisma:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "bootstrap:local-db": "node --import tsx scripts/bootstrap-local-db.ts",
+    "assets:optimize": "node scripts/optimize-static-images.mjs",
     "assets:placeholder": "node scripts/generate-placeholder-assets.mjs"
   },
   "prisma": {

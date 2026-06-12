@@ -1,9 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  ArrowDown,
   ArrowRight,
   CalendarDays,
   Check,
@@ -164,45 +162,49 @@ const paymentStatusLabel: Record<string, string> = {
   REFUNDED: "Devuelto",
 };
 
+const menuPhotoVersion = "20260612-menu-grade";
+const getMenuPhotoSrc = (slug: string) =>
+  `/images/menu/optimized/${slug}.jpg?v=${menuPhotoVersion}`;
+
 const flavorPhotosBySlug: Record<string, FlavorPhoto> = {
   natta: {
-    src: "/images/Instagram_files/633114726_18560669452017460_185298347140133489_n.jpg",
+    src: getMenuPhotoSrc("natta"),
     alt: "Tartas Natta vistas desde arriba en sus moldes",
   },
   limu: {
-    src: "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    src: getMenuPhotoSrc("limu"),
     alt: "Porcion cremosa de tarta Natta sobre plato negro",
   },
   choco: {
-    src: "/images/Instagram_files/520535978_753804793969988_6114112854840394034_n.jpg",
+    src: getMenuPhotoSrc("choco"),
     alt: "Porcion de tarta Natta con cucharita dorada",
   },
   tella: {
-    src: "/images/Instagram_files/519650611_18516525010017460_3007151048163527603_n.jpg",
+    src: getMenuPhotoSrc("tella"),
     alt: "Porcion de tarta Natta con frutos secos",
   },
   blanca: {
-    src: "/images/Instagram_files/521939553_18517831567017460_4398237793762632065_n.jpg",
+    src: getMenuPhotoSrc("blanca"),
     alt: "Tarta Natta entera sobre plato negro",
   },
   tachio: {
-    src: "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    src: getMenuPhotoSrc("tachio"),
     alt: "Porcion de tarta Natta con pistachos",
   },
   duo: {
-    src: "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    src: getMenuPhotoSrc("duo"),
     alt: "Lattas Natta con etiquetas de sabores",
   },
   argenta: {
-    src: "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    src: getMenuPhotoSrc("argenta"),
     alt: "Tarta Natta caramelizada en molde",
   },
   mocha: {
-    src: "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    src: getMenuPhotoSrc("mocha"),
     alt: "Lattas Natta listas para entregar",
   },
   brulee: {
-    src: "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    src: getMenuPhotoSrc("brulee"),
     alt: "Tarta Natta creme brulee con superficie caramelizada",
   },
 };
@@ -391,6 +393,17 @@ function getSizeDetail(size: CatalogSize | undefined) {
     return size.servings;
   }
   return size.description;
+}
+
+const mobileSizeWeightLabels: Record<string, string> = {
+  chica: "950g",
+  grande: "1.900g",
+  latta: "300g",
+};
+
+function getMobileSizeWeight(size: CatalogSize | undefined) {
+  if (!size) return null;
+  return mobileSizeWeightLabels[size.slug] ?? null;
 }
 
 export function OrderAssistant() {
@@ -1115,37 +1128,45 @@ export function OrderAssistant() {
 
   return (
     <>
-      <div className="grid w-full min-w-0 gap-5 md:gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
       <div
-        className="hidden min-w-0 space-y-4 md:block lg:sticky lg:top-24 lg:space-y-6"
-        data-reveal="subtle"
+        className={`grid w-full min-w-0 gap-5 md:gap-6 lg:items-start ${
+          currentView === "builder"
+            ? "lg:grid-cols-1 lg:justify-items-center"
+            : "lg:grid-cols-[0.72fr_1.28fr]"
+        }`}
       >
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:text-sm md:tracking-[0.24em]">
-          <Clock className="h-4 w-4" />
-          {leftColumnContent.label}
-        </div>
-        <div>
-          <h2 className="max-w-full break-words font-display text-4xl leading-none tracking-[-0.03em] text-[var(--chocolate-deep)] md:text-7xl">
-            {leftColumnContent.title}
-          </h2>
-          <p className="mt-3 max-w-xl break-words text-base leading-7 text-[var(--chocolate)]/78 md:mt-5 md:text-lg md:leading-8">
-            {leftColumnContent.body}
-          </p>
-        </div>
+      {currentView !== "builder" ? (
+        <div
+          className="hidden min-w-0 space-y-4 md:block lg:sticky lg:top-24 lg:space-y-6"
+          data-reveal="subtle"
+        >
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:text-sm md:tracking-[0.24em]">
+            <Clock className="h-4 w-4" />
+            {leftColumnContent.label}
+          </div>
+          <div>
+            <h2 className="max-w-full break-words font-display text-4xl leading-none tracking-[-0.03em] text-[var(--chocolate-deep)] md:text-7xl">
+              {leftColumnContent.title}
+            </h2>
+            <p className="mt-3 max-w-xl break-words text-base leading-7 text-[var(--chocolate)]/78 md:mt-5 md:text-lg md:leading-8">
+              {leftColumnContent.body}
+            </p>
+          </div>
 
-        <div className="hidden gap-3 text-sm text-[var(--chocolate)]/76 sm:grid sm:grid-cols-2 lg:grid-cols-1">
-          {leftColumnContent.notes.map((note) => (
-            <div className="border-t border-[var(--line)] pt-4" key={note}>
-              <Check className="mb-3 h-5 w-5 text-[var(--sage)]" />
-              {note}
-            </div>
-          ))}
+          <div className="hidden gap-3 text-sm text-[var(--chocolate)]/76 sm:grid sm:grid-cols-2 lg:grid-cols-1">
+            {leftColumnContent.notes.map((note) => (
+              <div className="border-t border-[var(--line)] pt-4" key={note}>
+                <Check className="mb-3 h-5 w-5 text-[var(--sage)]" />
+                {note}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {currentView === "builder" ? (
         <form
-          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7"
+          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:max-w-[70rem] lg:p-8 xl:max-w-[74rem]"
           data-testid="order-assistant"
           id="pedido-asistido"
           onSubmit={handleBuilderSubmit}
@@ -1164,28 +1185,24 @@ export function OrderAssistant() {
                     Sumá unidades por sabor según el tamaño que quieras llevar.
                   </p>
                 </div>
-                <p className="hidden items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-[var(--sage)]/85 md:flex">
-                  Deslizá para ver más sabores
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </p>
               </div>
 
-              <div className="mt-4 space-y-5 sm:mt-6 sm:space-y-6">
+              <div className="mt-4 space-y-5 sm:mt-6 sm:space-y-6 lg:mt-7 lg:space-y-4">
                 {catalog.flavors.map((flavor) => (
                   <article className="py-1" key={flavor.id}>
-                    <div className="grid gap-3 sm:gap-5 xl:grid-cols-[minmax(11rem,0.58fr)_minmax(0,1.42fr)] xl:items-stretch">
-                      <div className="flex min-h-full items-start justify-between gap-3 xl:items-center">
+                    <div className="grid gap-3 sm:gap-5 lg:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)] lg:items-center lg:gap-5">
+                      <div className="flex min-h-full items-start justify-between gap-3 lg:min-h-[8.25rem] lg:flex-col lg:items-start lg:justify-center lg:gap-3">
                         <div className="min-w-0">
-                          <h3 className="font-display text-2xl leading-none text-[var(--chocolate-deep)] sm:text-3xl">
+                          <h3 className="font-display text-2xl leading-none text-[var(--chocolate-deep)] sm:text-3xl lg:text-[2.35rem]">
                             {flavor.name}
                           </h3>
-                          <p className="mt-1 min-w-0 text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6 xl:mt-3 xl:max-w-[14rem]">
+                          <p className="mt-1 min-w-0 text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6 lg:max-w-[12rem]">
                             {flavor.description}
                           </p>
                         </div>
                         <button
                           aria-label={`Ver foto de ${flavor.name}`}
-                          className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-full bg-white/75 px-2.5 uppercase tracking-[0.1em] text-[var(--chocolate)] shadow-[0_4px_12px_rgba(43,26,24,0.075)] transition hover:bg-[var(--milk)] hover:shadow-[0_6px_16px_rgba(43,26,24,0.1)] sm:h-8"
+                          className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-full bg-white/75 px-2.5 uppercase tracking-[0.1em] text-[var(--chocolate)] shadow-[0_4px_12px_rgba(43,26,24,0.075)] transition hover:bg-[var(--milk)] hover:shadow-[0_6px_16px_rgba(43,26,24,0.1)] sm:h-8 lg:px-3"
                           onClick={() => setPhotoFlavor(flavor)}
                           type="button"
                         >
@@ -1194,33 +1211,41 @@ export function OrderAssistant() {
                         </button>
                       </div>
 
-                      <div className="grid min-w-0 grid-cols-3 gap-2">
+                      <div className="grid min-w-0 grid-cols-3 gap-2 lg:gap-3">
                         {flavor.prices.map((price) => {
                           const key = itemKey(flavor.id, price.sizeId);
                           const quantity = quantities[key] ?? 0;
                           const size = sizeLookup.get(price.sizeId);
+                          const mobileSizeWeight = getMobileSizeWeight(size);
 
                           return (
                             <div
-                              className={`order-card flex min-h-[5.35rem] flex-col justify-between rounded-[1rem] p-1.5 transition sm:min-h-36 sm:rounded-[1.35rem] sm:p-3 ${
+                              className={`order-card flex min-h-[5.35rem] flex-col justify-between rounded-[1rem] p-1.5 transition sm:min-h-36 sm:rounded-[1.35rem] sm:p-3 lg:min-h-[8.25rem] lg:rounded-[1.2rem] lg:p-3.5 ${
                                 quantity > 0
                                   ? "bg-[var(--cream)] shadow-[0_10px_24px_rgba(43,26,24,0.13)]"
                                   : "bg-white/62 shadow-[0_7px_18px_rgba(43,26,24,0.075)]"
                               }`}
                               key={key}
                             >
-                              <div className="flex flex-col gap-0.5 px-1 pt-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2 sm:px-1.5 sm:pt-1.5">
-                                <div>
-                                  <p className="text-xs font-medium sm:text-base">{price.sizeName}</p>
-                                  <p className="mt-1 hidden text-xs text-[var(--chocolate)]/62 sm:block">
+                              <div className="flex flex-col gap-2 px-1 pt-1 sm:flex-row sm:items-start sm:justify-between sm:px-1.5 sm:pt-1.5 lg:min-h-[4.4rem] lg:flex-col lg:justify-start lg:gap-1 lg:px-2 lg:pt-2">
+                                <div className="flex items-center justify-between gap-1 sm:block">
+                                  <p className="text-xs font-medium leading-none tracking-[0] sm:text-base sm:leading-normal lg:text-[0.95rem]">
+                                    {price.sizeName}
+                                  </p>
+                                  {mobileSizeWeight ? (
+                                    <p className="flex shrink-0 items-center text-right text-[0.58rem] font-medium leading-none tracking-[0] text-[var(--chocolate)]/58 sm:hidden">
+                                      {mobileSizeWeight}
+                                    </p>
+                                  ) : null}
+                                  <p className="mt-1 hidden text-xs text-[var(--chocolate)]/62 sm:block lg:whitespace-nowrap lg:text-[0.72rem]">
                                     {getSizeDetail(size)}
                                   </p>
                                 </div>
-                                <p className="font-mono text-[0.56rem] text-[var(--chocolate)]/72 sm:text-xs">
+                                <p className="font-mono text-[0.56rem] text-[var(--chocolate)]/72 sm:text-xs lg:mt-1.5 lg:text-[0.78rem]">
                                   {formatMoney(price.amountArs)}
                                 </p>
                               </div>
-                              <div className="mt-2 flex h-7 w-full items-center justify-between self-center rounded-full bg-[var(--milk)] px-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_4px_12px_rgba(43,26,24,0.07)] sm:mt-3 sm:h-10 sm:px-2">
+                              <div className="mt-2 flex h-7 w-full items-center justify-between self-center rounded-full bg-[var(--milk)] px-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_4px_12px_rgba(43,26,24,0.07)] sm:mt-3 sm:h-10 sm:px-2 lg:mt-auto">
                                 <button
                                   aria-label={`Restar ${price.sizeName} ${flavor.name}`}
                                   className="grid h-5 w-5 place-items-center rounded-full transition hover:bg-[var(--sage-soft)] disabled:opacity-35 sm:h-8 sm:w-8"
@@ -1926,23 +1951,22 @@ export function OrderAssistant() {
 
           <article className="image-shadow relative w-full max-w-[27rem] overflow-hidden rounded-[28px] border border-white/55 bg-[var(--milk)] text-[var(--chocolate)]">
             <div className="absolute inset-0 opacity-20">
-              <Image
+              <img
                 alt=""
-                className="scale-110 object-cover blur-2xl"
-                fill
-                sizes="27rem"
+                className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+                decoding="async"
+                loading="lazy"
                 src={modalPhoto.src}
               />
             </div>
 
             <div className="relative p-2">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-[var(--cream)]">
-                <Image
+              <div className="relative aspect-[9/10] overflow-hidden rounded-[22px] bg-[var(--cream)]">
+                <img
                   alt={modalPhoto.alt}
-                  className="object-cover"
-                  fill
-                  priority
-                  sizes="(min-width: 640px) 27rem, calc(100vw - 2rem)"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  decoding="async"
+                  fetchPriority="high"
                   src={modalPhoto.src}
                 />
               </div>

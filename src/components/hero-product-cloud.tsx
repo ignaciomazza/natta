@@ -2,7 +2,6 @@
 
 import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { Sparkles } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 
@@ -37,6 +36,8 @@ type HeroPiece = {
   scale?: number;
   hoverScale?: number;
   opacity?: number;
+  priority?: boolean;
+  hideOnDesktop?: boolean;
   hideOnMobile?: boolean;
   hideOnSmallMobile?: boolean;
   tablet?: HeroPieceOverride;
@@ -53,21 +54,26 @@ const logo = {
   height: 610,
 };
 
+const staticImageVersion = "20260612-static";
+const optimizedHeroPiece = (file: string) =>
+  `/images/optimized/hero-pieces/${file}?v=${staticImageVersion}`;
+
 const heroPieces: HeroPiece[] = [
   {
-    src: "/images/transparent-images/1.png",
+    src: optimizedHeroPiece("1.webp"),
     alt: "Tarta vasca Natta con centro cremoso",
     width: "clamp(5.4rem, 11vw, 10.4rem)",
-    naturalWidth: 2268,
-    naturalHeight: 4032,
-    left: 16,
-    top: 31,
+    naturalWidth: 788,
+    naturalHeight: 1400,
+    left: 15,
+    top: 48,
     rotate: -17,
     depth: 18,
     expandX: -42,
     expandY: -18,
     scale: 0.98,
     hoverScale: 1.12,
+    priority: true,
     floatDelay: "-1.1s",
     tablet: {
       left: 14,
@@ -90,19 +96,20 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/transparent-images/2.png",
+    src: optimizedHeroPiece("2.webp"),
     alt: "Porcion de tarta vasca Natta",
     width: "clamp(4.7rem, 9vw, 8.8rem)",
-    naturalWidth: 3213,
-    naturalHeight: 5712,
-    left: 83,
-    top: 26,
+    naturalWidth: 788,
+    naturalHeight: 1400,
+    left: 84,
+    top: 39,
     rotate: 16,
     depth: -20,
     expandX: 42,
     expandY: -32,
     scale: 0.92,
     hoverScale: 1.16,
+    priority: true,
     floatDelay: "-3.5s",
     floatY: "0px",
     className: "hero-product-piece--bottom-safe",
@@ -127,11 +134,11 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/transparent-images/3.png",
+    src: optimizedHeroPiece("3.webp"),
     alt: "Latta Natta con superficie dorada",
     width: "clamp(5.8rem, 12vw, 11.5rem)",
-    naturalWidth: 2268,
-    naturalHeight: 4032,
+    naturalWidth: 788,
+    naturalHeight: 1400,
     left: 11,
     top: 61,
     rotate: 12,
@@ -139,6 +146,8 @@ const heroPieces: HeroPiece[] = [
     expandX: -56,
     expandY: 10,
     hoverScale: 1.1,
+    hideOnDesktop: true,
+    priority: true,
     hideOnMobile: true,
     floatDelay: "-2.2s",
     tablet: {
@@ -162,11 +171,11 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/transparent-images/5.png",
+    src: optimizedHeroPiece("5.webp"),
     alt: "Tarta vasca Natta en formato chico",
     width: "clamp(4rem, 7vw, 7rem)",
-    naturalWidth: 3213,
-    naturalHeight: 5712,
+    naturalWidth: 788,
+    naturalHeight: 1400,
     left: 20,
     top: 86,
     rotate: -24,
@@ -174,6 +183,8 @@ const heroPieces: HeroPiece[] = [
     expandX: -26,
     expandY: 42,
     hoverScale: 1.18,
+    hideOnDesktop: true,
+    priority: true,
     hideOnMobile: true,
     floatDelay: "-0.4s",
     tablet: {
@@ -197,13 +208,13 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/transparent-images/6.png",
+    src: optimizedHeroPiece("6.webp"),
     alt: "Porcion de tarta vasca con borde caramelizado",
     width: "clamp(4.8rem, 9vw, 8.7rem)",
-    naturalWidth: 4284,
-    naturalHeight: 5712,
-    left: 80,
-    top: 86,
+    naturalWidth: 1050,
+    naturalHeight: 1400,
+    left: 84,
+    top: 83,
     rotate: 19,
     depth: -18,
     expandX: 34,
@@ -233,18 +244,19 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/transparent-images/7.png",
+    src: optimizedHeroPiece("7.webp"),
     alt: "Tarta Natta vista desde arriba",
     width: "clamp(4.1rem, 7vw, 6.8rem)",
-    naturalWidth: 4284,
-    naturalHeight: 5712,
-    left: 48,
-    top: 14,
+    naturalWidth: 1050,
+    naturalHeight: 1400,
+    left: 50,
+    top: 12,
     rotate: 8,
     depth: 10,
     expandX: 0,
     expandY: -44,
     opacity: 0.88,
+    priority: true,
     floatDelay: "-5.2s",
     tablet: {
       left: 48,
@@ -268,11 +280,11 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/transparent-images/8.png",
+    src: optimizedHeroPiece("8.webp"),
     alt: "Porcion cremosa de tarta vasca Natta",
     width: "clamp(4.4rem, 7vw, 7.2rem)",
-    naturalWidth: 4284,
-    naturalHeight: 5712,
+    naturalWidth: 1050,
+    naturalHeight: 1400,
     left: 50,
     top: 92,
     rotate: -5,
@@ -280,11 +292,12 @@ const heroPieces: HeroPiece[] = [
     expandX: 0,
     expandY: 36,
     opacity: 0.88,
+    hideOnDesktop: true,
     hideOnMobile: true,
     floatDelay: "-1.8s",
   },
   {
-    src: "/images/ilustration/IMG_5332.PNG",
+    src: optimizedHeroPiece("IMG_5332.webp"),
     alt: "Ilustracion de tarta Natta",
     width: "clamp(3.8rem, 6vw, 5.8rem)",
     naturalWidth: 998,
@@ -298,6 +311,7 @@ const heroPieces: HeroPiece[] = [
     scale: 0.9,
     hoverScale: 1.08,
     opacity: 0.58,
+    hideOnDesktop: true,
     hideOnMobile: true,
     floatDelay: "-3.1s",
     floatY: "-5px",
@@ -323,7 +337,7 @@ const heroPieces: HeroPiece[] = [
     },
   },
   {
-    src: "/images/ilustration/IMG_5333.PNG",
+    src: optimizedHeroPiece("IMG_5333.webp"),
     alt: "Ilustracion de porcion Natta",
     width: "clamp(3.6rem, 6vw, 5.5rem)",
     naturalWidth: 999,
@@ -337,6 +351,7 @@ const heroPieces: HeroPiece[] = [
     scale: 0.88,
     hoverScale: 1.1,
     opacity: 0.52,
+    hideOnDesktop: true,
     hideOnMobile: true,
     floatDelay: "-0.7s",
     floatY: "-6px",
@@ -589,6 +604,7 @@ export function HeroProductCloud() {
               <span
                 className={[
                   "hero-product-piece",
+                  piece.hideOnDesktop ? "hero-product-piece--hide-desktop" : "",
                   piece.hideOnMobile ? "hero-product-piece--hide-mobile" : "",
                   piece.hideOnSmallMobile
                     ? "hero-product-piece--hide-small-mobile"
@@ -600,18 +616,12 @@ export function HeroProductCloud() {
                 key={piece.src}
                 style={style}
               >
-                <Image
+                <img
                   alt={piece.alt}
                   className="hero-product-piece__image"
+                  decoding="async"
+                  fetchPriority={piece.priority ? "high" : "auto"}
                   height={piece.naturalHeight}
-                  priority={
-                    piece.src === "/images/transparent-images/1.png" ||
-                    piece.src === "/images/transparent-images/2.png" ||
-                    piece.src === "/images/transparent-images/7.png" ||
-                    piece.src === "/images/transparent-images/5.png" ||
-                    piece.src === "/images/transparent-images/3.png"
-                  }
-                  sizes="(min-width: 1024px) 12vw, (min-width: 768px) 16vw, 24vw"
                   src={piece.src}
                   width={piece.naturalWidth}
                 />
@@ -631,12 +641,12 @@ export function HeroProductCloud() {
             className="hero-product-cloud__logo reveal-soft"
             href="/pedido"
           >
-            <Image
+            <img
               alt="Natta"
               className="hero-product-cloud__logo-image"
+              decoding="async"
+              fetchPriority="high"
               height={logo.height}
-              priority
-              sizes="(min-width: 1024px) 34rem, (min-width: 768px) 42vw, 74vw"
               src={logo.src}
               width={logo.width}
             />

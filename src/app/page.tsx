@@ -1,8 +1,8 @@
-import Image from "next/image";
 import {
   ArrowRight,
   ExternalLink,
   Heart,
+  ReceiptText,
 } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { FaqList } from "@/components/faq-list";
@@ -11,25 +11,33 @@ import { MenuPhotoTable } from "@/components/menu-photo-table";
 import { SiteFooter } from "@/components/site-footer";
 import { cakeSizes } from "@/lib/catalog";
 
+const staticImageVersion = "20260612-static";
+const optimizedInstagramImage = (file: string) =>
+  `/images/optimized/instagram/${file}.jpg?v=${staticImageVersion}`;
+
 const instagramImages = {
-  hero: "/images/Instagram_files/633114726_18560669452017460_185298347140133489_n.jpg",
-  box: "/images/Instagram_files/517107658_18515416462017460_6047792586767829182_n.jpg",
+  hero: optimizedInstagramImage(
+    "633114726_18560669452017460_185298347140133489_n",
+  ),
+  box: optimizedInstagramImage(
+    "517107658_18515416462017460_6047792586767829182_n",
+  ),
   platedSlice:
-    "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    optimizedInstagramImage("517928155_18515416210017460_2823923844824747085_n"),
   cutCake:
-    "/images/Instagram_files/519650611_18516525010017460_3007151048163527603_n.jpg",
+    optimizedInstagramImage("519650611_18516525010017460_3007151048163527603_n"),
   wholeCake:
-    "/images/Instagram_files/521939553_18517831567017460_4398237793762632065_n.jpg",
+    optimizedInstagramImage("521939553_18517831567017460_4398237793762632065_n"),
   spoonable:
-    "/images/Instagram_files/520535978_753804793969988_6114112854840394034_n.jpg",
+    optimizedInstagramImage("520535978_753804793969988_6114112854840394034_n"),
   tableMoment:
-    "/images/Instagram_files/580286270_18412217524143217_8204408670605817052_n.jpg",
+    optimizedInstagramImage("580286270_18412217524143217_8204408670605817052_n"),
   caramelTop:
-    "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    optimizedInstagramImage("590847679_18544256392017460_217947530894216047_n"),
   couple:
-    "/images/Instagram_files/607318777_18550019701017460_8443849260003577236_n.jpg",
+    optimizedInstagramImage("607318777_18550019701017460_8443849260003577236_n"),
   lattas:
-    "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    optimizedInstagramImage("629664627_18562076539017460_5672466112806136791_n"),
 };
 
 const editorialImages = [
@@ -96,7 +104,7 @@ const faq = [
 export default function Home() {
   return (
     <main className="overflow-hidden">
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-[rgba(81,53,48,0.09)] bg-[var(--cream-soft)]/76 px-4 py-3 backdrop-blur-2xl md:px-8">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-[rgba(81,53,48,0.09)] bg-[var(--cream-soft)]/76 px-4 py-2.5 backdrop-blur-2xl md:px-8">
         <nav className="content-shell grid grid-cols-[1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
           <a
             className="shrink-0 justify-self-start font-display text-3xl leading-none italic text-[var(--chocolate)] transition hover:text-[var(--chocolate-deep)]"
@@ -144,60 +152,92 @@ export default function Home() {
         className="middle-mobile-section hero-followup-section mobile-section-compact section-pad section-y section-y-roomy bg-[var(--milk)]"
         id="como-pedir"
       >
-        <div className="content-shell grid gap-8 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-          <div className="max-w-2xl" data-reveal="left">
-            <p className="mb-3 text-[0.68rem] uppercase tracking-[0.22em] text-[var(--sage)] md:mb-5 md:text-sm md:tracking-[0.28em]">
-              Cómo pedir
-            </p>
-            <h2 className="font-display text-[2.55rem] leading-[0.95] tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl md:leading-none">
-              Elegís, reservás y coordinamos.
-            </h2>
-            <p className="mt-4 max-w-lg text-base leading-7 text-[var(--chocolate)]/72 md:mt-6 md:text-lg md:leading-8">
-              48 h de anticipación · Villa Devoto · envío por Uber.
-            </p>
+        <div className="content-shell">
+          <div className="grid gap-8 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+            <div className="max-w-2xl" data-reveal="left">
+              <p className="mb-3 text-[0.68rem] uppercase tracking-[0.22em] text-[var(--sage)] md:mb-5 md:text-sm md:tracking-[0.28em]">
+                Cómo pedir
+              </p>
+              <h2 className="font-display text-[2.55rem] leading-[0.95] tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl md:leading-none">
+                Elegís, reservás y coordinamos.
+              </h2>
+              <p className="mt-4 max-w-lg text-base leading-7 text-[var(--chocolate)]/72 md:mt-6 md:text-lg md:leading-8">
+                48 h de anticipación · Villa Devoto · envío por Uber.
+              </p>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-3 md:gap-7" data-stagger>
+              <div
+                className="step-card border-[var(--line)] pt-3 md:border-t md:pt-5"
+                data-reveal="subtle"
+              >
+                <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
+                  01
+                </p>
+                <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
+                  Elegís
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
+                  Tamaño, sabor y fecha.
+                </p>
+              </div>
+              <div
+                className="step-card border-[var(--line)] pt-3 md:border-t md:pt-5"
+                data-reveal="subtle"
+              >
+                <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
+                  02
+                </p>
+                <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
+                  Reservás
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
+                  Confirmamos cupo y seña.
+                </p>
+              </div>
+              <div
+                className="step-card border-[var(--line)] pt-3 md:border-t md:pt-5"
+                data-reveal="subtle"
+              >
+                <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
+                  03
+                </p>
+                <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
+                  Retirás
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
+                  Por Devoto o con envío por Uber previamente coordinado.
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-5 sm:grid-cols-3 md:gap-7" data-stagger>
-            <div
-              className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
-              data-reveal="subtle"
-            >
-              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
-                01
+
+          <div
+            className="mx-auto mb-[4.75rem] mt-36 grid max-w-[54rem] gap-12 py-10 sm:grid-cols-2 sm:gap-12 md:mb-[4.25rem] md:mt-48 md:gap-24 md:py-14"
+            data-reveal="subtle"
+          >
+            <div className="flex flex-col items-center text-center">
+              <p className="mb-2 text-sm uppercase tracking-[0.2em] text-[var(--sage)] md:text-base">
+                Nuevo pedido
               </p>
-              <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
-                Elegís
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
-                Tamaño, sabor y fecha.
-              </p>
+              <BrandLoaderLink
+                className="motion-button inline-flex h-12 w-[17rem] items-center justify-center gap-2 rounded-full bg-[var(--chocolate-deep)] px-7 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--milk)] shadow-[0_8px_16px_rgba(38,35,33,0.18)] transition hover:bg-[var(--sage)] hover:shadow-[0_9px_18px_rgba(38,35,33,0.2)] sm:w-[18rem] md:h-[3.35rem] md:text-[0.95rem]"
+                href="/pedido"
+              >
+                Armar
+                <ArrowRight className="h-4 w-4" />
+              </BrandLoaderLink>
             </div>
-            <div
-              className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
-              data-reveal="subtle"
-            >
-              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
-                02
+            <div className="flex flex-col items-center text-center">
+              <p className="mb-2 text-sm uppercase tracking-[0.2em] text-[var(--sage)] md:text-base">
+                Pedido en curso
               </p>
-              <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
-                Reservás
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
-                Confirmamos cupo y seña.
-              </p>
-            </div>
-            <div
-              className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
-              data-reveal="subtle"
-            >
-              <p className="hidden text-xs uppercase tracking-[0.2em] text-[var(--sage)] md:block">
-                03
-              </p>
-              <p className="font-display text-2xl text-[var(--chocolate-deep)] md:mt-3 md:text-3xl">
-                Retirás
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
-                Por Devoto o con envío por Uber previamente coordinado.
-              </p>
+              <BrandLoaderLink
+                className="motion-button inline-flex h-12 w-[17rem] items-center justify-center gap-2 rounded-full border border-[rgba(64,58,55,0.08)] bg-transparent px-7 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] shadow-[0_8px_16px_rgba(43,26,24,0.08)] transition hover:border-[var(--chocolate)] hover:bg-[var(--cream-soft)] hover:shadow-[0_9px_18px_rgba(43,26,24,0.1)] sm:w-[18rem] md:h-[3.35rem] md:text-[0.95rem]"
+                href="/estado-pedido"
+              >
+                Ver estado
+                <ReceiptText className="h-4 w-4" />
+              </BrandLoaderLink>
             </div>
           </div>
         </div>
@@ -207,53 +247,56 @@ export default function Home() {
         className="middle-mobile-section section-pad section-y bg-[var(--cream)]"
         id="historia"
       >
-        <div className="content-shell grid gap-12 md:gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
-          <div data-reveal="left">
+        <div className="content-shell grid gap-9 md:gap-11 lg:grid-cols-[minmax(0,0.98fr)_minmax(21rem,0.72fr)] lg:items-center lg:gap-16">
+          <div className="max-w-2xl" data-reveal="left">
             <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
               Nosotros
             </p>
             <h2 className="font-display text-5xl leading-[0.95] tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
               De Devoto a tu mesa.
             </h2>
-          </div>
-          <div className="max-w-3xl space-y-4 text-base leading-7 text-[var(--chocolate)]/80 md:space-y-5 md:text-xl md:leading-9">
-            <p data-reveal="right">
+            <div className="mt-5 max-w-xl space-y-4 text-base leading-7 text-[var(--chocolate)]/78 md:mt-7 md:space-y-5 md:text-lg md:leading-8">
+              <p>
               Natta empezó en la cocina de Cami y Martín, entre pruebas,
               sobremesas y una búsqueda clara: una tarta vasca cremosa, firme y
               con identidad propia.
-            </p>
-            <p data-reveal="right">
+              </p>
+              <p>
               Desde Devoto, esa idea encontró su formato más reconocible en la
               Latta: una porción individual, práctica y reutilizable, pensada
               para viajar bien y quedarse en la mesa.
-            </p>
+              </p>
+            </div>
+          </div>
+          <div className="lg:justify-self-end" data-reveal="right">
             <a
-              className="group block max-w-md overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--milk)] text-[var(--chocolate)] image-shadow transition !mt-8 hover:-translate-y-0.5 hover:text-[var(--chocolate-deep)] md:!mt-10"
-              data-reveal="right"
+              className="group block max-w-md overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--milk)] text-[var(--chocolate)] image-shadow transition hover:-translate-y-0.5 hover:text-[var(--chocolate-deep)] lg:max-w-[24rem]"
               href="https://www.iprofesional.com/negocios/456313-tomaron-un-postre-tradicional-lo-pusieron-en-una-lata-y-crearon-un-gran-negocio"
               rel="noreferrer"
               target="_blank"
             >
               <span className="relative block aspect-[4/5] overflow-hidden bg-[var(--cream)]">
-                <Image
+                <img
                   alt="Cami y Martin sosteniendo una tarta vasca Natta"
-                  className="object-cover transition duration-700 group-hover:scale-105"
-                  fill
-                  sizes="(min-width: 768px) 28rem, 92vw"
+                  className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                  decoding="async"
+                  loading="lazy"
                   src={instagramImages.couple}
                   style={{ objectPosition: "center 18%" }}
                 />
+                <span className="absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col items-start rounded-full bg-[var(--milk)]/90 px-3 py-1.5 text-[0.62rem] uppercase leading-none tracking-[0.18em] text-[var(--sage)] shadow-[0_10px_22px_rgba(43,26,24,0.14)] backdrop-blur md:bottom-4 md:left-4 md:px-3.5 md:py-2 md:text-[0.68rem]">
+                  Nota en iProfesional
+                </span>
               </span>
               <span className="flex min-w-0 items-center justify-between gap-3 p-4 md:p-5">
                 <span className="min-w-0">
-                  <span className="block text-[0.68rem] uppercase leading-5 tracking-[0.18em] text-[var(--sage)] md:text-xs">
-                    Nota en iProfesional
-                  </span>
-                  <span className="mt-1 block text-base leading-6 md:text-lg md:leading-7">
+                  <span className="block text-base leading-6 md:text-lg md:leading-7">
                     La historia de cómo la tarta vasca llegó al formato latta.
                   </span>
                 </span>
-                <ExternalLink className="h-5 w-5 shrink-0 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <span className="shrink-0 px-1.5">
+                  <ExternalLink className="h-5 w-5 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </span>
               </span>
             </a>
           </div>
@@ -274,7 +317,7 @@ export default function Home() {
           <div className="grid gap-5 sm:grid-cols-3 md:gap-6" data-stagger>
             {cakeSizes.map((size) => (
               <div
-                className="step-card border-t border-white/18 pt-3 md:pt-5"
+                className="step-card border-white/18 pt-3 md:border-t md:pt-5"
                 data-reveal="subtle"
                 key={size.id}
               >
@@ -306,7 +349,7 @@ export default function Home() {
         </div>
 
         <div
-          className="editorial-rail flex gap-4 overflow-x-auto px-7 py-10 md:gap-4 md:px-10"
+          className="editorial-rail flex gap-4 overflow-x-auto px-7 pb-10 pt-6 md:gap-4 md:px-10 md:pt-8"
           data-stagger
         >
           {editorialImages.map((image, index) => (
@@ -320,11 +363,11 @@ export default function Home() {
               key={image.src}
             >
               <span className="absolute inset-0 overflow-hidden rounded-[26px]">
-                <Image
+                <img
                   alt={image.alt}
-                  className="object-cover transition duration-700 group-hover:scale-105"
-                  fill
-                  sizes="(min-width: 768px) 380px, 300px"
+                  className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                  decoding="async"
+                  loading="lazy"
                   src={image.src}
                 />
               </span>
@@ -362,7 +405,7 @@ export default function Home() {
       >
         <div className="content-shell grid gap-12 md:gap-12 lg:grid-cols-[0.8fr_1.2fr]">
           <div data-reveal="left">
-            <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
+            <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)]/65 md:mb-5">
               Preguntas frecuentes
             </p>
             <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
