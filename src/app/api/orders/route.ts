@@ -8,6 +8,7 @@ import { logServerError } from "@/lib/server/log";
 import { createPaymentExternalReference, createPublicReceiptCode, paymentKindByMode, calculateOrderTotals } from "@/lib/orders";
 import { validateCapacityForOrder } from "@/lib/capacity";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
+import { isCatalogPairAvailable } from "@/lib/catalog-db";
 
 const orderCreateSchema = z.object({
   customer: z.object({
@@ -151,11 +152,13 @@ export async function POST(req: NextRequest) {
         flavor: {
           select: {
             isActive: true,
+            slug: true,
           },
         },
         size: {
           select: {
             isActive: true,
+            slug: true,
           },
         },
       },
@@ -168,7 +171,12 @@ export async function POST(req: NextRequest) {
 
     for (const item of body.items) {
       const price = priceByKey.get(`${item.flavorId}::${item.sizeId}`);
-      if (!price || !price.flavor.isActive || !price.size.isActive) {
+      if (
+        !price ||
+        !price.flavor.isActive ||
+        !price.size.isActive ||
+        !isCatalogPairAvailable(price.flavor.slug, price.size.slug)
+      ) {
         return NextResponse.json({ error: "Producto no disponible" }, { status: 400 });
       }
     }

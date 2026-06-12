@@ -9,6 +9,56 @@ export const sizeSlugToId = {
 
 export type SizeSlug = keyof typeof sizeSlugToId;
 
+const unavailableCatalogPairs = new Set(["brulee::chica", "brulee::grande"]);
+
+export function isCatalogPairAvailable(flavorSlug: string, sizeSlug: string) {
+  return !unavailableCatalogPairs.has(`${flavorSlug}::${sizeSlug}`);
+}
+
+const flavorDescriptionOverrides: Partial<Record<string, string>> = {
+  argenta: "Dulce de leche.",
+  blanca: "Chocolate blanco.",
+  brulee: "Crème brûlée con crocante de caramelo.",
+  choco: "60% cacao.",
+  duo: "Chocolate blanco y Oreos.",
+  limu: "Lima.",
+  mocha: "Café con base de chocolate.",
+  natta: "Clásica de queso.",
+  tachio: "Pistachos.",
+  tella: "Avellanas.",
+};
+
+const sizeContentOverrides: Partial<
+  Record<
+    SizeSlug,
+    {
+      description: string;
+      servings: string;
+      diameterCm: number;
+      grams: number;
+    }
+  >
+> = {
+  latta: {
+    description: "11 cm · 300 g",
+    servings: "Cuchareable individual",
+    diameterCm: 11,
+    grams: 300,
+  },
+  chica: {
+    description: "15 cm · 950 g aprox.",
+    servings: "Entre 4 y 6 porciones",
+    diameterCm: 15,
+    grams: 950,
+  },
+  grande: {
+    description: "24 cm · 2 kg aprox.",
+    servings: "Entre 10 y 12 porciones",
+    diameterCm: 24,
+    grams: 2000,
+  },
+};
+
 export async function getActiveCatalog() {
   const [flavors, sizes, prices] = await Promise.all([
     prisma.flavor.findMany({
@@ -31,6 +81,7 @@ export async function getActiveCatalog() {
         description: true,
         servings: true,
         diameterCm: true,
+        grams: true,
       },
     }),
     prisma.price.findMany({
@@ -43,7 +94,11 @@ export async function getActiveCatalog() {
     }),
   ]);
 
-  const sizeMap = new Map(sizes.map((size) => [size.id, size]));
+  const normalizedSizes = sizes.map((size) => ({
+    ...size,
+    ...(sizeContentOverrides[size.slug as SizeSlug] ?? {}),
+  }));
+  const sizeMap = new Map(normalizedSizes.map((size) => [size.id, size]));
   const pricesByFlavor = new Map<
     string,
     Array<{ sizeId: string; amountArs: number }>
@@ -62,6 +117,9 @@ export async function getActiveCatalog() {
         .map((price) => {
           const size = sizeMap.get(price.sizeId);
           if (!size) return null;
+          if (!isCatalogPairAvailable(flavor.slug, size.slug)) {
+            return null;
+          }
           return {
             sizeId: size.id,
             sizeSlug: size.slug,
@@ -73,9 +131,10 @@ export async function getActiveCatalog() {
 
       return {
         ...flavor,
+        description: flavorDescriptionOverrides[flavor.slug] ?? flavor.description,
         prices: mapped,
       };
     }),
-    sizes,
+    sizes: normalizedSizes,
   };
 }

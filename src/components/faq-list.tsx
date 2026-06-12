@@ -22,7 +22,7 @@ export function FaqList({ items }: FaqListProps) {
         const contentId = `faq-answer-${index}`;
 
         return (
-          <div className="faq-item py-5 md:py-6" key={item.question}>
+          <div className="faq-item py-6 md:py-6" key={item.question}>
             <button
               aria-controls={contentId}
               aria-expanded={isOpen}
@@ -42,7 +42,7 @@ export function FaqList({ items }: FaqListProps) {
               id={contentId}
             >
               <div className="faq-answer-inner">
-                <p className="mt-4 max-w-2xl text-lg leading-8 text-[var(--chocolate)]/76">
+                <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--chocolate)]/76 md:text-lg md:leading-8">
                   {item.answer}
                 </p>
               </div>

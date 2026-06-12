@@ -1,9 +1,15 @@
 import Image from "next/image";
-import { ArrowRight, Heart } from "lucide-react";
+import {
+  ArrowRight,
+  ExternalLink,
+  Heart,
+} from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { FaqList } from "@/components/faq-list";
 import { HeroProductCloud } from "@/components/hero-product-cloud";
-import { cakeSizes, flavors, formatCurrency } from "@/lib/catalog";
+import { MenuPhotoTable } from "@/components/menu-photo-table";
+import { SiteFooter } from "@/components/site-footer";
+import { cakeSizes } from "@/lib/catalog";
 
 const instagramImages = {
   hero: "/images/Instagram_files/633114726_18560669452017460_185298347140133489_n.jpg",
@@ -26,25 +32,12 @@ const instagramImages = {
     "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
 };
 
-const featuredImages = [
-  {
-    src: instagramImages.couple,
-    alt: "Cami y Martin sosteniendo una tarta vasca Natta",
-    label: "nosotros",
-  },
+const editorialImages = [
   {
     src: instagramImages.cutCake,
     alt: "Porcion de tarta vasca Natta de pistacho sobre plato negro",
     label: "pistacho",
   },
-  {
-    src: instagramImages.box,
-    alt: "Caja Natta para retiro o envio",
-    label: "retiro",
-  },
-];
-
-const editorialImages = [
   {
     src: instagramImages.platedSlice,
     alt: "Porcion de tarta vasca sobre plato negro",
@@ -53,7 +46,7 @@ const editorialImages = [
   {
     src: instagramImages.spoonable,
     alt: "Latta de chocolate cuchareable",
-    label: "cuchareable",
+    label: "textura",
   },
   {
     src: instagramImages.lattas,
@@ -68,7 +61,7 @@ const editorialImages = [
   {
     src: instagramImages.wholeCake,
     alt: "Tarta vasca entera sobre plato negro",
-    label: "entera",
+    label: "clásica de queso",
   },
   {
     src: instagramImages.caramelTop,
@@ -86,17 +79,17 @@ const faq = [
   {
     question: "¿Cuánto tarda el pedido?",
     answer:
-      "Si hay cupo puede salir en 24 h, pero la recomendación real es pedir con 48/72 h de anticipación, y más tiempo para ocasiones especiales.",
+      "Si hay cupo puede salir en 24 h, pero la recomendación real es pedir con 48 h de anticipación, y más tiempo para ocasiones especiales.",
   },
   {
     question: "¿Qué diferencia hay entre chica y grande?",
     answer:
-      "La chica mide 15 cm y rinde entre 4 y 6 porciones. La grande ronda 24 cm y rinde entre 8 y 12 porciones.",
+      "La Latta mide 11 cm y pesa 300 g. La chica mide 15 cm, pesa 950 g aprox. y rinde entre 4 y 6 porciones. La grande mide 24 cm, pesa 2 kg aprox. y rinde entre 10 y 12 porciones.",
   },
   {
     question: "¿Hacen envíos?",
     answer:
-      "Sí, coordinados en el día por Uber o Cabify. Para envío se pide el pago total del producto por anticipado.",
+      "Sí, coordinamos envío por Uber. Para envío se pide el pago total del producto por anticipado.",
   },
 ];
 
@@ -148,10 +141,10 @@ export default function Home() {
       <HeroProductCloud />
 
       <section
-        className="hero-followup-section mobile-section-compact section-pad section-y bg-[var(--milk)]"
+        className="middle-mobile-section hero-followup-section mobile-section-compact section-pad section-y section-y-roomy bg-[var(--milk)]"
         id="como-pedir"
       >
-        <div className="content-shell grid gap-6 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+        <div className="content-shell grid gap-8 md:gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
           <div className="max-w-2xl" data-reveal="left">
             <p className="mb-3 text-[0.68rem] uppercase tracking-[0.22em] text-[var(--sage)] md:mb-5 md:text-sm md:tracking-[0.28em]">
               Cómo pedir
@@ -160,10 +153,10 @@ export default function Home() {
               Elegís, reservás y coordinamos.
             </h2>
             <p className="mt-4 max-w-lg text-base leading-7 text-[var(--chocolate)]/72 md:mt-6 md:text-lg md:leading-8">
-              48/72 h de anticipación · Villa Devoto · envío por Uber/Cabify.
+              48 h de anticipación · Villa Devoto · envío por Uber.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3 md:gap-7" data-stagger>
+          <div className="grid gap-5 sm:grid-cols-3 md:gap-7" data-stagger>
             <div
               className="step-card border-t border-[var(--line)] pt-3 md:pt-5"
               data-reveal="subtle"
@@ -203,7 +196,7 @@ export default function Home() {
                 Retirás
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
-                Por Devoto o con envío coordinado.
+                Por Devoto o con envío por Uber previamente coordinado.
               </p>
             </div>
           </div>
@@ -211,73 +204,64 @@ export default function Home() {
       </section>
 
       <section
-        className="section-pad section-y bg-[var(--cream)]"
+        className="middle-mobile-section section-pad section-y bg-[var(--cream)]"
         id="historia"
       >
-        <div className="content-shell grid gap-10 md:gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+        <div className="content-shell grid gap-12 md:gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
           <div data-reveal="left">
             <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
               Nosotros
             </p>
             <h2 className="font-display text-5xl leading-[0.95] tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
-              Devoto le puso nombre a nuestras tartas.
+              De Devoto a tu mesa.
             </h2>
           </div>
-          <div className="max-w-3xl space-y-5 text-lg leading-8 text-[var(--chocolate)]/80 md:text-xl md:leading-9">
+          <div className="max-w-3xl space-y-4 text-base leading-7 text-[var(--chocolate)]/80 md:space-y-5 md:text-xl md:leading-9">
             <p data-reveal="right">
-              Natta nació de una pasión que compartimos desde hace 12 años: la
-              cocina y la búsqueda constante de nuevas experiencias
-              gastronómicas.
+              Natta empezó en la cocina de Cami y Martín, entre pruebas,
+              sobremesas y una búsqueda clara: una tarta vasca cremosa, firme y
+              con identidad propia.
             </p>
             <p data-reveal="right">
-              Con el tiempo, esa curiosidad por explorar sabores y texturas se
-              convirtió también en una búsqueda cada vez más precisa: entender
-              los detalles, perfeccionar procesos y encontrar ese equilibrio
-              entre intensidad, suavidad y cremosidad que define cada creación.
+              Desde Devoto, esa idea encontró su formato más reconocible en la
+              Latta: una porción individual, práctica y reutilizable, pensada
+              para viajar bien y quedarse en la mesa.
             </p>
-            <p data-reveal="right">
-              Un proyecto creado para compartir, acompañar encuentros y
-              transformar el sabor en experiencia. Porque creemos que muchas
-              veces los mejores recuerdos empiezan alrededor de una mesa.
-            </p>
-          </div>
-        </div>
-
-        <div
-          className="content-shell mt-10 grid grid-cols-2 gap-3 md:mt-14 md:grid-cols-3 md:gap-4"
-          data-stagger
-        >
-          {featuredImages.map((image, index) => (
-            <div
-              className={`group image-shadow lift-hover relative overflow-hidden rounded-[20px] bg-[var(--milk)] md:rounded-[26px] ${
-                index === 2
-                  ? "col-span-2 aspect-[2.25/1] md:col-span-1 md:aspect-[4/5]"
-                  : "aspect-[4/5]"
-              }`}
-              data-reveal="scale"
-              key={image.src}
+            <a
+              className="group block max-w-md overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--milk)] text-[var(--chocolate)] image-shadow transition !mt-8 hover:-translate-y-0.5 hover:text-[var(--chocolate-deep)] md:!mt-10"
+              data-reveal="right"
+              href="https://www.iprofesional.com/negocios/456313-tomaron-un-postre-tradicional-lo-pusieron-en-una-lata-y-crearon-un-gran-negocio"
+              rel="noreferrer"
+              target="_blank"
             >
-              <Image
-                alt={image.alt}
-                className="object-cover transition duration-700 group-hover:scale-105"
-                fill
-                sizes={
-                  index === 2
-                    ? "(min-width: 768px) 33vw, 100vw"
-                    : "(min-width: 768px) 33vw, 50vw"
-                }
-                src={image.src}
-              />
-              <span className="absolute bottom-3 left-3 rounded-full bg-[var(--milk)]/88 px-3 py-1.5 text-sm lowercase text-[var(--chocolate)] backdrop-blur md:bottom-4 md:left-4 md:px-4 md:py-2">
-                {image.label}
+              <span className="relative block aspect-[4/5] overflow-hidden bg-[var(--cream)]">
+                <Image
+                  alt="Cami y Martin sosteniendo una tarta vasca Natta"
+                  className="object-cover transition duration-700 group-hover:scale-105"
+                  fill
+                  sizes="(min-width: 768px) 28rem, 92vw"
+                  src={instagramImages.couple}
+                  style={{ objectPosition: "center 18%" }}
+                />
               </span>
-            </div>
-          ))}
+              <span className="flex min-w-0 items-center justify-between gap-3 p-4 md:p-5">
+                <span className="min-w-0">
+                  <span className="block text-[0.68rem] uppercase leading-5 tracking-[0.18em] text-[var(--sage)] md:text-xs">
+                    Nota en iProfesional
+                  </span>
+                  <span className="mt-1 block text-base leading-6 md:text-lg md:leading-7">
+                    La historia de cómo la tarta vasca llegó al formato latta.
+                  </span>
+                </span>
+                <ExternalLink className="h-5 w-5 shrink-0 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </span>
+            </a>
+          </div>
         </div>
       </section>
 
-      <section className="mobile-section-compact section-pad section-y bg-[var(--chocolate-deep)] text-[var(--milk)]">
-        <div className="content-shell grid gap-6 md:gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+      <section className="middle-mobile-section mobile-section-compact section-pad section-y section-y-roomy bg-[var(--chocolate-deep)] text-[var(--milk)]">
+        <div className="content-shell grid gap-8 md:gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start">
           <div data-reveal="left">
             <p className="mb-3 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.22em] text-[var(--caramel-soft)] md:mb-5 md:gap-3 md:text-sm md:tracking-[0.28em]">
               <Heart className="h-3.5 w-3.5 md:h-4 md:w-4" />
@@ -287,7 +271,7 @@ export default function Home() {
               Cremosa por dentro. Firme por fuera.
             </h2>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3 md:gap-6" data-stagger>
+          <div className="grid gap-5 sm:grid-cols-3 md:gap-6" data-stagger>
             {cakeSizes.map((size) => (
               <div
                 className="step-card border-t border-white/18 pt-3 md:pt-5"
@@ -307,34 +291,27 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-y-tight bg-[var(--cream-soft)]">
-        <div className="section-pad content-shell">
+      <section className="middle-mobile-section instagram-mobile-section section-y-tight !pb-0 bg-[var(--cream-soft)]">
+        <div className="section-pad content-shell max-md:px-5">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end md:gap-8">
             <div data-reveal="left">
               <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
                 Desde Instagram
               </p>
               <h2 className="font-display text-5xl leading-none tracking-[-0.04em] text-[var(--chocolate-deep)] md:text-7xl">
-                La textura se entiende antes de leer.
+                Natta y vos.
               </h2>
             </div>
-            <p
-              className="max-w-md text-lg leading-8 text-[var(--chocolate)]/78 md:pb-1"
-              data-reveal="right"
-            >
-              Fotos reales del producto, las cajas y las mesas donde Natta ya
-              empezó a formar parte de cumpleaños, antojos y sobremesas.
-            </p>
           </div>
         </div>
 
         <div
-          className="editorial-rail mt-10 flex gap-3 overflow-x-auto px-4 pb-5 md:mt-12 md:gap-4 md:px-8"
+          className="editorial-rail flex gap-4 overflow-x-auto px-7 py-10 md:gap-4 md:px-10"
           data-stagger
         >
           {editorialImages.map((image, index) => (
             <div
-              className={`editorial-card group image-shadow lift-hover relative shrink-0 overflow-hidden rounded-[26px] bg-[var(--milk)] ${
+              className={`editorial-card group image-shadow lift-hover relative shrink-0 rounded-[26px] bg-[var(--milk)] ${
                 index % 3 === 1
                   ? "h-[430px] w-[300px] md:h-[560px] md:w-[380px]"
                   : "h-[390px] w-[270px] md:h-[500px] md:w-[340px]"
@@ -342,13 +319,15 @@ export default function Home() {
               data-reveal="scale"
               key={image.src}
             >
-              <Image
-                alt={image.alt}
-                className="object-cover transition duration-700 group-hover:scale-105"
-                fill
-                sizes="(min-width: 768px) 380px, 300px"
-                src={image.src}
-              />
+              <span className="absolute inset-0 overflow-hidden rounded-[26px]">
+                <Image
+                  alt={image.alt}
+                  className="object-cover transition duration-700 group-hover:scale-105"
+                  fill
+                  sizes="(min-width: 768px) 380px, 300px"
+                  src={image.src}
+                />
+              </span>
               <span className="absolute bottom-3 left-3 rounded-full bg-[var(--milk)]/88 px-3 py-1.5 text-sm lowercase text-[var(--chocolate)] backdrop-blur md:bottom-4 md:left-4 md:px-4 md:py-2">
                 {image.label}
               </span>
@@ -358,12 +337,12 @@ export default function Home() {
       </section>
 
       <section
-        className="section-pad section-y bg-[var(--cream-soft)]"
+        className="middle-mobile-section section-pad section-y bg-[var(--cream-soft)]"
         id="menu"
       >
         <div className="content-shell">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end md:gap-8">
-            <div data-reveal="left">
+          <div className="flex flex-col items-center justify-center gap-7 text-center md:gap-8">
+            <div className="mx-auto max-w-xl" data-reveal="left">
               <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
                 Menú inicial
               </p>
@@ -373,43 +352,15 @@ export default function Home() {
             </div>
           </div>
 
-          <div
-            className="mt-10 overflow-hidden rounded-[22px] border border-[var(--line)] bg-[var(--milk)] md:mt-14 md:rounded-[28px]"
-            data-reveal="subtle"
-          >
-            <div className="grid grid-cols-[minmax(7rem,1.4fr)_repeat(3,minmax(3.25rem,0.8fr))] items-center gap-2 border-b border-[var(--line)] px-4 py-3 text-[0.66rem] uppercase tracking-[0.14em] text-[var(--sage)] md:gap-3 md:px-7 md:py-4 md:text-xs md:tracking-[0.18em]">
-              <span>Sabor</span>
-              <span>Latta</span>
-              <span>Chica</span>
-              <span>Grande</span>
-            </div>
-            {flavors.map((flavor) => (
-              <div
-                className="menu-row grid grid-cols-[minmax(7rem,1.4fr)_repeat(3,minmax(3.25rem,0.8fr))] items-center gap-2 border-b border-[var(--line)] px-4 py-4 last:border-b-0 md:gap-3 md:px-7 md:py-5"
-                key={flavor.id}
-              >
-                <div>
-                  <p className="font-display text-3xl leading-none text-[var(--chocolate-deep)]">
-                    {flavor.name}
-                  </p>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-[var(--chocolate)]/72">
-                    {flavor.description}
-                  </p>
-                </div>
-                <Price value={flavor.prices.latta} />
-                <Price value={flavor.prices.chica} />
-                <Price value={flavor.prices.grande} />
-              </div>
-            ))}
-          </div>
+          <MenuPhotoTable />
         </div>
       </section>
 
       <section
-        className="section-pad section-y bg-[var(--cream-soft)]"
+        className="middle-mobile-section section-pad section-y bg-[var(--cream-soft)]"
         id="faq"
       >
-        <div className="content-shell grid gap-10 md:gap-12 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="content-shell grid gap-12 md:gap-12 lg:grid-cols-[0.8fr_1.2fr]">
           <div data-reveal="left">
             <p className="mb-4 text-sm uppercase tracking-[0.28em] text-[var(--sage)] md:mb-5">
               Preguntas frecuentes
@@ -422,22 +373,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="section-pad bg-[var(--chocolate-deep)] pb-32 pt-12 text-[var(--milk)] md:py-12">
-        <div className="content-shell flex flex-col justify-between gap-6 md:flex-row md:items-center">
-          <div>
-            <p className="font-display text-5xl italic">natta</p>
-            <p className="mt-2 text-sm text-[var(--milk)]/62">
-              Amantes de las tartas de queso · Villa Devoto
-            </p>
-          </div>
-          <BrandLoaderLink
-            className="motion-button lift-hover inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
-            href="/pedido"
-          >
-            Armar pedido
-          </BrandLoaderLink>
-        </div>
-      </footer>
+      <SiteFooter />
 
       <div className="mobile-cta-gradient pointer-events-none fixed inset-x-0 bottom-0 z-40 h-28 md:hidden" />
 
@@ -451,13 +387,5 @@ export default function Home() {
         </BrandLoaderLink>
       </div>
     </main>
-  );
-}
-
-function Price({ value }: { value: number }) {
-  return (
-    <span className="self-center font-mono text-[0.72rem] text-[var(--chocolate)] md:text-base">
-      {formatCurrency(value)}
-    </span>
   );
 }

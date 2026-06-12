@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { OrderAssistant } from "@/components/order-assistant";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "Pedido | Natta Vascas",
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 const orderDetails = [
   {
     label: "Anticipación",
-    title: "48/72 h",
+    title: "48 h",
     text: "Para asegurar cupo.",
   },
   {
@@ -23,7 +24,7 @@ const orderDetails = [
   },
   {
     label: "Envío",
-    title: "Uber/Cabify",
+    title: "Uber",
     text: "Coordinado en el día.",
   },
 ];
@@ -109,22 +110,7 @@ export default function PedidoPage() {
         </div>
       </section>
 
-      <section className="section-pad bg-[var(--chocolate-deep)] py-12 text-[var(--milk)]">
-        <div className="content-shell flex flex-col justify-between gap-6 md:flex-row md:items-center">
-          <div>
-            <p className="font-display text-5xl italic">natta</p>
-            <p className="mt-2 text-sm text-[var(--milk)]/62">
-              Pedidos por encargo · Villa Devoto
-            </p>
-          </div>
-          <BrandLoaderLink
-            className="motion-button lift-hover inline-flex h-12 items-center justify-center rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
-            href="/"
-          >
-            Volver al inicio
-          </BrandLoaderLink>
-        </div>
-      </section>
+      <SiteFooter ctaHref="/" ctaLabel="Volver al inicio" />
     </main>
   );
 }

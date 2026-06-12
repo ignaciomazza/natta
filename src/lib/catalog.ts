@@ -15,7 +15,7 @@ export type Flavor = {
   id: string;
   name: string;
   description: string;
-  prices: Record<SizeId, number>;
+  prices: Record<SizeId, number | null>;
 };
 
 export const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
@@ -24,30 +24,39 @@ export const cakeSizes: CakeSize[] = [
   {
     id: "latta",
     label: "Latta",
-    detail: "300 g",
+    detail: "11 cm · 300 g",
     servings: "Cuchareable individual",
+    diameter: "11 cm",
   },
   {
     id: "chica",
     label: "Chica",
-    detail: "15 cm",
+    detail: "15 cm · 950 g aprox.",
     servings: "Entre 4 y 6 porciones",
     diameter: "15 cm",
   },
   {
     id: "grande",
     label: "Grande",
-    detail: "24 cm",
-    servings: "Entre 8 y 12 porciones",
+    detail: "24 cm · 2 kg aprox.",
+    servings: "Entre 10 y 12 porciones",
     diameter: "24 cm",
   },
 ];
 
-function buildPrices(latta: number, chica: number, grande: number): Record<SizeId, number> {
+function buildPrices(latta: number, chica: number, grande: number): Record<SizeId, number | null> {
   return {
     latta: applyPriceMultiplier(latta),
     chica: applyPriceMultiplier(chica),
     grande: applyPriceMultiplier(grande),
+  };
+}
+
+function buildLattaOnlyPrice(latta: number): Record<SizeId, number | null> {
+  return {
+    latta: applyPriceMultiplier(latta),
+    chica: null,
+    grande: null,
   };
 }
 
@@ -61,56 +70,56 @@ export const flavors: Flavor[] = [
   {
     id: "limu",
     name: "Limu",
-    description: "Tarta de queso sabor lima.",
+    description: "Lima.",
     prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "choco",
     name: "Choco",
-    description: "Tarta de queso sabor 60% cacao.",
+    description: "60% cacao.",
     prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "tella",
     name: "Tella",
-    description: "Tarta de queso con avellanas.",
+    description: "Avellanas.",
     prices: buildPrices(13000, 26000, 45000),
   },
   {
     id: "blanca",
     name: "Blanca",
-    description: "Tarta de queso sabor chocolate blanco.",
+    description: "Chocolate blanco.",
     prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "tachio",
     name: "Tachio",
-    description: "Tarta de queso con pistachos.",
+    description: "Pistachos.",
     prices: buildPrices(13000, 29000, 50000),
   },
   {
     id: "duo",
     name: "Duo",
-    description: "Tarta de queso sabor chocolate blanco y Oreos.",
+    description: "Chocolate blanco y Oreos.",
     prices: buildPrices(13000, 29000, 50000),
   },
   {
     id: "argenta",
     name: "Argenta",
-    description: "Tarta de queso sabor dulce de leche.",
+    description: "Dulce de leche.",
     prices: buildPrices(13000, 23000, 40000),
   },
   {
     id: "mocha",
     name: "Mocha",
-    description: "Tarta de queso sabor café con base de chocolate.",
+    description: "Café con base de chocolate.",
     prices: buildPrices(13000, 26000, 45000),
   },
   {
     id: "brulee",
     name: "Brulée",
-    description: "Tarta de queso sabor crème brûlée con crocante de caramelo.",
-    prices: buildPrices(13000, 23000, 40000),
+    description: "Crème brûlée con crocante de caramelo.",
+    prices: buildLattaOnlyPrice(13000),
   },
 ];
 

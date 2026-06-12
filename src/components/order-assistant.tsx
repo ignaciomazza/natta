@@ -1,21 +1,28 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowDown,
   ArrowRight,
   CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   CreditCard,
+  ImageIcon,
   LoaderCircle,
   MapPin,
   Minus,
   Plus,
   QrCode,
+  ReceiptText,
+  RefreshCw,
   ShoppingBag,
   Truck,
   UserRound,
+  X,
 } from "lucide-react";
 import { MercadoPagoCardForm } from "@/components/mercadopago-card-form";
 
@@ -26,6 +33,7 @@ type CatalogSize = {
   description: string;
   servings: string;
   diameterCm: number | null;
+  grams: number | null;
 };
 
 type CatalogFlavor = {
@@ -134,6 +142,10 @@ type QuantityMap = Record<string, number>;
 type StepIndex = 0 | 1 | 2 | 3;
 type AssistantView = "builder" | "payment" | "success";
 type PaymentChoice = "wallet" | "card";
+type FlavorPhoto = {
+  src: string;
+  alt: string;
+};
 
 const steps = [
   { label: "Sabores" },
@@ -142,12 +154,57 @@ const steps = [
   { label: "Pago" },
 ] as const;
 
+const DATE_PAGE_SIZE = 9;
+
 const paymentStatusLabel: Record<string, string> = {
   APPROVED: "Acreditado",
   PENDING: "Pendiente",
   REJECTED: "Rechazado",
   CANCELLED: "Cancelado",
   REFUNDED: "Devuelto",
+};
+
+const flavorPhotosBySlug: Record<string, FlavorPhoto> = {
+  natta: {
+    src: "/images/Instagram_files/633114726_18560669452017460_185298347140133489_n.jpg",
+    alt: "Tartas Natta vistas desde arriba en sus moldes",
+  },
+  limu: {
+    src: "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    alt: "Porcion cremosa de tarta Natta sobre plato negro",
+  },
+  choco: {
+    src: "/images/Instagram_files/520535978_753804793969988_6114112854840394034_n.jpg",
+    alt: "Porcion de tarta Natta con cucharita dorada",
+  },
+  tella: {
+    src: "/images/Instagram_files/519650611_18516525010017460_3007151048163527603_n.jpg",
+    alt: "Porcion de tarta Natta con frutos secos",
+  },
+  blanca: {
+    src: "/images/Instagram_files/521939553_18517831567017460_4398237793762632065_n.jpg",
+    alt: "Tarta Natta entera sobre plato negro",
+  },
+  tachio: {
+    src: "/images/Instagram_files/517928155_18515416210017460_2823923844824747085_n.jpg",
+    alt: "Porcion de tarta Natta con pistachos",
+  },
+  duo: {
+    src: "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    alt: "Lattas Natta con etiquetas de sabores",
+  },
+  argenta: {
+    src: "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    alt: "Tarta Natta caramelizada en molde",
+  },
+  mocha: {
+    src: "/images/Instagram_files/629664627_18562076539017460_5672466112806136791_n.jpg",
+    alt: "Lattas Natta listas para entregar",
+  },
+  brulee: {
+    src: "/images/Instagram_files/590847679_18544256392017460_217947530894216047_n.jpg",
+    alt: "Tarta Natta creme brulee con superficie caramelizada",
+  },
 };
 
 const formatMoney = (value: number) =>
@@ -158,6 +215,9 @@ const formatMoney = (value: number) =>
   }).format(value);
 
 const itemKey = (flavorId: string, sizeId: string) => `${flavorId}::${sizeId}`;
+
+const getFlavorPhoto = (flavor: CatalogFlavor) =>
+  flavorPhotosBySlug[flavor.slug] ?? flavorPhotosBySlug.natta;
 
 const getDateOnly = (date: Date) => {
   const year = date.getFullYear();
@@ -265,7 +325,7 @@ function isDeliveryMode(mode: string | null | undefined) {
 }
 
 function getFulfillmentLabel(mode: string | null | undefined) {
-  return isDeliveryMode(mode) ? "Uber / Cabify" : "Retiro Devoto";
+  return isDeliveryMode(mode) ? "Uber" : "Retiro Devoto";
 }
 
 function getDueCopy(
@@ -313,8 +373,19 @@ function sanitizeUiMessage(message: string) {
 
 function getSizeDetail(size: CatalogSize | undefined) {
   if (!size) return "";
+  const parts: string[] = [];
   if (size.diameterCm) {
-    return `${size.diameterCm} cm`;
+    parts.push(`${size.diameterCm} cm`);
+  }
+  if (size.grams) {
+    const gramsLabel =
+      size.grams >= 1000 && size.grams % 1000 === 0
+        ? `${size.grams / 1000} kg`
+        : `${size.grams} g`;
+    parts.push(size.slug === "latta" ? gramsLabel : `${gramsLabel} aprox.`);
+  }
+  if (parts.length) {
+    return parts.join(" · ");
   }
   if (size.servings.trim()) {
     return size.servings;
@@ -359,6 +430,8 @@ export function OrderAssistant() {
     getMercadoPagoReturnPaymentId(),
   );
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("wallet");
+  const [photoFlavor, setPhotoFlavor] = useState<CatalogFlavor | null>(null);
+  const [datePage, setDatePage] = useState(0);
 
   useEffect(() => {
     void (async () => {
@@ -374,16 +447,47 @@ export function OrderAssistant() {
         setCatalog(payload);
 
         const now = new Date();
-        const firstAvailable = payload.availability.find(
+        const firstAvailableIndex = payload.availability.findIndex(
           (item) => !getDayBlockingReason(item, now),
         );
+        const firstAvailable = payload.availability[firstAvailableIndex];
         setDate(firstAvailable?.date ?? "");
+        setDatePage(firstAvailableIndex >= 0 ? Math.floor(firstAvailableIndex / DATE_PAGE_SIZE) : 0);
       } catch (error) {
         setCatalogError(error instanceof Error ? error.message : "No se pudo cargar el catálogo");
       } finally {
         setLoadingCatalog(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    if (!photoFlavor) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPhotoFlavor(null);
+      }
+    };
+    const originalOverflow = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [photoFlavor]);
+
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
   }, []);
 
   useEffect(() => {
@@ -425,6 +529,12 @@ export function OrderAssistant() {
     };
   }, [createdOrderId, returnPaymentId, returnPaymentState]);
 
+  useEffect(() => {
+    if (!createdOrderId || !loadingPaymentView) return;
+
+    scrollPageToTop("auto");
+  }, [createdOrderId, loadingPaymentView]);
+
   const sizeLookup = useMemo(
     () => new Map((catalog?.sizes ?? []).map((size) => [size.id, size])),
     [catalog],
@@ -463,6 +573,15 @@ export function OrderAssistant() {
   const selectedDayBlockingReason = selectedDay
     ? getDayBlockingReason(selectedDay, availabilityReference)
     : null;
+  const availabilityPageCount = Math.max(
+    1,
+    Math.ceil((catalog?.availability.length ?? 0) / DATE_PAGE_SIZE),
+  );
+  const activeDatePage = Math.min(Math.max(datePage, 0), availabilityPageCount - 1);
+  const visibleAvailability = catalog?.availability.slice(
+    activeDatePage * DATE_PAGE_SIZE,
+    activeDatePage * DATE_PAGE_SIZE + DATE_PAGE_SIZE,
+  ) ?? [];
 
   const primaryPayment = useMemo(() => {
     if (!paymentSnapshot?.payments.length) return null;
@@ -585,6 +704,8 @@ export function OrderAssistant() {
             title: "Armá tu pedido.",
           };
 
+  const modalPhoto = photoFlavor ? getFlavorPhoto(photoFlavor) : null;
+
   function updateQuantity(flavorId: string, sizeId: string, delta: number) {
     const key = itemKey(flavorId, sizeId);
     setQuantities((current) => {
@@ -601,6 +722,21 @@ export function OrderAssistant() {
       ...current,
       [field]: value,
     }));
+  }
+
+  function scrollPageToTop(behavior: ScrollBehavior = "smooth") {
+    const scroll = (nextBehavior: ScrollBehavior) => {
+      window.scrollTo({ left: 0, top: 0, behavior: nextBehavior });
+      if (nextBehavior === "auto") {
+        window.scrollTo(0, 0);
+      }
+    };
+
+    requestAnimationFrame(() => {
+      scroll(behavior);
+      window.setTimeout(() => scroll("auto"), 120);
+      window.setTimeout(() => scroll("auto"), 360);
+    });
   }
 
   function goToNextStep() {
@@ -667,7 +803,8 @@ export function OrderAssistant() {
 
     setPaymentSnapshot(payload);
     setSubmittedCode(payload.order.publicReceiptCode);
-    setDate(payload.order.deliveryDate.split("T")[0] ?? payload.order.deliveryDate);
+    const deliveryDate = payload.order.deliveryDate.split("T")[0] ?? payload.order.deliveryDate;
+    setDate(deliveryDate);
     setMode(isDeliveryMode(payload.order.fulfillmentMode) ? "delivery" : "pickup");
     setCustomer({
       name: payload.order.customer.name,
@@ -788,6 +925,7 @@ export function OrderAssistant() {
     setReturnPaymentState(null);
     setPaymentChoice("wallet");
     setLoadingPaymentView(true);
+    scrollPageToTop();
 
     try {
       const orderPayload = {
@@ -931,10 +1069,10 @@ export function OrderAssistant() {
 
           return (
             <button
-              className={`step-card rounded-xl border px-2 py-2 text-center transition sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${
+              className={`step-card rounded-xl px-2 py-2 text-center transition sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${
                 isActive
-                  ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                  : "border-[var(--line)] bg-white/55 text-[var(--chocolate)]/70 hover:border-[var(--caramel)] disabled:opacity-55 disabled:hover:border-[var(--line)]"
+                  ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_8px_18px_rgba(43,26,24,0.16)]"
+                  : "bg-white/58 text-[var(--chocolate)]/70 shadow-[0_5px_14px_rgba(43,26,24,0.055)] hover:bg-white/82 hover:shadow-[0_8px_18px_rgba(43,26,24,0.085)] disabled:opacity-45 disabled:hover:bg-white/58 disabled:hover:shadow-[0_5px_14px_rgba(43,26,24,0.055)]"
               }`}
               disabled={isDisabled}
               key={item.label}
@@ -976,7 +1114,8 @@ export function OrderAssistant() {
   }
 
   return (
-    <div className="grid w-full min-w-0 gap-5 md:gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+    <>
+      <div className="grid w-full min-w-0 gap-5 md:gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
       <div
         className="hidden min-w-0 space-y-4 md:block lg:sticky lg:top-24 lg:space-y-6"
         data-reveal="subtle"
@@ -1006,7 +1145,7 @@ export function OrderAssistant() {
 
       {currentView === "builder" ? (
         <form
-          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:border sm:border-white/70 sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7"
+          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7"
           data-testid="order-assistant"
           id="pedido-asistido"
           onSubmit={handleBuilderSubmit}
@@ -1031,17 +1170,28 @@ export function OrderAssistant() {
                 </p>
               </div>
 
-              <div className="mt-3 divide-y divide-[var(--line)] sm:mt-5">
+              <div className="mt-4 space-y-5 sm:mt-6 sm:space-y-6">
                 {catalog.flavors.map((flavor) => (
-                  <article className="py-3 sm:py-5" key={flavor.id}>
-                    <div className="grid gap-3 sm:gap-5 xl:grid-cols-[0.52fr_1.48fr] xl:items-stretch">
-                      <div className="flex min-h-full flex-wrap items-baseline gap-x-3 gap-y-1 md:flex-col md:flex-nowrap md:items-start md:justify-center md:gap-0">
-                        <h3 className="font-display text-2xl leading-none text-[var(--chocolate-deep)] sm:text-3xl">
-                          {flavor.name}
-                        </h3>
-                        <p className="min-w-0 flex-1 text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6 md:mt-3 md:max-w-[17rem] md:flex-none">
-                          {flavor.description}
-                        </p>
+                  <article className="py-1" key={flavor.id}>
+                    <div className="grid gap-3 sm:gap-5 xl:grid-cols-[minmax(11rem,0.58fr)_minmax(0,1.42fr)] xl:items-stretch">
+                      <div className="flex min-h-full items-start justify-between gap-3 xl:items-center">
+                        <div className="min-w-0">
+                          <h3 className="font-display text-2xl leading-none text-[var(--chocolate-deep)] sm:text-3xl">
+                            {flavor.name}
+                          </h3>
+                          <p className="mt-1 min-w-0 text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6 xl:mt-3 xl:max-w-[14rem]">
+                            {flavor.description}
+                          </p>
+                        </div>
+                        <button
+                          aria-label={`Ver foto de ${flavor.name}`}
+                          className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-full bg-white/75 px-2.5 uppercase tracking-[0.1em] text-[var(--chocolate)] shadow-[0_4px_12px_rgba(43,26,24,0.075)] transition hover:bg-[var(--milk)] hover:shadow-[0_6px_16px_rgba(43,26,24,0.1)] sm:h-8"
+                          onClick={() => setPhotoFlavor(flavor)}
+                          type="button"
+                        >
+                          <ImageIcon className="h-3 w-3" />
+                          <span className="text-[0.48rem] font-semibold sm:text-[0.52rem]">Ver foto</span>
+                        </button>
                       </div>
 
                       <div className="grid min-w-0 grid-cols-3 gap-2">
@@ -1052,14 +1202,14 @@ export function OrderAssistant() {
 
                           return (
                             <div
-                              className={`order-card flex min-h-[5.35rem] flex-col justify-between rounded-xl border p-1.5 transition sm:min-h-36 sm:rounded-2xl sm:p-3 ${
+                              className={`order-card flex min-h-[5.35rem] flex-col justify-between rounded-[1rem] p-1.5 transition sm:min-h-36 sm:rounded-[1.35rem] sm:p-3 ${
                                 quantity > 0
-                                  ? "border-[var(--chocolate)] bg-[var(--cream)]"
-                                  : "border-[var(--line)] bg-white/55"
+                                  ? "bg-[var(--cream)] shadow-[0_10px_24px_rgba(43,26,24,0.13)]"
+                                  : "bg-white/62 shadow-[0_7px_18px_rgba(43,26,24,0.075)]"
                               }`}
                               key={key}
                             >
-                              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+                              <div className="flex flex-col gap-0.5 px-1 pt-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2 sm:px-1.5 sm:pt-1.5">
                                 <div>
                                   <p className="text-xs font-medium sm:text-base">{price.sizeName}</p>
                                   <p className="mt-1 hidden text-xs text-[var(--chocolate)]/62 sm:block">
@@ -1070,7 +1220,7 @@ export function OrderAssistant() {
                                   {formatMoney(price.amountArs)}
                                 </p>
                               </div>
-                              <div className="mt-2 flex h-7 w-full items-center justify-between self-center rounded-full border border-[var(--line)] bg-[var(--milk)] px-1 sm:mt-3 sm:h-10 sm:px-2">
+                              <div className="mt-2 flex h-7 w-full items-center justify-between self-center rounded-full bg-[var(--milk)] px-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_4px_12px_rgba(43,26,24,0.07)] sm:mt-3 sm:h-10 sm:px-2">
                                 <button
                                   aria-label={`Restar ${price.sizeName} ${flavor.name}`}
                                   className="grid h-5 w-5 place-items-center rounded-full transition hover:bg-[var(--sage-soft)] disabled:opacity-35 sm:h-8 sm:w-8"
@@ -1103,30 +1253,61 @@ export function OrderAssistant() {
 
           {step === 1 ? (
             <section className="step-panel mt-5 space-y-5 sm:mt-7 sm:space-y-7">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
-                  <CalendarDays className="h-4 w-4" />
-                  Disponibilidad
-                </p>
-                <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
-                  Las primeras 48/72 h quedan como preparación. Los domingos no se toman pedidos ni retiros.
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
+                    <CalendarDays className="h-4 w-4" />
+                    Disponibilidad
+                  </p>
+                  <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
+                    Las primeras 48 h quedan como preparación. Los domingos no se toman pedidos ni retiros.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    aria-label="Fechas anteriores"
+                    className="grid h-9 w-9 place-items-center rounded-full bg-white/72 text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.07)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.1)] disabled:opacity-35 disabled:hover:bg-white/72 disabled:hover:shadow-[0_5px_14px_rgba(43,26,24,0.07)]"
+                    disabled={activeDatePage === 0}
+                    onClick={() => setDatePage((current) => Math.max(0, current - 1))}
+                    type="button"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span
+                    aria-live="polite"
+                    className="min-w-10 text-center font-mono text-[0.68rem] text-[var(--chocolate)]/60"
+                  >
+                    {activeDatePage + 1}/{availabilityPageCount}
+                  </span>
+                  <button
+                    aria-label="Fechas siguientes"
+                    className="grid h-9 w-9 place-items-center rounded-full bg-white/72 text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.07)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.1)] disabled:opacity-35 disabled:hover:bg-white/72 disabled:hover:shadow-[0_5px_14px_rgba(43,26,24,0.07)]"
+                    disabled={activeDatePage >= availabilityPageCount - 1}
+                    onClick={() =>
+                      setDatePage((current) => Math.min(availabilityPageCount - 1, current + 1))
+                    }
+                    type="button"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
-                {catalog.availability.map((day) => {
+                {visibleAvailability.map((day) => {
                   const blockedReason = getDayBlockingReason(day, availabilityReference);
                   const isDisabled = Boolean(blockedReason);
                   const parts = formatCalendarDate(day.date);
 
                   return (
                     <button
-                      className={`order-card rounded-xl border p-2 text-left transition sm:rounded-2xl sm:p-3 ${
+                      className={`order-card rounded-[1rem] p-2 text-left transition sm:rounded-[1.35rem] sm:p-3 ${
                         date === day.date
-                          ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
+                          ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
                           : isDisabled
-                            ? "border-[var(--line)] bg-[var(--cream)] text-[var(--chocolate)]/42"
-                            : "border-[var(--line)] bg-white/60 hover:border-[var(--caramel)]"
+                            ? "bg-[var(--cream)] text-[var(--chocolate)]/42 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_4px_12px_rgba(43,26,24,0.045)]"
+                            : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
                       }`}
                       disabled={isDisabled}
                       key={day.date}
@@ -1160,16 +1341,16 @@ export function OrderAssistant() {
                   Entrega
                 </p>
                 <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
-                  Elegí si retirás por Devoto o si coordinamos envío por Uber / Cabify.
+                  Elegí si retirás por Devoto o si coordinamos envío por Uber.
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
-                  className={`order-card rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                  className={`order-card rounded-[1rem] p-3 text-left transition sm:rounded-[1.35rem] sm:p-4 ${
                     mode === "pickup"
-                      ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                      : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
+                      ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
+                      : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
                   }`}
                   data-testid="mode-pickup"
                   onClick={() => setMode("pickup")}
@@ -1180,17 +1361,17 @@ export function OrderAssistant() {
                   <span className="mt-1 block text-sm opacity-80">Seña desde la web del 50%</span>
                 </button>
                 <button
-                  className={`order-card rounded-xl border p-3 text-left transition sm:rounded-2xl sm:p-4 ${
+                  className={`order-card rounded-[1rem] p-3 text-left transition sm:rounded-[1.35rem] sm:p-4 ${
                     mode === "delivery"
-                      ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                      : "border-[var(--line)] bg-white/55 hover:border-[var(--caramel)]"
+                      ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
+                      : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
                   }`}
                   data-testid="mode-delivery"
                   onClick={() => setMode("delivery")}
                   type="button"
                 >
                   <Truck className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
-                  <span className="block font-semibold">Uber / Cabify</span>
+                  <span className="block font-semibold">Uber</span>
                   <span className="mt-1 block text-sm opacity-80">Pago desde la web del producto</span>
                 </button>
               </div>
@@ -1199,7 +1380,7 @@ export function OrderAssistant() {
 
           {step === 3 ? (
             <section className="step-panel mt-5 grid gap-5 sm:mt-7 sm:gap-7 xl:grid-cols-[1fr_0.82fr]">
-              <div className="space-y-4 sm:space-y-5">
+              <div className="order-card space-y-4 rounded-[20px] bg-[var(--cream)] p-4 shadow-[0_10px_24px_rgba(43,26,24,0.09)] sm:space-y-5 sm:rounded-[24px] sm:p-5">
                 <div>
                   <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                     <UserRound className="h-4 w-4" />
@@ -1210,20 +1391,20 @@ export function OrderAssistant() {
                   </p>
                 </div>
 
-                <label className="block space-y-2">
+                <label className="flex flex-col gap-3">
                   <span className="text-sm font-medium">Nombre</span>
                   <input
-                    className="h-12 w-full rounded-xl border border-[var(--line)] bg-white/70 px-4 outline-none transition focus:border-[var(--chocolate)] sm:h-14 sm:rounded-2xl"
+                    className="h-12 w-full rounded-[1rem] bg-white/68 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_5px_14px_rgba(43,26,24,0.06)] outline-none transition focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(64,58,55,0.18),0_7px_18px_rgba(43,26,24,0.08)] sm:h-14 sm:rounded-[1.25rem]"
                     onChange={(event) => updateCustomer("name", event.target.value)}
                     placeholder="Tu nombre"
                     value={customer.name}
                   />
                 </label>
 
-                <label className="block space-y-2">
+                <label className="flex flex-col gap-3">
                   <span className="text-sm font-medium">Teléfono</span>
                   <input
-                    className="h-12 w-full rounded-xl border border-[var(--line)] bg-white/70 px-4 outline-none transition focus:border-[var(--chocolate)] sm:h-14 sm:rounded-2xl"
+                    className="h-12 w-full rounded-[1rem] bg-white/68 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_5px_14px_rgba(43,26,24,0.06)] outline-none transition focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(64,58,55,0.18),0_7px_18px_rgba(43,26,24,0.08)] sm:h-14 sm:rounded-[1.25rem]"
                     onChange={(event) => updateCustomer("phone", event.target.value)}
                     placeholder="Para recibir confirmación"
                     value={customer.phone}
@@ -1231,10 +1412,10 @@ export function OrderAssistant() {
                 </label>
 
                 {mode === "delivery" ? (
-                  <label className="block space-y-2">
+                  <label className="flex flex-col gap-3">
                     <span className="text-sm font-medium">Dirección</span>
                     <input
-                      className="h-12 w-full rounded-xl border border-[var(--line)] bg-white/70 px-4 outline-none transition focus:border-[var(--chocolate)] sm:h-14 sm:rounded-2xl"
+                      className="h-12 w-full rounded-[1rem] bg-white/68 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_5px_14px_rgba(43,26,24,0.06)] outline-none transition focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(64,58,55,0.18),0_7px_18px_rgba(43,26,24,0.08)] sm:h-14 sm:rounded-[1.25rem]"
                       onChange={(event) => updateCustomer("address", event.target.value)}
                       placeholder="Calle, número, piso o departamento"
                       value={customer.address}
@@ -1242,10 +1423,10 @@ export function OrderAssistant() {
                   </label>
                 ) : null}
 
-                <label className="block space-y-2">
+                <label className="flex flex-col gap-3">
                   <span className="text-sm font-medium">Notas</span>
                   <textarea
-                    className="min-h-20 w-full resize-none rounded-xl border border-[var(--line)] bg-white/70 p-4 outline-none transition focus:border-[var(--chocolate)] sm:min-h-24 sm:rounded-2xl"
+                    className="min-h-20 w-full resize-none rounded-[1rem] bg-white/68 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_5px_14px_rgba(43,26,24,0.06)] outline-none transition focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(64,58,55,0.18),0_7px_18px_rgba(43,26,24,0.08)] sm:min-h-24 sm:rounded-[1.25rem]"
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder="Horario preferido o aclaraciones."
                     value={notes}
@@ -1253,7 +1434,7 @@ export function OrderAssistant() {
                 </label>
               </div>
 
-              <aside className="order-card rounded-[20px] bg-[var(--cream)] p-4 sm:rounded-[24px] sm:p-5">
+              <aside className="order-card rounded-[20px] bg-[var(--cream)] p-4 shadow-[0_10px_24px_rgba(43,26,24,0.09)] sm:rounded-[24px] sm:p-5">
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                   <CreditCard className="h-4 w-4" />
                   Resumen y pago
@@ -1262,7 +1443,7 @@ export function OrderAssistant() {
                 <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
                   {summaryItems.map((item) => (
                     <div
-                      className="flex justify-between gap-4 border-b border-[var(--line)] pb-2 text-sm last:border-b-0 sm:pb-3"
+                      className="flex justify-between gap-4 rounded-2xl bg-white/48 px-3 py-2 text-sm shadow-[0_4px_12px_rgba(43,26,24,0.045)] sm:px-4 sm:py-3"
                       key={item.key}
                     >
                       <div>
@@ -1276,7 +1457,7 @@ export function OrderAssistant() {
                   ))}
                 </div>
 
-                <div className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm sm:mt-5 sm:space-y-3 sm:pt-5">
+                <div className="mt-4 space-y-2 p-3 text-sm sm:mt-5 sm:space-y-3 sm:p-4">
                   <div className="flex justify-between gap-4">
                     <span>Fecha</span>
                     <strong className="text-right font-medium">
@@ -1295,7 +1476,7 @@ export function OrderAssistant() {
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-xl bg-[var(--milk)] p-3 sm:mt-5 sm:rounded-2xl sm:p-4">
+                <div className="mt-4 rounded-2xl bg-[var(--milk)] p-3 shadow-[0_6px_16px_rgba(43,26,24,0.06)] sm:mt-5 sm:p-4">
                   <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--sage)] sm:text-xs sm:tracking-[0.2em]">
                     A pagar ahora
                   </p>
@@ -1312,22 +1493,18 @@ export function OrderAssistant() {
 
           {submitError ? <p className="mt-5 text-sm text-red-600">{submitError}</p> : null}
 
-          <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[var(--line)] pt-4 sm:mt-7 sm:flex-row sm:items-center sm:justify-between sm:pt-5">
+          <div className="mt-5 flex flex-col-reverse gap-3 pt-1 sm:mt-7 sm:flex-row sm:items-center sm:justify-between">
             <button
-              className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--line)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] disabled:opacity-0 sm:h-12 sm:text-sm"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-white/68 px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.06)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.09)] disabled:opacity-0 sm:h-12 sm:text-sm"
               disabled={step === 0}
               onClick={goToPreviousStep}
               type="button"
             >
+              <ArrowRight className="mr-2 h-3.5 w-3.5 rotate-180" />
               Volver
             </button>
 
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <p className="text-center text-sm text-[var(--chocolate)]/68 sm:text-left">
-                {totalUnits > 0
-                  ? `${totalUnits} ${totalUnits === 1 ? "unidad" : "unidades"} · ${formatMoney(totalArs)}`
-                  : "Agregá al menos un producto."}
-              </p>
               <button
                 className="motion-button inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] disabled:bg-[var(--line)] disabled:text-[var(--chocolate)]/45 sm:h-12 sm:px-6 sm:text-sm"
                 disabled={!canAdvance}
@@ -1339,9 +1516,15 @@ export function OrderAssistant() {
                     Preparando pedido...
                   </span>
                 ) : step === 3 ? (
-                  "Confirmar y pagar"
+                  <span className="inline-flex items-center gap-2">
+                    <Check className="h-4 w-4" />
+                    Confirmar y pagar
+                  </span>
                 ) : (
-                  "Continuar"
+                  <span className="inline-flex items-center gap-2">
+                    <Check className="h-4 w-4" />
+                    Continuar
+                  </span>
                 )}
               </button>
             </div>
@@ -1351,7 +1534,7 @@ export function OrderAssistant() {
 
       {currentView === "payment" ? (
         <section
-          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:border sm:border-white/70 sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7"
+          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7"
           id="pago-final"
         >
           {renderStepHeader(3, true, (targetStep) => {
@@ -1359,7 +1542,7 @@ export function OrderAssistant() {
           })}
 
           {loadingPaymentView ? (
-            <div className="mt-8 flex min-h-72 flex-col items-center justify-center gap-3 rounded-[24px] border border-[var(--line)] bg-white/60 px-6 text-center">
+            <div className="mt-8 flex min-h-72 flex-col items-center justify-center gap-3 rounded-[24px] bg-white/60 px-6 text-center shadow-[0_8px_22px_rgba(43,26,24,0.07)]">
               <LoaderCircle className="h-5 w-5 animate-spin text-[var(--sage)]" />
               <p className="text-sm text-[var(--chocolate)]/72">
                 Preparando las opciones de pago...
@@ -1368,13 +1551,13 @@ export function OrderAssistant() {
           ) : (
             <>
               {submitError ? (
-                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 shadow-[0_5px_14px_rgba(153,27,27,0.08)]">
                   {submitError}
                 </div>
               ) : null}
 
               {!submitError && currentPaymentStatus === "REJECTED" ? (
-                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 shadow-[0_5px_14px_rgba(153,27,27,0.08)]">
                   El pago no se pudo acreditar. Podés volver a intentarlo.
                 </div>
               ) : null}
@@ -1382,7 +1565,7 @@ export function OrderAssistant() {
               {!submitError &&
               currentPaymentStatus !== "REJECTED" &&
               getReturnStateMessage(returnPaymentState) ? (
-                <div className="mt-5 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--chocolate)]">
+                <div className="mt-5 rounded-2xl bg-white/70 px-4 py-3 text-sm text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.055)]">
                   {getReturnStateMessage(returnPaymentState)}
                 </div>
               ) : null}
@@ -1391,7 +1574,7 @@ export function OrderAssistant() {
                 <div>
                 <div>
                   <button
-                    className="inline-flex h-9 items-center justify-center rounded-full border border-[var(--line)] px-3 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:h-10 sm:px-4 sm:text-xs"
+                    className="mb-5 inline-flex h-9 items-center justify-center rounded-full bg-white/68 px-3 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.06)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.09)] sm:h-10 sm:px-4 sm:text-[0.68rem]"
                     onClick={() => {
                       void returnToBuilder(3);
                     }}
@@ -1409,32 +1592,36 @@ export function OrderAssistant() {
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <button
-                      className={`rounded-xl border p-4 text-left transition sm:rounded-2xl ${
+                      className={`rounded-[1rem] p-4 text-left transition sm:rounded-[1.35rem] ${
                         paymentChoice === "wallet"
-                          ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                          : "border-[var(--line)] bg-white/60 hover:border-[var(--caramel)]"
+                          ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
+                          : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
                       }`}
                       onClick={() => setPaymentChoice("wallet")}
                       type="button"
                     >
-                      <QrCode className="mb-3 h-5 w-5" />
-                      <span className="block font-semibold">Dinero en cuenta o QR</span>
+                      <span className="flex items-center gap-2">
+                        <QrCode className="h-5 w-5 shrink-0" />
+                        <span className="font-semibold">Dinero en cuenta o QR</span>
+                      </span>
                       <span className="mt-1 block text-sm opacity-80">
                         Se abre Mercado Pago para terminar el pago.
                       </span>
                     </button>
 
                     <button
-                      className={`rounded-xl border p-4 text-left transition sm:rounded-2xl ${
+                      className={`rounded-[1rem] p-4 text-left transition sm:rounded-[1.35rem] ${
                         paymentChoice === "card"
-                          ? "border-[var(--chocolate)] bg-[var(--chocolate)] text-[var(--milk)]"
-                          : "border-[var(--line)] bg-white/60 hover:border-[var(--caramel)]"
+                          ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
+                          : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
                       }`}
                       onClick={() => setPaymentChoice("card")}
                       type="button"
                     >
-                      <CreditCard className="mb-3 h-5 w-5" />
-                      <span className="block font-semibold">Tarjeta</span>
+                      <span className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 shrink-0" />
+                        <span className="font-semibold">Tarjeta</span>
+                      </span>
                       <span className="mt-1 block text-sm opacity-80">
                         Pagás sin salir de Natta.
                       </span>
@@ -1443,11 +1630,13 @@ export function OrderAssistant() {
 
                   {checkoutSession ? (
                     paymentChoice === "wallet" ? (
-                      <section className="mt-5 rounded-[24px] border border-[var(--line)] bg-[linear-gradient(145deg,#413935_0%,#2b2521_100%)] p-5 text-[var(--milk)]">
-                        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-                          <QrCode className="h-5 w-5" />
+                      <section className="mt-5 rounded-[24px] bg-[linear-gradient(145deg,#413935_0%,#2b2521_100%)] p-5 text-[var(--milk)] shadow-[0_12px_26px_rgba(43,26,24,0.16)]">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10">
+                            <QrCode className="h-5 w-5" />
+                          </span>
+                          <h3 className="text-2xl font-semibold">Abrir Mercado Pago</h3>
                         </div>
-                        <h3 className="mt-2 text-2xl font-semibold">Abrir Mercado Pago</h3>
                         <p className="mt-2 max-w-md text-sm leading-6 text-[var(--milk)]/75">
                           Se abre Mercado Pago para terminar el pago con saldo en cuenta o con el QR disponible.
                         </p>
@@ -1456,12 +1645,13 @@ export function OrderAssistant() {
                           onClick={openWalletPayment}
                           type="button"
                         >
+                          <QrCode className="h-4 w-4" />
                           <span>Abrir Mercado Pago</span>
                           <ArrowRight className="h-4 w-4" />
                         </button>
                       </section>
                     ) : (
-                      <section className="mt-5 rounded-[24px] border border-[var(--line)] bg-white/82 p-4 sm:p-5">
+                      <section className="mt-5 rounded-[24px] bg-white/82 p-4 shadow-[0_8px_22px_rgba(43,26,24,0.075)] sm:p-5">
                         <div className="mb-4 flex items-start gap-3">
                           <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--cream)] text-[var(--chocolate-deep)]">
                             <CreditCard className="h-5 w-5" />
@@ -1482,7 +1672,7 @@ export function OrderAssistant() {
                       </section>
                     )
                   ) : (
-                    <section className="mt-5 rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm text-[var(--chocolate)]">
+                    <section className="mt-5 rounded-2xl bg-white/70 p-4 text-sm text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.055)]">
                       <p>No se pudo preparar el pago todavía.</p>
                       <button
                         className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[var(--chocolate-deep)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--milk)] transition hover:bg-[var(--sage)] sm:text-sm"
@@ -1498,37 +1688,45 @@ export function OrderAssistant() {
                     </section>
                   )}
 
-                  <div className="mt-5 flex flex-wrap gap-4 text-sm text-[var(--chocolate)]/82">
+                  <div className="mt-5 grid grid-cols-2 gap-2 text-sm text-[var(--chocolate)]/82 sm:inline-grid">
                     <button
-                      className="font-semibold underline underline-offset-4"
+                      className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white/68 px-2 text-[0.44rem] font-semibold uppercase tracking-[0.07em] text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.06)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.09)] sm:px-3 sm:text-[0.5rem]"
                       disabled={checkingStatus}
                       onClick={() => {
                         void refreshPaymentStatus();
                       }}
+                      style={{ fontSize: "0.5rem" }}
                       type="button"
                     >
+                      {checkingStatus ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
                       {checkingStatus ? "Revisando..." : "Actualizar estado"}
                     </button>
                     {receiptCode ? (
                       <a
-                        className="font-semibold underline underline-offset-4"
+                        className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white/68 px-2 text-[0.54rem] font-semibold uppercase tracking-[0.08em] text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.06)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.09)] sm:px-3 sm:text-[0.62rem]"
                         href={`/comprobante/${receiptCode}`}
                       >
+                        <ReceiptText className="h-3.5 w-3.5" />
                         Ver comprobante
                       </a>
                     ) : null}
                     {paymentReceiptUrl ? (
                       <a
-                        className="font-semibold underline underline-offset-4"
+                        className="col-span-2 inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white/68 px-2 text-[0.54rem] font-semibold uppercase tracking-[0.08em] text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.06)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.09)] sm:col-span-1 sm:px-3 sm:text-[0.62rem]"
                         href={paymentReceiptUrl}
                       >
+                        <ReceiptText className="h-3.5 w-3.5" />
                         Ver constancia del pago
                       </a>
                     ) : null}
                   </div>
                 </div>
 
-                <aside className="order-card rounded-[22px] border border-[var(--line)] bg-[var(--cream)] p-4 sm:rounded-[24px] sm:border-0 sm:p-5">
+                <aside className="order-card rounded-[22px] bg-[var(--cream)] p-4 shadow-[0_10px_24px_rgba(43,26,24,0.09)] sm:rounded-[24px] sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                       Resumen
@@ -1553,7 +1751,7 @@ export function OrderAssistant() {
                   <div className="mt-4 space-y-2 sm:space-y-3">
                     {summaryItems.map((item) => (
                       <div
-                        className="flex justify-between gap-4 border-b border-[var(--line)] pb-2 text-sm last:border-b-0 sm:pb-3"
+                        className="flex justify-between gap-4 rounded-2xl bg-white/48 px-3 py-2 text-sm shadow-[0_4px_12px_rgba(43,26,24,0.045)] sm:px-4 sm:py-3"
                         key={item.key}
                       >
                         <div>
@@ -1567,7 +1765,7 @@ export function OrderAssistant() {
                     ))}
                   </div>
 
-                  <div className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm sm:space-y-3">
+                  <div className="mt-4 space-y-2 p-3 text-sm sm:space-y-3 sm:p-4">
                     <div className="flex justify-between gap-4">
                       <span>Fecha</span>
                       <strong className="text-right font-medium">
@@ -1586,7 +1784,7 @@ export function OrderAssistant() {
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-xl bg-white/80 p-4 sm:rounded-2xl">
+                  <div className="mt-4 rounded-2xl bg-white/80 p-4 shadow-[0_6px_16px_rgba(43,26,24,0.06)]">
                     <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--sage)] sm:text-xs sm:tracking-[0.2em]">
                       A pagar ahora
                     </p>
@@ -1605,11 +1803,11 @@ export function OrderAssistant() {
       ) : null}
 
       {currentView === "success" ? (
-        <section className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:border sm:border-white/70 sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7">
+        <section className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:p-7">
           {renderStepHeader(3, false)}
 
           <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_0.82fr] xl:gap-7">
-            <div className="rounded-[24px] bg-[var(--cream)] p-5 sm:p-6">
+            <div className="rounded-[24px] bg-[var(--cream)] p-5 shadow-[0_10px_24px_rgba(43,26,24,0.09)] sm:p-6">
               <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[var(--chocolate-deep)] text-[var(--milk)]">
                 <Check className="h-5 w-5" />
               </div>
@@ -1643,7 +1841,7 @@ export function OrderAssistant() {
                 ) : null}
                 {paymentReceiptUrl ? (
                   <a
-                    className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--line)] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] transition hover:border-[var(--chocolate)] sm:h-12 sm:text-sm"
+                    className="inline-flex h-11 items-center justify-center rounded-full bg-white/68 px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.06)] transition hover:bg-white hover:shadow-[0_7px_18px_rgba(43,26,24,0.09)] sm:h-12 sm:text-sm"
                     href={paymentReceiptUrl}
                   >
                     Ver constancia del pago
@@ -1652,7 +1850,7 @@ export function OrderAssistant() {
               </div>
             </div>
 
-            <aside className="order-card rounded-[20px] bg-[var(--cream)] p-4 sm:rounded-[24px] sm:p-5">
+            <aside className="order-card rounded-[20px] bg-[var(--cream)] p-4 shadow-[0_10px_24px_rgba(43,26,24,0.09)] sm:rounded-[24px] sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:text-sm sm:tracking-[0.2em]">
                 Resumen del pedido
               </p>
@@ -1660,7 +1858,7 @@ export function OrderAssistant() {
               <div className="mt-4 space-y-2 sm:space-y-3">
                 {summaryItems.map((item) => (
                   <div
-                    className="flex justify-between gap-4 border-b border-[var(--line)] pb-2 text-sm last:border-b-0 sm:pb-3"
+                    className="flex justify-between gap-4 rounded-2xl bg-white/48 px-3 py-2 text-sm shadow-[0_4px_12px_rgba(43,26,24,0.045)] sm:px-4 sm:py-3"
                     key={item.key}
                   >
                     <div>
@@ -1674,7 +1872,7 @@ export function OrderAssistant() {
                 ))}
               </div>
 
-              <div className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm sm:space-y-3">
+              <div className="mt-4 space-y-2 rounded-2xl bg-white/44 p-3 text-sm shadow-[0_4px_12px_rgba(43,26,24,0.045)] sm:space-y-3 sm:p-4">
                 <div className="flex justify-between gap-4">
                   <span>Fecha</span>
                   <strong className="text-right font-medium">
@@ -1693,7 +1891,7 @@ export function OrderAssistant() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl bg-white/80 p-4 sm:rounded-2xl">
+              <div className="mt-4 rounded-2xl bg-white/80 p-4 shadow-[0_6px_16px_rgba(43,26,24,0.06)]">
                 <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--sage)] sm:text-xs sm:tracking-[0.2em]">
                   Cobrado ahora
                 </p>
@@ -1710,6 +1908,69 @@ export function OrderAssistant() {
           </div>
         </section>
       ) : null}
-    </div>
+      </div>
+
+      {photoFlavor && modalPhoto ? (
+        <div
+          aria-labelledby="flavor-photo-title"
+          aria-modal="true"
+          className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-7"
+          role="dialog"
+        >
+          <button
+            aria-label="Cerrar foto"
+            className="absolute inset-0 bg-[var(--chocolate-deep)]/42 backdrop-blur-md"
+            onClick={() => setPhotoFlavor(null)}
+            type="button"
+          />
+
+          <article className="image-shadow relative w-full max-w-[27rem] overflow-hidden rounded-[28px] border border-white/55 bg-[var(--milk)] text-[var(--chocolate)]">
+            <div className="absolute inset-0 opacity-20">
+              <Image
+                alt=""
+                className="scale-110 object-cover blur-2xl"
+                fill
+                sizes="27rem"
+                src={modalPhoto.src}
+              />
+            </div>
+
+            <div className="relative p-2">
+              <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-[var(--cream)]">
+                <Image
+                  alt={modalPhoto.alt}
+                  className="object-cover"
+                  fill
+                  priority
+                  sizes="(min-width: 640px) 27rem, calc(100vw - 2rem)"
+                  src={modalPhoto.src}
+                />
+              </div>
+
+              <button
+                aria-label="Cerrar"
+                className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-white/60 bg-[var(--milk)]/86 text-[var(--chocolate)] shadow-[0_10px_26px_rgba(0,0,0,0.18)] backdrop-blur transition hover:bg-white"
+                onClick={() => setPhotoFlavor(null)}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="px-4 pb-5 pt-5 sm:px-5 sm:pb-6">
+                <h3
+                  className="font-display text-4xl leading-none text-[var(--chocolate-deep)]"
+                  id="flavor-photo-title"
+                >
+                  {photoFlavor.name}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--chocolate)]/72 sm:text-base sm:leading-7">
+                  {photoFlavor.description}
+                </p>
+              </div>
+            </div>
+          </article>
+        </div>
+      ) : null}
+    </>
   );
 }

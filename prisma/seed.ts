@@ -18,26 +18,29 @@ const sizes: SeedSize[] = [
   {
     slug: "latta",
     name: "Latta",
-    description: "300 g",
+    description: "11 cm · 300 g",
     servings: "Cuchareable individual",
     sortOrder: 1,
+    diameterCm: 11,
     grams: 300,
   },
   {
     slug: "chica",
     name: "Chica",
-    description: "15 cm",
+    description: "15 cm · 950 g aprox.",
     servings: "Entre 4 y 6 porciones",
     sortOrder: 2,
     diameterCm: 15,
+    grams: 950,
   },
   {
     slug: "grande",
     name: "Grande",
-    description: "24 cm",
-    servings: "Entre 8 y 12 porciones",
+    description: "24 cm · 2 kg aprox.",
+    servings: "Entre 10 y 12 porciones",
     sortOrder: 3,
     diameterCm: 24,
+    grams: 2000,
   },
 ];
 
@@ -51,56 +54,56 @@ const flavorCatalog = [
   {
     slug: "limu",
     name: "Limu",
-    description: "Tarta de queso sabor lima.",
+    description: "Lima.",
     prices: { latta: 13000, chica: 23000, grande: 40000 },
   },
   {
     slug: "choco",
     name: "Choco",
-    description: "Tarta de queso sabor 60% cacao.",
+    description: "60% cacao.",
     prices: { latta: 13000, chica: 23000, grande: 40000 },
   },
   {
     slug: "tella",
     name: "Tella",
-    description: "Tarta de queso con avellanas.",
+    description: "Avellanas.",
     prices: { latta: 13000, chica: 26000, grande: 45000 },
   },
   {
     slug: "blanca",
     name: "Blanca",
-    description: "Tarta de queso sabor chocolate blanco.",
+    description: "Chocolate blanco.",
     prices: { latta: 13000, chica: 23000, grande: 40000 },
   },
   {
     slug: "tachio",
     name: "Tachio",
-    description: "Tarta de queso con pistachos.",
+    description: "Pistachos.",
     prices: { latta: 13000, chica: 29000, grande: 50000 },
   },
   {
     slug: "duo",
     name: "Duo",
-    description: "Tarta de queso sabor chocolate blanco y Oreos.",
+    description: "Chocolate blanco y Oreos.",
     prices: { latta: 13000, chica: 29000, grande: 50000 },
   },
   {
     slug: "argenta",
     name: "Argenta",
-    description: "Tarta de queso sabor dulce de leche.",
+    description: "Dulce de leche.",
     prices: { latta: 13000, chica: 23000, grande: 40000 },
   },
   {
     slug: "mocha",
     name: "Mocha",
-    description: "Tarta de queso sabor café con base de chocolate.",
+    description: "Café con base de chocolate.",
     prices: { latta: 13000, chica: 26000, grande: 45000 },
   },
   {
     slug: "brulee",
     name: "Brulée",
-    description: "Tarta de queso sabor crème brûlée con crocante de caramelo.",
-    prices: { latta: 13000, chica: 23000, grande: 40000 },
+    description: "Crème brûlée con crocante de caramelo.",
+    prices: { latta: 13000 },
   },
 ] as const;
 
@@ -156,9 +159,13 @@ async function main() {
       },
     });
 
+    const activeSizeIds = new Set<string>();
+
     for (const [sizeSlug, amountArs] of Object.entries(flavor.prices)) {
       const size = sizeBySlug.get(sizeSlug);
       if (!size) continue;
+
+      activeSizeIds.add(size.id);
 
       await prisma.price.upsert({
         where: {
@@ -177,6 +184,15 @@ async function main() {
         },
       });
     }
+
+    await prisma.price.deleteMany({
+      where: {
+        flavorId: upsertedFlavor.id,
+        sizeId: {
+          notIn: [...activeSizeIds],
+        },
+      },
+    });
   }
 
   for (const weekday of [0, 1, 2, 3, 4, 5, 6]) {
