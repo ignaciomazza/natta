@@ -58,15 +58,15 @@ type SummaryCardProps = {
 function SummaryCard({ label, value, detail, tone = "neutral" }: SummaryCardProps) {
   const toneClass =
     tone === "danger"
-      ? "border-rose-200 bg-rose-50/75"
+      ? "bg-rose-50/75"
       : tone === "warning"
-        ? "border-amber-200 bg-amber-50/80"
+        ? "bg-amber-50/80"
         : tone === "success"
-          ? "border-emerald-200 bg-emerald-50/75"
-          : "border-[color:var(--line)] bg-white/90";
+          ? "bg-emerald-50/75"
+          : "bg-white/90";
 
   return (
-    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+    <div className={`rounded-[1.6rem] p-4 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.66),0_8px_18px_-18px_rgba(82,74,70,0.42)] ${toneClass}`}>
       <p className="text-xs uppercase tracking-[0.14em] text-zinc-600">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-[color:var(--chocolate-deep)]">{value}</p>
       <p className="mt-1 text-sm text-zinc-600">{detail}</p>
@@ -97,7 +97,6 @@ export default async function FocoHoyPage() {
   const [
     todayOrdersTotal,
     todayOrdersPreview,
-    todayBalanceAggregate,
     pendingPaymentsTotal,
     pendingPaymentsPreview,
     pendingPaymentsAmountAggregate,
@@ -114,10 +113,6 @@ export default async function FocoHoyPage() {
         customer: { select: { name: true, phone: true } },
       },
       take: 12,
-    }),
-    prisma.order.aggregate({
-      where: todayWhere,
-      _sum: { amountBalanceArs: true },
     }),
     prisma.payment.count({ where: { status: "PENDING" } }),
     prisma.payment.findMany({
@@ -162,7 +157,6 @@ export default async function FocoHoyPage() {
 
   const todayPending = todayOrdersPreview.filter((order) => order.status === "PENDING").length;
   const todayConfirmed = todayOrdersPreview.filter((order) => order.status === "CONFIRMED").length;
-  const todayBalance = todayBalanceAggregate._sum?.amountBalanceArs ?? 0;
 
   const pendingPaymentsAmount = pendingPaymentsAmountAggregate._sum.amountArs ?? 0;
 
@@ -201,7 +195,6 @@ export default async function FocoHoyPage() {
             </Link>
           </div>
         }
-        description="Tablero diario para ejecutar prioridades sin ruido visual."
         icon={Target}
         title="Foco de hoy"
       />
@@ -226,7 +219,7 @@ export default async function FocoHoyPage() {
           value={formatNumber(nextTwoDaysTotal)}
         />
         <SummaryCard
-          detail={`${formatMoney(todayBalance)} saldo de hoy`}
+          detail="Activos fuera de fecha"
           label="Pedidos vencidos"
           tone={overdueOrders > 0 ? "danger" : "success"}
           value={formatNumber(overdueOrders)}
@@ -334,7 +327,7 @@ export default async function FocoHoyPage() {
             prepDays.map((day) => (
               <div
                 key={day.dateLabel}
-                className="rounded-xl border border-[color:var(--line)] bg-white/80 px-3 py-2.5"
+                className="rounded-xl bg-white/82 px-3 py-2.5 shadow-[0_12px_28px_-24px_rgba(38,35,33,0.62),0_6px_14px_-14px_rgba(82,74,70,0.42)]"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[color:var(--chocolate-deep)]">{day.dateLabel}</p>
@@ -349,7 +342,7 @@ export default async function FocoHoyPage() {
               </div>
             ))
           ) : (
-            <p className="rounded-xl border border-dashed border-[color:var(--line)] bg-white/70 px-3 py-2 text-sm text-zinc-600 sm:col-span-2">
+            <p className="rounded-xl bg-white/72 px-3 py-2 text-sm text-zinc-600 shadow-[0_12px_28px_-24px_rgba(38,35,33,0.58),0_6px_14px_-14px_rgba(82,74,70,0.38)] sm:col-span-2">
               No hay pedidos para preparar en los próximos 2 días.
             </p>
           )}
@@ -379,13 +372,13 @@ export default async function FocoHoyPage() {
 
       <div className="flex flex-wrap gap-2">
         <Link className={buttonSoftClassName} href="/interno/pedidos">
-          Gestionar estados de pedidos
+          Pedidos
         </Link>
         <Link className={buttonSoftClassName} href="/interno/cobros">
-          Confirmar cobranzas
+          Cobros
         </Link>
         <Link className={buttonSoftClassName} href="/interno/cupos">
-          Revisar cupos
+          Cupos
         </Link>
       </div>
     </section>

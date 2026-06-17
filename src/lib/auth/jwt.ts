@@ -11,6 +11,12 @@ const getSecret = () => {
   if (!secret) {
     throw new Error("JWT_SECRET is not set");
   }
+  if (
+    process.env.NODE_ENV === "production" &&
+    (secret.length < 32 || secret === "reemplazar-con-secreto")
+  ) {
+    throw new Error("JWT_SECRET must be a strong production secret");
+  }
 
   return new TextEncoder().encode(secret);
 };
@@ -28,7 +34,14 @@ export async function signToken(
 
 export async function verifyToken(token: string) {
   const { payload } = await jwtVerify(token, getSecret());
-  return payload as AuthPayload;
+  if (typeof payload.userId !== "string" || typeof payload.email !== "string") {
+    throw new Error("INVALID_TOKEN");
+  }
+
+  return {
+    userId: payload.userId,
+    email: payload.email,
+  };
 }
 
 export { AUTH_COOKIE_NAME };

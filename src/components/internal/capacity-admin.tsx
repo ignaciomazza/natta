@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Minus, Plus, X } from "lucide-react";
 import {
   Pill,
   SectionTitle,
@@ -13,6 +13,40 @@ import {
   inputClassName,
 } from "@/components/internal/ui";
 
+type FlavorOption = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
+type WeekdayRuleItem = {
+  weekday: number;
+  isOpen: boolean;
+  maxUnits: number;
+  minLeadTimeDays: number;
+  cutoffHour: number;
+};
+
+type WeekdayFlavorRuleItem = {
+  weekday: number;
+  flavorId: string;
+  maxUnits: number;
+};
+
+type FlavorCapacityItem = {
+  flavorId: string;
+  flavorSlug: string;
+  flavorName: string;
+  isClosed: boolean;
+  maxUnits: number | null;
+  weekdayMaxUnits: number | null;
+  bookedUnits: number;
+  availableUnits: number | null;
+  source: "none" | "weekday" | "override";
+  hasOverride: boolean;
+  overrideNote: string | null;
+};
+
 type CapacityItem = {
   date: string;
   weekday: number;
@@ -23,6 +57,26 @@ type CapacityItem = {
   source: "weekday" | "override";
   hasOverride: boolean;
   overrideNote: string | null;
+  flavors: FlavorCapacityItem[];
+};
+
+type CalendarPayload = {
+  items: CapacityItem[];
+  flavors: FlavorOption[];
+  weekdayRules: WeekdayRuleItem[];
+  weekdayFlavorRules: WeekdayFlavorRuleItem[];
+};
+
+type ExceptionFlavorEditor = {
+  flavorId: string;
+  flavorName: string;
+  bookedUnits: number;
+  currentMaxUnits: number | null;
+  inheritedMaxUnits: number | null;
+  source: "none" | "weekday" | "override";
+  hasOverride: boolean;
+  isClosed: boolean;
+  maxInput: string;
 };
 
 type ExceptionEditor = {
@@ -32,6 +86,7 @@ type ExceptionEditor = {
   bookedUnits: number;
   availableUnits: number;
   hasOverride: boolean;
+  flavors: ExceptionFlavorEditor[];
 };
 
 const weekdayOptions = [
@@ -81,20 +136,282 @@ function getOccupancyPercent(booked: number, max: number) {
   return Math.max(0, Math.min(100, Math.round((booked / max) * 100)));
 }
 
+function parseOptionalUnits(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.trunc(parsed);
+}
+
+function sanitizeUnitInput(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function hasSpecificDraft(value: string | undefined) {
+  return Boolean(value?.trim());
+}
+
+function formatDraftUnits(value: string | undefined) {
+  const parsed = parseOptionalUnits(value ?? "");
+  return parsed === null ? "Libre" : String(parsed);
+}
+
+function getWeekdayDraft(
+  selectedWeekday: number,
+  rules: WeekdayRuleItem[],
+  flavorRules: WeekdayFlavorRuleItem[],
+  flavors: FlavorOption[],
+) {
+  const rule = rules.find((item) => item.weekday === selectedWeekday);
+  const flavorCaps = Object.fromEntries(
+    flavors.map((flavor) => {
+      const flavorRule = flavorRules.find(
+        (item) => item.weekday === selectedWeekday && item.flavorId === flavor.id,
+      );
+      return [flavor.id, flavorRule ? String(flavorRule.maxUnits) : ""];
+    }),
+  );
+
+  return {
+    isOpen: rule?.isOpen ?? selectedWeekday !== 0,
+    maxUnits: rule?.maxUnits ?? (selectedWeekday === 0 ? 0 : 20),
+    flavorCaps,
+  };
+}
+
+function formatFlavorCapacity(flavor: FlavorCapacityItem) {
+  if (flavor.maxUnits === null) {
+    return `${flavor.bookedUnits} reservadas`;
+  }
+  return `${flavor.bookedUnits}/${flavor.maxUnits}`;
+}
+
+function getFlavorPillTone(flavor: FlavorCapacityItem) {
+  if (flavor.isClosed || flavor.availableUnits === 0) return "danger" as const;
+  if (flavor.hasOverride) return "warning" as const;
+  if (flavor.maxUnits !== null) return "info" as const;
+  return "neutral" as const;
+}
+
+function visibleFlavorCaps(item: CapacityItem) {
+  const constrained = item.flavors.filter(
+    (flavor) => flavor.maxUnits !== null || flavor.bookedUnits > 0,
+  );
+  return constrained.slice(0, 5);
+}
+
+function formatExceptionFlavorMeta(flavor: ExceptionFlavorEditor) {
+  if (flavor.isClosed) return `${flavor.bookedUnits} reservadas · cerrado`;
+  if (hasSpecificDraft(flavor.maxInput)) {
+    return `${flavor.bookedUnits} reservadas · cupo ${formatDraftUnits(flavor.maxInput)}`;
+  }
+  if (flavor.inheritedMaxUnits !== null) {
+    return `${flavor.bookedUnits} reservadas · hereda ${flavor.inheritedMaxUnits}`;
+  }
+  return `${flavor.bookedUnits} reservadas · libre`;
+}
+
+type FlavorPickerOption = {
+  id: string;
+  name: string;
+  meta: string;
+  marked?: boolean;
+};
+
+type FlavorPickerProps = {
+  label: string;
+  open: boolean;
+  options: FlavorPickerOption[];
+  selectedId: string | null;
+  selectedName?: string;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (id: string) => void;
+};
+
+function FlavorPicker({
+  label,
+  open,
+  options,
+  selectedId,
+  selectedName,
+  onOpenChange,
+  onSelect,
+}: FlavorPickerProps) {
+  return (
+    <div className="relative min-w-0">
+      <p className={fieldLabelClassName}>{label}</p>
+      <button
+        className="mt-2 flex h-12 w-full items-center justify-between gap-3 rounded-[1.35rem] border border-[color:var(--line)] bg-white/85 px-3.5 text-left shadow-[0_10px_24px_rgba(43,26,24,0.06)] transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55"
+        disabled={!options.length}
+        onClick={() => onOpenChange(!open)}
+        type="button"
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-[color:var(--chocolate-deep)]">
+            {selectedName ?? "Sin sabores"}
+          </span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-zinc-500 transition ${
+            open ? "rotate-180" : "rotate-0"
+          }`}
+        />
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 right-0 z-30 mt-2 max-h-64 overflow-y-auto rounded-[1.35rem] border border-[color:var(--line)] bg-[color:var(--milk)] p-1.5 shadow-[0_18px_42px_rgba(43,26,24,0.13)]">
+          {options.map((option) => (
+            <button
+              className={`flex w-full items-center justify-between gap-3 rounded-[1rem] px-3 py-2 text-left transition ${
+                selectedId === option.id
+                  ? "bg-[color:var(--surface-soft)] text-[color:var(--chocolate-deep)]"
+                  : "text-zinc-700 hover:bg-white"
+              }`}
+              key={option.id}
+              onClick={() => {
+                onSelect(option.id);
+                onOpenChange(false);
+              }}
+              type="button"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium">{option.name}</span>
+                <span className="mt-0.5 block truncate text-xs text-zinc-500">
+                  {option.meta}
+                </span>
+              </span>
+              {option.marked ? (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[color:var(--accent)]" />
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type UnitCounterProps = {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  placeholder?: string;
+  onChange: (value: string) => void;
+};
+
+function UnitCounter({
+  label,
+  value,
+  disabled = false,
+  placeholder = "Libre",
+  onChange,
+}: UnitCounterProps) {
+  const parsed = parseOptionalUnits(value);
+  const isEmpty = !value.trim();
+  const canDecrease = !disabled && parsed !== null && parsed > 0;
+
+  const step = (delta: number) => {
+    const current = parsed ?? 0;
+    onChange(String(Math.max(0, current + delta)));
+  };
+
+  return (
+    <div className="min-w-0">
+      <p className={fieldLabelClassName}>{label}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div
+          className={`inline-grid h-12 grid-cols-[2.75rem_minmax(5rem,7rem)_2.75rem] overflow-hidden rounded-[1.35rem] bg-white/85 shadow-[0_10px_24px_rgba(43,26,24,0.07)] ring-1 ring-[rgba(94,83,76,0.13)] ${
+            disabled ? "opacity-55" : ""
+          }`}
+        >
+          <button
+            aria-label="Restar cupo"
+            className="inline-flex items-center justify-center text-zinc-600 transition hover:bg-[color:var(--surface-soft)] disabled:cursor-not-allowed disabled:text-zinc-300"
+            disabled={!canDecrease}
+            onClick={() => step(-1)}
+            type="button"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <input
+            className="min-w-0 bg-transparent px-1 text-center text-sm font-semibold text-[color:var(--chocolate-deep)] outline-none placeholder:font-normal placeholder:text-zinc-400 disabled:cursor-not-allowed"
+            disabled={disabled}
+            inputMode="numeric"
+            onChange={(event) => onChange(sanitizeUnitInput(event.target.value))}
+            pattern="[0-9]*"
+            placeholder={placeholder}
+            value={isEmpty ? "" : value}
+          />
+          <button
+            aria-label="Sumar cupo"
+            className="inline-flex items-center justify-center text-zinc-600 transition hover:bg-[color:var(--surface-soft)] disabled:cursor-not-allowed disabled:text-zinc-300"
+            disabled={disabled}
+            onClick={() => step(1)}
+            type="button"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        <button
+          className="h-12 rounded-[1.35rem] border border-transparent px-3 text-sm text-zinc-600 transition hover:border-[color:var(--line)] hover:text-[color:var(--chocolate-deep)] disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={disabled || isEmpty}
+          onClick={() => onChange("")}
+          type="button"
+        >
+          Libre
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function CapacityAdmin() {
   const [items, setItems] = useState<CapacityItem[]>([]);
+  const [flavors, setFlavors] = useState<FlavorOption[]>([]);
+  const [weekdayRules, setWeekdayRules] = useState<WeekdayRuleItem[]>([]);
+  const [weekdayFlavorRules, setWeekdayFlavorRules] = useState<
+    WeekdayFlavorRuleItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [savingWeekday, setSavingWeekday] = useState(false);
   const [savingException, setSavingException] = useState(false);
 
   const [weekday, setWeekday] = useState(1);
   const [weekdayOpen, setWeekdayOpen] = useState(true);
   const [weekdayMax, setWeekdayMax] = useState(20);
+  const [weekdayFlavorCaps, setWeekdayFlavorCaps] = useState<Record<string, string>>({});
   const [weeklyPanelOpen, setWeeklyPanelOpen] = useState(false);
+  const [weeklyFlavorPickerOpen, setWeeklyFlavorPickerOpen] = useState(false);
+  const [selectedWeeklyFlavorId, setSelectedWeeklyFlavorId] = useState<string | null>(
+    null,
+  );
 
   const [exceptionEditor, setExceptionEditor] = useState<ExceptionEditor | null>(
     null,
   );
+  const [exceptionFlavorPickerOpen, setExceptionFlavorPickerOpen] = useState(false);
+  const [selectedExceptionFlavorId, setSelectedExceptionFlavorId] = useState<
+    string | null
+  >(null);
+
+  const applyWeekdayDraft = (
+    nextWeekday: number,
+    nextRules = weekdayRules,
+    nextFlavorRules = weekdayFlavorRules,
+    nextFlavors = flavors,
+  ) => {
+    const draft = getWeekdayDraft(
+      nextWeekday,
+      nextRules,
+      nextFlavorRules,
+      nextFlavors,
+    );
+    setWeekdayOpen(draft.isOpen);
+    setWeekdayMax(draft.maxUnits);
+    setWeekdayFlavorCaps(draft.flavorCaps);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -106,8 +423,26 @@ export function CapacityAdmin() {
       if (!response.ok) {
         throw new Error("No se pudo cargar capacidad");
       }
-      const payload = (await response.json()) as { items: CapacityItem[] };
+      const payload = (await response.json()) as CalendarPayload;
       setItems(payload.items);
+      setFlavors(payload.flavors);
+      setWeekdayRules(payload.weekdayRules);
+      setWeekdayFlavorRules(payload.weekdayFlavorRules);
+
+      const draft = getWeekdayDraft(
+        weekday,
+        payload.weekdayRules,
+        payload.weekdayFlavorRules,
+        payload.flavors,
+      );
+      setWeekdayOpen(draft.isOpen);
+      setWeekdayMax(draft.maxUnits);
+      setWeekdayFlavorCaps(draft.flavorCaps);
+      setSelectedWeeklyFlavorId((previous) =>
+        payload.flavors.some((flavor) => flavor.id === previous)
+          ? previous
+          : (payload.flavors[0]?.id ?? null),
+      );
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Error");
     } finally {
@@ -118,6 +453,7 @@ export function CapacityAdmin() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -126,6 +462,7 @@ export function CapacityAdmin() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setExceptionEditor(null);
+        setExceptionFlavorPickerOpen(false);
       }
     };
 
@@ -136,29 +473,105 @@ export function CapacityAdmin() {
   const saveWeekday = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setSavingWeekday(true);
 
-    const response = await fetch("/api/capacity/weekday", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        weekday,
-        isOpen: weekdayOpen,
-        maxUnits: weekdayMax,
-      }),
-    });
+    try {
+      const response = await fetch("/api/capacity/weekday", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekday,
+          isOpen: weekdayOpen,
+          maxUnits: weekdayOpen ? weekdayMax : 0,
+        }),
+      });
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "No se pudo guardar");
-      return;
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(payload?.error ?? "No se pudo guardar");
+      }
+
+      const flavorResponses = await Promise.all(
+        flavors.map((flavor) =>
+          fetch("/api/capacity/flavor-rule", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              weekday,
+              flavorId: flavor.id,
+              maxUnits: parseOptionalUnits(weekdayFlavorCaps[flavor.id] ?? ""),
+            }),
+          }),
+        ),
+      );
+
+      if (flavorResponses.some((item) => !item.ok)) {
+        throw new Error("No se pudieron guardar algunos cupos por sabor");
+      }
+
+      await load();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
+    } finally {
+      setSavingWeekday(false);
     }
+  };
 
-    await load();
+  const selectWeekday = (nextWeekday: number) => {
+    setWeekday(nextWeekday);
+    setWeeklyFlavorPickerOpen(false);
+    applyWeekdayDraft(nextWeekday);
+  };
+
+  const updateWeekdayFlavorCap = (flavorId: string, value: string) => {
+    setWeekdayFlavorCaps((prev) => ({
+      ...prev,
+      [flavorId]: value,
+    }));
+  };
+
+  const updateExceptionFlavor = (
+    flavorId: string,
+    updater: (flavor: ExceptionFlavorEditor) => ExceptionFlavorEditor,
+  ) => {
+    setExceptionEditor((prev) =>
+      prev
+        ? {
+            ...prev,
+            flavors: prev.flavors.map((flavor) =>
+              flavor.flavorId === flavorId ? updater(flavor) : flavor,
+            ),
+          }
+        : prev,
+    );
   };
 
   const openExceptionEditor = (item: CapacityItem) => {
+    const nextFlavors = item.flavors.map((flavor) => ({
+      flavorId: flavor.flavorId,
+      flavorName: flavor.flavorName,
+      bookedUnits: flavor.bookedUnits,
+      currentMaxUnits: flavor.maxUnits,
+      inheritedMaxUnits: flavor.weekdayMaxUnits,
+      source: flavor.source,
+      hasOverride: flavor.hasOverride,
+      isClosed: flavor.source === "override" && flavor.isClosed,
+      maxInput:
+        flavor.source === "override" && !flavor.isClosed && flavor.maxUnits !== null
+          ? String(flavor.maxUnits)
+          : "",
+    }));
+
+    setSelectedExceptionFlavorId(
+      nextFlavors.find(
+        (flavor) => flavor.isClosed || flavor.hasOverride || hasSpecificDraft(flavor.maxInput),
+      )?.flavorId ??
+        nextFlavors[0]?.flavorId ??
+        null,
+    );
+    setExceptionFlavorPickerOpen(false);
     setExceptionEditor({
       date: item.date,
       isClosed: !item.isOpen,
@@ -166,6 +579,7 @@ export function CapacityAdmin() {
       bookedUnits: item.bookedUnits,
       availableUnits: item.availableUnits,
       hasOverride: item.hasOverride,
+      flavors: nextFlavors,
     });
   };
 
@@ -176,44 +590,95 @@ export function CapacityAdmin() {
     setError(null);
     setSavingException(true);
 
-    const response = await fetch("/api/capacity/override", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date: exceptionEditor.date,
-        isClosed: exceptionEditor.isClosed,
-        maxUnits: exceptionEditor.isClosed ? 0 : exceptionEditor.maxUnits,
-      }),
-    });
+    try {
+      const response = await fetch("/api/capacity/override", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: exceptionEditor.date,
+          isClosed: exceptionEditor.isClosed,
+          maxUnits: exceptionEditor.isClosed ? 0 : exceptionEditor.maxUnits,
+        }),
+      });
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "No se pudo guardar excepción");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(payload?.error ?? "No se pudo guardar excepción");
+      }
+
+      const flavorResponses = await Promise.all(
+        exceptionEditor.flavors.map((flavor) => {
+          const maxUnits = parseOptionalUnits(flavor.maxInput);
+          const clear = !flavor.isClosed && maxUnits === null;
+
+          return fetch("/api/capacity/flavor-override", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date: exceptionEditor.date,
+              flavorId: flavor.flavorId,
+              clear,
+              isClosed: flavor.isClosed,
+              maxUnits: flavor.isClosed ? 0 : maxUnits,
+            }),
+          });
+        }),
+      );
+
+      if (flavorResponses.some((item) => !item.ok)) {
+        throw new Error("No se pudieron guardar algunos cupos por sabor");
+      }
+
+      await load();
+      setExceptionEditor(null);
+      setExceptionFlavorPickerOpen(false);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "No se pudo guardar excepción",
+      );
+    } finally {
       setSavingException(false);
-      return;
     }
-
-    await load();
-    setSavingException(false);
-    setExceptionEditor(null);
   };
 
   const summary = useMemo(() => {
     const withOverride = items.filter((item) => item.hasOverride).length;
     const closed = items.filter((item) => !item.isOpen).length;
+    const flavorLimitedDays = items.filter((item) =>
+      item.flavors.some((flavor) => flavor.maxUnits !== null),
+    ).length;
     return {
       total: items.length,
       withOverride,
       closed,
+      flavorLimitedDays,
     };
   }, [items]);
+
+  const selectedWeeklyFlavor =
+    flavors.find((flavor) => flavor.id === selectedWeeklyFlavorId) ?? flavors[0] ?? null;
+  const selectedWeeklyFlavorValue = selectedWeeklyFlavor
+    ? (weekdayFlavorCaps[selectedWeeklyFlavor.id] ?? "")
+    : "";
+  const weeklySpecificCaps = flavors.filter((flavor) =>
+    hasSpecificDraft(weekdayFlavorCaps[flavor.id]),
+  );
+  const selectedExceptionFlavor =
+    exceptionEditor?.flavors.find(
+      (flavor) => flavor.flavorId === selectedExceptionFlavorId,
+    ) ??
+    exceptionEditor?.flavors[0] ??
+    null;
+  const exceptionSpecificFlavors =
+    exceptionEditor?.flavors.filter(
+      (flavor) => flavor.isClosed || hasSpecificDraft(flavor.maxInput),
+    ) ?? [];
 
   return (
     <section className="space-y-7">
       <SectionTitle
-        description="Configurá la regla semanal y tocá una fecha para aplicar una excepción puntual."
         icon={CalendarDays}
         title="Cupos de producción"
       />
@@ -228,10 +693,11 @@ export function CapacityAdmin() {
         <Pill>Total de fechas: {summary.total}</Pill>
         <Pill tone="warning">Días cerrados: {summary.closed}</Pill>
         <Pill tone="info">Con excepción: {summary.withOverride}</Pill>
+        <Pill tone="success">Con cupo por sabor: {summary.flavorLimitedDays}</Pill>
       </div>
 
       <div className="space-y-6">
-        <section className="rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--milk)]/90 p-4">
+        <section className="rounded-[1.6rem] bg-[color:var(--milk)]/92 p-4 shadow-[0_18px_40px_-32px_rgba(38,35,33,0.72),0_8px_20px_-18px_rgba(82,74,70,0.5)]">
           <button
             aria-controls="regla-semanal-contenido"
             aria-expanded={weeklyPanelOpen}
@@ -242,9 +708,6 @@ export function CapacityAdmin() {
             <div>
               <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
                 Regla semanal
-              </p>
-              <p className="mt-1 text-xs text-zinc-600">
-                Base por día de la semana. Se aplica por defecto si no hay excepción.
               </p>
             </div>
             <ChevronDown
@@ -263,8 +726,14 @@ export function CapacityAdmin() {
             }`}
             id="regla-semanal-contenido"
           >
-            <div className={`overflow-hidden ${weeklyPanelOpen ? "" : "pointer-events-none"}`}>
-              <form className="space-y-4" onSubmit={saveWeekday}>
+            <div
+              className={
+                weeklyPanelOpen
+                  ? "overflow-visible"
+                  : "pointer-events-none overflow-hidden"
+              }
+            >
+              <form className="space-y-5" onSubmit={saveWeekday}>
                 <div className="flex flex-wrap gap-2">
                   {weekdayOptions.map((option) => (
                     <button
@@ -274,7 +743,7 @@ export function CapacityAdmin() {
                           : "border-[color:var(--line)] bg-[color:var(--milk)] text-zinc-700 hover:border-[color:var(--accent)]"
                       }`}
                       key={option.value}
-                      onClick={() => setWeekday(option.value)}
+                      onClick={() => selectWeekday(option.value)}
                       type="button"
                     >
                       {option.label}
@@ -282,160 +751,194 @@ export function CapacityAdmin() {
                   ))}
                 </div>
 
-                <label className={`${fieldLabelClassName} block`}>
-                  Cupo máximo
-                  <input
-                    className={inputClassName}
-                    min={0}
-                    onChange={(event) => setWeekdayMax(Number(event.target.value))}
-                    type="number"
-                    value={weekdayMax}
-                  />
-                </label>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)] sm:items-end">
+                  <label className={`${fieldLabelClassName} block`}>
+                    Cupo máximo general
+                    <input
+                      className={inputClassName}
+                      disabled={!weekdayOpen}
+                      min={0}
+                      onChange={(event) => setWeekdayMax(Number(event.target.value))}
+                      type="number"
+                      value={weekdayMax}
+                    />
+                  </label>
 
-                <div className={controlRowClassName}>
-                  <Toggle
-                    checked={weekdayOpen}
-                    label="Día habilitado"
-                    onChange={setWeekdayOpen}
-                  />
+                  <div className={controlRowClassName}>
+                    <Toggle
+                      checked={weekdayOpen}
+                      label="Día habilitado"
+                      onChange={setWeekdayOpen}
+                    />
+                  </div>
                 </div>
 
-                <button className={`${buttonSoftClassName} block`} type="submit">
-                  Guardar regla semanal
+                <div className="border-t border-[color:var(--line)] pt-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
+                        Cupos por sabor
+                      </p>
+                    </div>
+                    {weeklySpecificCaps.length ? (
+                      <Pill mini tone="success">
+                        {weeklySpecificCaps.length} configurados
+                      </Pill>
+                    ) : null}
+                  </div>
+
+                  {selectedWeeklyFlavor ? (
+                    <>
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(14rem,0.9fr)_auto] lg:items-end lg:justify-start">
+                        <FlavorPicker
+                          label="Sabor"
+                          onOpenChange={setWeeklyFlavorPickerOpen}
+                          onSelect={setSelectedWeeklyFlavorId}
+                          open={weeklyFlavorPickerOpen}
+                          options={flavors.map((flavor) => ({
+                            id: flavor.id,
+                            name: flavor.name,
+                            meta: hasSpecificDraft(weekdayFlavorCaps[flavor.id])
+                              ? `Cupo ${formatDraftUnits(weekdayFlavorCaps[flavor.id])}`
+                              : "Hereda cupo general",
+                            marked: hasSpecificDraft(weekdayFlavorCaps[flavor.id]),
+                          }))}
+                          selectedId={selectedWeeklyFlavor.id}
+                          selectedName={selectedWeeklyFlavor.name}
+                        />
+
+                        <UnitCounter
+                          disabled={!weekdayOpen}
+                          label="Cantidad"
+                          onChange={(value) =>
+                            updateWeekdayFlavorCap(selectedWeeklyFlavor.id, value)
+                          }
+                          value={selectedWeeklyFlavorValue}
+                        />
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {weeklySpecificCaps.length ? (
+                          weeklySpecificCaps.map((flavor) => (
+                            <button
+                              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                                selectedWeeklyFlavor.id === flavor.id
+                                  ? "border-[color:var(--accent)] bg-[color:var(--surface-soft)] text-[color:var(--chocolate-deep)]"
+                                  : "border-[#ddd2c5] bg-[#f4efea] text-[#665c57] hover:border-[color:var(--accent)]"
+                              }`}
+                              key={flavor.id}
+                              onClick={() => setSelectedWeeklyFlavorId(flavor.id)}
+                              type="button"
+                            >
+                              {flavor.name}: {formatDraftUnits(weekdayFlavorCaps[flavor.id])}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-sm text-zinc-500">
+                            Sin sabores con cupo específico.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-sm text-zinc-500">No hay sabores cargados.</p>
+                  )}
+                </div>
+
+                <button
+                  className={`${buttonSoftClassName} block`}
+                  disabled={savingWeekday}
+                  type="submit"
+                >
+                  {savingWeekday ? "Guardando..." : "Guardar regla semanal"}
                 </button>
               </form>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 p-4">
+        <section className="space-y-3">
           {loading ? (
             <p className="text-sm text-zinc-600">Cargando calendario...</p>
           ) : (
-            <>
-              <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-white/70 px-2 md:hidden">
-                {items.map((item) => (
-                  <button
-                    className="w-full cursor-pointer px-1 py-3 text-left transition hover:bg-[color:var(--surface-soft)]/55"
-                    key={item.date}
-                    onClick={() => openExceptionEditor(item)}
-                    type="button"
-                  >
-                    <div className="flex items-center justify-between gap-2">
+            items.map((item) => {
+              const flavorCaps = visibleFlavorCaps(item);
+
+              return (
+                <article
+                  className="grid gap-4 rounded-[1.6rem] bg-[color:var(--milk)]/92 p-4 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.72),0_8px_18px_-18px_rgba(82,74,70,0.48)] transition-shadow hover:shadow-[0_20px_44px_-30px_rgba(38,35,33,0.78),0_12px_24px_-18px_rgba(82,74,70,0.52)] md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-center"
+                  key={item.date}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p
-                        className={`text-left text-sm ${
+                        className={`text-sm ${
                           item.hasOverride
                             ? "font-semibold text-[color:var(--accent-strong)]"
-                            : "font-medium text-[color:var(--chocolate-deep)]"
+                            : "font-semibold text-[color:var(--chocolate-deep)]"
                         }`}
                       >
                         {formatCapacityDate(item.date, true)}
                       </p>
                       {item.hasOverride ? <Pill mini tone="warning">Excepción</Pill> : null}
                     </div>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {weekdayLabel.get(item.weekday) ?? "-"}
+                    </p>
+                  </div>
 
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Pill mini tone={item.isOpen ? "success" : "danger"}>
                         {item.isOpen ? "Abierto" : "Cerrado"}
                       </Pill>
+                      <span className="text-xs text-zinc-500">
+                        {item.availableUnits} disponibles
+                      </span>
                     </div>
-
-                    <div className="mt-2 space-y-1.5">
-                      <p className="text-sm font-medium text-zinc-800">
-                        {item.bookedUnits} de {item.maxUnits} reservados · {item.availableUnits}{" "}
-                        disponibles
-                      </p>
-                      <div className="h-1.5 w-full rounded-full bg-zinc-200/80">
-                        <div
-                          className={`h-1.5 rounded-full ${
-                            item.hasOverride ? "bg-[color:var(--accent)]" : "bg-zinc-500/70"
-                          }`}
-                          style={{
-                            width: `${getOccupancyPercent(item.bookedUnits, item.maxUnits)}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto md:block">
-                <table className="min-w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
-                      <th className="px-3 py-3">Fecha</th>
-                      <th className="px-3 py-3">Día</th>
-                      <th className="px-3 py-3">Estado</th>
-                      <th className="px-3 py-3">Capacidad</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item) => (
-                      <tr
-                        className="cursor-pointer border-b border-[#e2ddd9] transition hover:bg-[color:var(--surface-soft)]/75"
-                        key={item.date}
-                        onClick={() => openExceptionEditor(item)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            openExceptionEditor(item);
-                          }
+                    <div className="h-1.5 w-full rounded-full bg-zinc-200/80">
+                      <div
+                        className={`h-1.5 rounded-full ${
+                          item.hasOverride ? "bg-[color:var(--accent)]" : "bg-zinc-500/70"
+                        }`}
+                        style={{
+                          width: `${getOccupancyPercent(item.bookedUnits, item.maxUnits)}%`,
                         }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`${
-                                item.hasOverride ? "font-semibold" : "font-medium"
-                              } text-[color:var(--accent-strong)]`}
-                            >
-                              {formatCapacityDate(item.date)}
-                            </span>
-                            {item.hasOverride ? (
-                              <Pill mini tone="warning">
-                                Excepción
-                              </Pill>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2">{weekdayLabel.get(item.weekday) ?? "-"}</td>
-                        <td className="px-3 py-2">
-                          <Pill mini tone={item.isOpen ? "success" : "danger"}>
-                            {item.isOpen ? "Abierto" : "Cerrado"}
+                      />
+                    </div>
+                    <p className="text-sm font-medium text-zinc-800">
+                      {item.bookedUnits} de {item.maxUnits} reservados
+                    </p>
+                  </div>
+
+                  <div className="min-w-0">
+                    {flavorCaps.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {flavorCaps.map((flavor) => (
+                          <Pill
+                            key={flavor.flavorId}
+                            mini
+                            tone={getFlavorPillTone(flavor)}
+                          >
+                            {flavor.flavorName}: {formatFlavorCapacity(flavor)}
                           </Pill>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="space-y-1.5">
-                            <p className="text-sm font-medium text-zinc-800">
-                              {item.bookedUnits} de {item.maxUnits} reservados
-                            </p>
-                            <div className="h-1.5 w-full rounded-full bg-zinc-200/80">
-                              <div
-                                className={`h-1.5 rounded-full ${
-                                  item.hasOverride
-                                    ? "bg-[color:var(--accent)]"
-                                    : "bg-zinc-500/70"
-                                }`}
-                                style={{
-                                  width: `${getOccupancyPercent(item.bookedUnits, item.maxUnits)}%`,
-                                }}
-                              />
-                            </div>
-                            <p className="text-xs text-zinc-600">
-                              {item.availableUnits} disponibles
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500">Sin cupos por sabor cargados</p>
+                    )}
+                  </div>
+
+                  <button
+                    className={`${buttonSoftClassName} whitespace-nowrap`}
+                    onClick={() => openExceptionEditor(item)}
+                    type="button"
+                  >
+                    Editar fecha
+                  </button>
+                </article>
+              );
+            })
           )}
         </section>
       </div>
@@ -445,14 +948,17 @@ export function CapacityAdmin() {
           <button
             aria-label="Cerrar cartel de excepción"
             className="absolute inset-0 bg-[#262321]/20 backdrop-blur-[1px]"
-            onClick={() => setExceptionEditor(null)}
+            onClick={() => {
+              setExceptionEditor(null);
+              setExceptionFlavorPickerOpen(false);
+            }}
             type="button"
           />
 
           <section
             aria-labelledby="exception-title"
             aria-modal="true"
-            className="relative z-10 w-full max-w-3xl rounded-3xl border border-[color:var(--line)] bg-[color:var(--milk)] p-5 shadow-[0_20px_40px_rgba(38,35,33,0.14)] sm:p-6"
+            className="relative z-10 max-h-[min(92vh,58rem)] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-[color:var(--milk)] p-5 shadow-[0_28px_70px_-36px_rgba(38,35,33,0.72),0_16px_34px_-22px_rgba(82,74,70,0.48)] sm:p-6"
             role="dialog"
           >
             <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] pb-4">
@@ -466,17 +972,15 @@ export function CapacityAdmin() {
                 >
                   {formatCapacityDate(exceptionEditor.date, true)}
                 </h3>
-                <p className="mt-1 text-xs text-zinc-600">
-                  {exceptionEditor.hasOverride
-                    ? "Esta fecha ya tiene una excepción cargada."
-                    : "Esta fecha usa regla semanal. Al guardar, se creará una excepción."}
-                </p>
               </div>
 
               <button
                 aria-label="Cerrar"
                 className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--line)] text-zinc-600 transition hover:border-[color:var(--accent)]"
-                onClick={() => setExceptionEditor(null)}
+                onClick={() => {
+                  setExceptionEditor(null);
+                  setExceptionFlavorPickerOpen(false);
+                }}
                 type="button"
               >
                 <X className="h-4 w-4" />
@@ -486,7 +990,7 @@ export function CapacityAdmin() {
             <form className="mt-5 space-y-5" onSubmit={saveException}>
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] sm:items-end">
                 <label className={`${fieldLabelClassName} block`}>
-                  Cupo máximo
+                  Cupo máximo general
                   <input
                     className={inputClassName}
                     disabled={exceptionEditor.isClosed}
@@ -506,7 +1010,7 @@ export function CapacityAdmin() {
                   />
                 </label>
 
-                <div className="rounded-2xl border border-dashed border-[color:var(--line)] bg-white/80 px-4 py-3 text-sm text-zinc-700">
+                <div className="text-sm text-zinc-700 sm:border-l sm:border-[color:var(--line)] sm:pl-4">
                   <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                     Estado actual
                   </p>
@@ -523,8 +1027,13 @@ export function CapacityAdmin() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--line)] pt-4">
-                <div className={controlRowClassName}>
+              <div className="border-t border-[color:var(--line)] pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
+                      Cupos por sabor de esta fecha
+                    </p>
+                  </div>
                   <Toggle
                     checked={exceptionEditor.isClosed}
                     label="Marcar fecha como cerrada"
@@ -541,22 +1050,121 @@ export function CapacityAdmin() {
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    className={buttonSoftClassName}
-                    disabled={savingException}
-                    type="submit"
-                  >
-                    {savingException ? "Guardando..." : "Guardar excepción"}
-                  </button>
-                  <button
-                    className={buttonGhostClassName}
-                    onClick={() => setExceptionEditor(null)}
-                    type="button"
-                  >
-                    Cancelar
-                  </button>
-                </div>
+                {selectedExceptionFlavor ? (
+                  <>
+                    <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(14rem,0.9fr)_auto_minmax(0,1fr)] lg:items-end">
+                      <FlavorPicker
+                        label="Sabor"
+                        onOpenChange={setExceptionFlavorPickerOpen}
+                        onSelect={setSelectedExceptionFlavorId}
+                        open={exceptionFlavorPickerOpen}
+                        options={exceptionEditor.flavors.map((flavor) => ({
+                          id: flavor.flavorId,
+                          name: flavor.flavorName,
+                          meta: formatExceptionFlavorMeta(flavor),
+                          marked: flavor.isClosed || hasSpecificDraft(flavor.maxInput),
+                        }))}
+                        selectedId={selectedExceptionFlavor.flavorId}
+                        selectedName={selectedExceptionFlavor.flavorName}
+                      />
+
+                      <UnitCounter
+                        disabled={exceptionEditor.isClosed || selectedExceptionFlavor.isClosed}
+                        label="Cantidad"
+                        onChange={(value) =>
+                          updateExceptionFlavor(selectedExceptionFlavor.flavorId, (flavor) => ({
+                            ...flavor,
+                            maxInput: value,
+                          }))
+                        }
+                        placeholder={
+                          selectedExceptionFlavor.inheritedMaxUnits === null
+                            ? "Libre"
+                            : String(selectedExceptionFlavor.inheritedMaxUnits)
+                        }
+                        value={selectedExceptionFlavor.maxInput}
+                      />
+
+                      <div className="pb-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Toggle
+                            checked={selectedExceptionFlavor.isClosed}
+                            label="Cerrar sabor"
+                            onChange={(checked) =>
+                              updateExceptionFlavor(
+                                selectedExceptionFlavor.flavorId,
+                                (flavor) => ({
+                                  ...flavor,
+                                  isClosed: checked,
+                                  maxInput: checked ? "" : flavor.maxInput,
+                                }),
+                              )
+                            }
+                          />
+                          {selectedExceptionFlavor.hasOverride ? (
+                            <Pill mini tone="warning">
+                              Fecha
+                            </Pill>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-xs text-zinc-500">
+                          {selectedExceptionFlavor.bookedUnits} reservadas
+                          {selectedExceptionFlavor.currentMaxUnits !== null
+                            ? ` · cupo actual ${selectedExceptionFlavor.currentMaxUnits}`
+                            : " · sin cupo específico"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {exceptionSpecificFlavors.length ? (
+                        exceptionSpecificFlavors.map((flavor) => (
+                          <button
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                              selectedExceptionFlavor.flavorId === flavor.flavorId
+                                ? "border-[color:var(--accent)] bg-[color:var(--surface-soft)] text-[color:var(--chocolate-deep)]"
+                                : "border-[#ddd2c5] bg-[#f4efea] text-[#665c57] hover:border-[color:var(--accent)]"
+                            }`}
+                            key={flavor.flavorId}
+                            onClick={() => setSelectedExceptionFlavorId(flavor.flavorId)}
+                            type="button"
+                          >
+                            {flavor.flavorName}:{" "}
+                            {flavor.isClosed
+                              ? "cerrado"
+                              : formatDraftUnits(flavor.maxInput)}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-zinc-500">
+                          Sin cupos específicos para esta fecha.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-zinc-500">No hay sabores cargados.</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--line)] pt-4">
+                <button
+                  className={buttonSoftClassName}
+                  disabled={savingException}
+                  type="submit"
+                >
+                  {savingException ? "Guardando..." : "Guardar excepción"}
+                </button>
+                <button
+                  className={buttonGhostClassName}
+                  onClick={() => {
+                    setExceptionEditor(null);
+                    setExceptionFlavorPickerOpen(false);
+                  }}
+                  type="button"
+                >
+                  Cancelar
+                </button>
               </div>
             </form>
           </section>

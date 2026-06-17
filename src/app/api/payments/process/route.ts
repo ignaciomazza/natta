@@ -15,6 +15,7 @@ import { logServerError } from "@/lib/server/log";
 
 const processSchema = z.object({
   orderId: z.string().min(1),
+  receiptCode: z.string().min(1),
   selectedPaymentMethod: z.string().min(1).optional(),
   formData: z.record(z.string(), z.unknown()),
   additionalData: z.record(z.string(), z.unknown()).optional(),
@@ -86,11 +87,17 @@ function buildIdempotencyKey(parts: Array<string | number | null | undefined>) {
 }
 
 export async function POST(req: NextRequest) {
+  let processingPaymentId: string | null = null;
+  let processingMarker: string | null = null;
+
   try {
     const body = processSchema.parse(await req.json());
 
-    const order = await prisma.order.findUnique({
-      where: { id: body.orderId },
+    const order = await prisma.order.findFirst({
+      where: {
+        id: body.orderId,
+        publicReceiptCode: body.receiptCode,
+      },
       include: {
         customer: true,
         payments: {
@@ -119,8 +126,7 @@ export async function POST(req: NextRequest) {
       ["paymentMethodId"],
     ]);
     const token = getStringValue(body.formData, [["token"]]);
-    const installments =
-      getNumberValue(body.formData, [["installments"]]) ?? 1;
+    const installments = getNumberValue(body.formData, [["installments"]]) ?? 1;
     const issuerId = getStringValue(body.formData, [["issuer_id"], ["issuer"]]);
     const email =
       getStringValue(body.formData, [["payer", "email"], ["email"]]) ??
@@ -163,6 +169,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!Number.isInteger(installments) || installments < 1 || installments > 24) {
+      return NextResponse.json(
+        { error: "Cantidad de cuotas invalida" },
+        { status: 400 },
+      );
+    }
+
     const isTicketPayment =
       selectedMethod === "ticket" ||
       paymentMethodId === "rapipago" ||
@@ -175,6 +188,34 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+
+    const idempotencyKey = buildIdempotencyKey([
+      pendingPayment.id,
+      "mercadopago-payment",
+      mercadoPagoEnvironment,
+    ]);
+    processingMarker = `PROCESSING:${idempotencyKey}`;
+    const processingClaim = await prisma.payment.updateMany({
+      where: {
+        id: pendingPayment.id,
+        status: "PENDING",
+        OR: [
+          { statusDetail: null },
+          { statusDetail: { not: { startsWith: "PROCESSING:" } } },
+        ],
+      },
+      data: {
+        statusDetail: processingMarker,
+      },
+    });
+
+    if (processingClaim.count !== 1) {
+      return NextResponse.json(
+        { error: "Ese cobro ya se esta procesando" },
+        { status: 409 },
+      );
+    }
+    processingPaymentId = pendingPayment.id;
 
     const { firstName, lastName } = splitNameParts(order.customer.name);
     const remotePayment = await createMercadoPagoPayment({
@@ -198,13 +239,7 @@ export async function POST(req: NextRequest) {
         ? getMercadoPagoTicketExpirationDate().toISOString()
         : undefined,
       environment: mercadoPagoEnvironment,
-      idempotencyKey: buildIdempotencyKey([
-        pendingPayment.id,
-        paymentMethodId,
-        token,
-        installments,
-        identificationNumber,
-      ]),
+      idempotencyKey,
     });
 
     const syncedPayment = await applyMercadoPagoPaymentSnapshot(remotePayment);
@@ -233,6 +268,21 @@ export async function POST(req: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
     }
+    if (processingPaymentId && processingMarker) {
+      await prisma.payment
+        .updateMany({
+          where: {
+            id: processingPaymentId,
+            status: "PENDING",
+            statusDetail: processingMarker,
+          },
+          data: {
+            statusDetail: null,
+          },
+        })
+        .catch(() => null);
+    }
+
     if (error instanceof MercadoPagoConfigError) {
       return NextResponse.json(
         { error: "Mercado Pago no esta configurado" },

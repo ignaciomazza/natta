@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
 export const inputClassName =
@@ -13,13 +13,19 @@ export const fieldLabelClassName =
 export const controlRowClassName = "flex h-11 items-center";
 
 export const panelClassName =
-  "rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 p-3.5 sm:p-4";
+  "rounded-[1.6rem] bg-[color:var(--milk)]/92 p-3.5 shadow-[0_18px_40px_-32px_rgba(38,35,33,0.72),0_8px_20px_-18px_rgba(82,74,70,0.5)] sm:p-4";
 
 export const panelDashedClassName =
-  "rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--milk)]/90 p-3.5 sm:p-4";
+  "rounded-[1.6rem] bg-[color:var(--milk)]/92 p-3.5 shadow-[0_18px_40px_-32px_rgba(38,35,33,0.72),0_8px_20px_-18px_rgba(82,74,70,0.5)] sm:p-4";
 
 export const tableShellClassName =
-  "hidden overflow-x-auto rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 md:block";
+  "hidden overflow-x-auto rounded-[1.6rem] bg-[color:var(--milk)]/92 shadow-[0_18px_42px_-32px_rgba(38,35,33,0.72),0_8px_20px_-18px_rgba(82,74,70,0.48)] md:block";
+
+export const listCardClassName =
+  "grid gap-4 rounded-[1.6rem] bg-[color:var(--milk)]/92 p-4 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.72),0_8px_18px_-18px_rgba(82,74,70,0.48)] transition-shadow hover:shadow-[0_20px_44px_-30px_rgba(38,35,33,0.78),0_12px_24px_-18px_rgba(82,74,70,0.52)]";
+
+export const emptyStateClassName =
+  "rounded-[1.6rem] bg-[color:var(--milk)]/82 px-4 py-6 text-sm text-zinc-600 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.68),0_8px_18px_-18px_rgba(82,74,70,0.42)]";
 
 export const buttonSoftClassName =
   "h-11 rounded-2xl border border-[color:var(--line)] bg-white px-4 text-sm text-zinc-700 transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55";
@@ -29,28 +35,22 @@ export const buttonGhostClassName =
 
 type SectionTitleProps = {
   title: string;
-  description: string;
   icon: LucideIcon;
   action?: ReactNode;
 };
 
 export function SectionTitle({
   title,
-  description,
   icon: Icon,
   action,
 }: SectionTitleProps) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--accent)]">
-          <Icon className="h-3.5 w-3.5" />
-          Gestión
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold text-[color:var(--chocolate-deep)]">
+        <h2 className="flex items-center gap-2.5 text-2xl font-semibold text-[color:var(--chocolate-deep)]">
+          <Icon className="h-5 w-5 shrink-0 text-[color:var(--accent)]" />
           {title}
         </h2>
-        <p className="mt-1 text-sm text-zinc-600">{description}</p>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
@@ -82,33 +82,6 @@ export function Pill({ children, tone = "neutral", mini = false }: PillProps) {
     >
       {children}
     </span>
-  );
-}
-
-type SelectFieldProps = {
-  value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-  className?: string;
-};
-
-export function SelectField({
-  value,
-  onChange,
-  children,
-  className,
-}: SelectFieldProps) {
-  return (
-    <div className="relative">
-      <select
-        className={`${inputClassName} appearance-none pr-10 ${className ?? ""}`}
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-    </div>
   );
 }
 
@@ -156,7 +129,6 @@ export function Toggle({ checked, onChange, label, mini = false }: ToggleProps) 
 
 type DisclosureProps = {
   title: string;
-  description?: string;
   children: ReactNode;
   defaultOpen?: boolean;
   variant?: "boxed" | "airy" | "dashed";
@@ -164,44 +136,56 @@ type DisclosureProps = {
 
 export function Disclosure({
   title,
-  description,
   children,
   defaultOpen = false,
   variant = "boxed",
 }: DisclosureProps) {
+  const disclosureId = useId();
+  const contentId = `${disclosureId}-content`;
   const boxed = variant === "boxed";
   const dashed = variant === "dashed";
   const airy = variant === "airy";
 
   return (
-    <details
-      className={`group h-fit ${
+    <section
+      className={`relative h-fit ${
         boxed
-          ? "rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 p-3.5 open:border-[color:var(--accent)]"
+          ? "rounded-[1.6rem] bg-[color:var(--milk)]/92 p-3.5 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.7),0_8px_18px_-18px_rgba(82,74,70,0.46)]"
           : dashed
-            ? "rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--milk)]/90 p-3.5 open:border-[color:var(--accent)]"
+            ? "rounded-[1.6rem] bg-[color:var(--milk)]/92 p-3.5 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.7),0_8px_18px_-18px_rgba(82,74,70,0.46)]"
             : "border-b border-[color:var(--line)] pb-3"
       }`}
-      open={defaultOpen}
     >
-      <summary
-        className={`flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none ${
+      <input
+        aria-controls={contentId}
+        className="peer sr-only"
+        defaultChecked={defaultOpen}
+        id={disclosureId}
+        type="checkbox"
+      />
+      <label
+        className={`flex cursor-pointer list-none items-center justify-between gap-3 pr-7 outline-none transition peer-focus-visible:ring-2 peer-focus-visible:ring-[color:var(--caramel-soft)] ${
           airy ? "py-1" : "rounded-xl px-1 py-1"
         }`}
+        htmlFor={disclosureId}
       >
         <div>
           <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
             {title}
           </p>
-          {description ? (
-            <p className="mt-0.5 text-xs text-zinc-600">{description}</p>
-          ) : null}
         </div>
-        <ChevronDown className="h-4 w-4 text-zinc-500 transition group-open:rotate-180" />
-      </summary>
-      <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-300 ease-out group-open:mt-3 group-open:grid-rows-[1fr] group-open:opacity-100">
-        <div className="overflow-hidden">{children}</div>
+      </label>
+      <ChevronDown
+        className={`pointer-events-none absolute h-4 w-4 text-zinc-500 transition-transform duration-300 peer-checked:rotate-180 ${
+          airy ? "right-0 top-1.5" : "right-4 top-4"
+        }`}
+      />
+      <div
+        className="grid grid-rows-[0fr] overflow-hidden opacity-0 transition-all duration-300 ease-out peer-checked:mt-3 peer-checked:grid-rows-[1fr] peer-checked:overflow-visible peer-checked:opacity-100"
+        id={contentId}
+      >
+        <div className="min-h-0 overflow-visible">{children}</div>
       </div>
-    </details>
+    </section>
   );
 }

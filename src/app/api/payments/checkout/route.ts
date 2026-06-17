@@ -10,10 +10,12 @@ import {
   getMercadoPagoTicketExpirationDays,
   MercadoPagoConfigError,
 } from "@/lib/payments/mercadopago";
+import { getOrCreatePendingPaymentForOrder } from "@/lib/payments/pending";
 import { logServerError } from "@/lib/server/log";
 
 const checkoutSchema = z.object({
   orderId: z.string().min(1),
+  receiptCode: z.string().min(1),
 });
 
 export const runtime = "nodejs";
@@ -22,16 +24,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = checkoutSchema.parse(await req.json());
 
-    const order = await prisma.order.findUnique({
-      where: { id: body.orderId },
+    const order = await prisma.order.findFirst({
+      where: {
+        id: body.orderId,
+        publicReceiptCode: body.receiptCode,
+      },
       include: {
         customer: true,
         payments: {
-          where: {
-            status: "PENDING",
-          },
           orderBy: { createdAt: "asc" },
-          take: 1,
         },
       },
     });
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pedido cancelado" }, { status: 409 });
     }
 
-    const pendingPayment = order.payments[0];
+    const pendingPayment = await getOrCreatePendingPaymentForOrder(order);
     if (!pendingPayment) {
       return NextResponse.json({ error: "No hay cobro pendiente" }, { status: 409 });
     }
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
 
     const preference = await createMercadoPagoPreference({
       orderId: order.id,
+      receiptCode: order.publicReceiptCode,
       externalReference: pendingPayment.externalReference ?? `natta_${order.id}`,
       title:
         order.fulfillmentMode === "PICKUP"

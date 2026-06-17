@@ -688,6 +688,7 @@ export function MercadoPagoCardForm({
         },
         body: JSON.stringify({
           orderId: checkout.orderId,
+          receiptCode: checkout.receiptCode,
           selectedPaymentMethod: "card",
           formData: {
             token,
@@ -730,6 +731,7 @@ export function MercadoPagoCardForm({
   }, [
     cardholderName,
     checkout.orderId,
+    checkout.receiptCode,
     email,
     identificationNumber,
     identificationType,

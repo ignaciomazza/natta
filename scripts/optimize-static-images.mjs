@@ -17,21 +17,21 @@ const menuOutputDir = path.join(root, "public/images/menu/optimized");
 const menuSources = [
   {
     slug: "argenta",
-    cropFocusY: 0.43,
-    enhance: { brightness: 1.02, contrast: 1.08, saturation: 1.08 },
+    cropFocusY: 0.76,
+    enhance: { brightness: 1.06, contrast: 1.08, saturation: 1.04 },
     file: "argenta.heic",
   },
   {
     slug: "blanca",
-    enhance: { brightness: 0.99, contrast: 1.1, saturation: 1.1 },
-    file: "blanca.heic",
-    position: "center",
+    cropFocusY: 0.34,
+    enhance: { brightness: 0.98, contrast: 1.04, saturation: 0.92 },
+    file: "blanca.heif",
   },
   {
     slug: "brulee",
-    enhance: { brightness: 1.01, contrast: 1.07, saturation: 1.06 },
+    cropFocusX: 0.56,
+    enhance: { brightness: 1.07, contrast: 1.05, saturation: 0.98 },
     file: "brulee.HEIC",
-    position: "center",
   },
   { slug: "choco", file: "choco.jpg", position: "center" },
   {

@@ -12,10 +12,10 @@ import { isCatalogPairAvailable } from "@/lib/catalog-db";
 
 const orderCreateSchema = z.object({
   customer: z.object({
-    name: z.string().min(2),
-    phone: z.string().min(6),
-    email: z.string().email().optional(),
-    address: z.string().min(3).optional(),
+    name: z.string().min(2).max(90),
+    phone: z.string().min(6).max(40),
+    email: z.string().email().max(120).optional(),
+    address: z.string().min(3).max(180).optional(),
   }),
   deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   fulfillmentMode: z.enum(["pickup", "delivery"]),
@@ -28,7 +28,16 @@ const orderCreateSchema = z.object({
         quantity: z.number().int().min(1).max(50),
       }),
     )
-    .min(1),
+    .min(1)
+    .max(20),
+}).superRefine((value, ctx) => {
+  if (value.fulfillmentMode === "delivery" && !value.customer.address?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["customer", "address"],
+      message: "La direccion es obligatoria para envios",
+    });
+  }
 });
 
 export const runtime = "nodejs";
@@ -195,6 +204,10 @@ export async function POST(req: NextRequest) {
     await validateCapacityForOrder({
       deliveryDate: body.deliveryDate,
       requestedUnits,
+      requestedFlavorUnits: orderItems.map((item) => ({
+        flavorId: item.flavorId,
+        quantity: item.quantity,
+      })),
     });
 
     const totals = calculateOrderTotals(mode, orderItems);
@@ -299,6 +312,9 @@ export async function POST(req: NextRequest) {
       }
       if (error.message === "CAPACITY_EXCEEDED") {
         return NextResponse.json({ error: "No hay cupo suficiente en esa fecha" }, { status: 409 });
+      }
+      if (error.message === "FLAVOR_CAPACITY_EXCEEDED") {
+        return NextResponse.json({ error: "No hay cupo suficiente para uno de los sabores en esa fecha" }, { status: 409 });
       }
       if (error.message === "CUTOFF_REACHED") {
         return NextResponse.json({ error: "Horario de corte alcanzado" }, { status: 400 });

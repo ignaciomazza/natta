@@ -7,14 +7,15 @@ import {
   Disclosure,
   Pill,
   SectionTitle,
-  SelectField,
   Toggle,
   buttonSoftClassName,
   controlRowClassName,
+  emptyStateClassName,
   fieldLabelClassName,
   inputClassName,
-  tableShellClassName,
+  listCardClassName,
 } from "@/components/internal/ui";
+import { SelectField, SelectOption } from "@/components/internal/select-field";
 
 type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "REFUNDED";
 type PaymentMethod = "MERCADO_PAGO" | "TRANSFER" | "CASH" | "MANUAL";
@@ -180,7 +181,6 @@ export function CollectionsAdmin() {
   return (
     <section className="space-y-5">
       <SectionTitle
-        description="Cobros online y manuales en una sola vista."
         icon={Coins}
         title="Cobros"
       />
@@ -192,7 +192,6 @@ export function CollectionsAdmin() {
       </div>
 
       <Disclosure
-        description="Filtrá por estado o mostrá solo cobros vinculados a pedido."
         title="Filtros de cobros"
         variant="dashed"
       >
@@ -203,11 +202,11 @@ export function CollectionsAdmin() {
               onChange={(value) => setStatusFilter(value as "ALL" | PaymentStatus)}
               value={statusFilter}
             >
-              <option value="ALL">Todos los estados</option>
+              <SelectOption value="ALL">Todos los estados</SelectOption>
               {statusOptions.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {statusLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -223,7 +222,6 @@ export function CollectionsAdmin() {
       </Disclosure>
 
       <Disclosure
-        description="Si no está asociado a pedido, queda como cobro manual."
         title="Registrar cobro manual"
         variant="dashed"
       >
@@ -273,9 +271,9 @@ export function CollectionsAdmin() {
             Tipo
             <SelectField onChange={(value) => setKind(value as PaymentKind)} value={kind}>
               {kindOptions.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {kindLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -283,9 +281,9 @@ export function CollectionsAdmin() {
             Método
             <SelectField onChange={(value) => setMethod(value as PaymentMethod)} value={method}>
               {methodOptions.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {methodLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -293,9 +291,9 @@ export function CollectionsAdmin() {
             Estado inicial
             <SelectField onChange={(value) => setStatus(value as PaymentStatus)} value={status}>
               {statusOptions.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {statusLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -312,99 +310,66 @@ export function CollectionsAdmin() {
         </p>
       ) : null}
 
-      <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 px-3 md:hidden">
-        {visibleItems.map((item) => (
-          <article className="py-3" key={item.id}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
-                {item.customerName || "Cobro manual"}
-              </p>
-              <Pill mini tone={statusTone(item.status)}>
-                {statusLabel[item.status]}
-              </Pill>
-            </div>
-            <p className="mt-1 text-xs text-zinc-500">{formatDateTime(item.createdAt)}</p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700">
-              <Pill mini>{kindLabel[item.kind]}</Pill>
-              <Pill mini tone="info">
-                {methodLabel[item.method]}
-              </Pill>
-            </div>
-            <p className="mt-3 font-medium text-zinc-900">{formatMoney(item.amountArs)}</p>
-            {item.referenceNote ? (
-              <p className="mt-2 rounded-xl border border-dashed border-[color:var(--line)] bg-[color:var(--surface-soft)]/75 px-2.5 py-2 text-xs text-zinc-600">
-                {item.referenceNote}
-              </p>
-            ) : null}
-            {item.order ? (
-              <a
-                className="mt-2 inline-flex text-xs text-zinc-700 underline underline-offset-2"
-                href={`/comprobante/${item.order.publicReceiptCode}`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                Pedido: {item.order.publicReceiptCode}
-              </a>
-            ) : null}
-          </article>
-        ))}
-      </div>
-
-      <div className={tableShellClassName}>
-        <table className="min-w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
-              <th className="px-3 py-3">Fecha</th>
-              <th className="px-3 py-3">Cliente</th>
-              <th className="px-3 py-3">Pedido</th>
-              <th className="px-3 py-3">Tipo</th>
-              <th className="px-3 py-3">Método</th>
-              <th className="px-3 py-3">Estado</th>
-              <th className="px-3 py-3">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems.map((item) => (
-              <tr className="border-b border-[#e2ddd9] transition" key={item.id}>
-                <td className="px-3 py-3">{formatDateTime(item.createdAt)}</td>
-                <td className="px-3 py-3">
-                  <p>{item.customerName || "-"}</p>
-                  <p className="text-xs text-zinc-500">{item.customerPhone || "-"}</p>
-                </td>
-                <td className="px-3 py-3">
-                  {item.order ? (
-                    <a
-                      className="text-zinc-700 underline underline-offset-2"
-                      href={`/comprobante/${item.order.publicReceiptCode}`}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      {item.order.publicReceiptCode}
-                    </a>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="px-3 py-3">
+      <div className="space-y-3">
+        {visibleItems.length ? (
+          visibleItems.map((item) => (
+            <article
+              className={`${listCardClassName} md:grid-cols-[minmax(8rem,0.85fr)_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:items-center`}
+              key={item.id}
+            >
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Fecha</p>
+                <p className="mt-1 text-sm font-medium text-[color:var(--chocolate-deep)]">
+                  {formatDateTime(item.createdAt)}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-[color:var(--chocolate-deep)]">
+                  {item.customerName || "Cobro manual"}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  {item.customerPhone || "Sin teléfono"}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Pedido</p>
+                {item.order ? (
+                  <a
+                    className="mt-1 inline-flex text-sm text-zinc-700 underline underline-offset-2"
+                    href={`/comprobante/${item.order.publicReceiptCode}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {item.order.publicReceiptCode}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm text-zinc-500">Sin pedido</p>
+                )}
+              </div>
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap gap-2">
                   <Pill mini>{kindLabel[item.kind]}</Pill>
-                </td>
-                <td className="px-3 py-3">
                   <Pill mini tone="info">
                     {methodLabel[item.method]}
                   </Pill>
-                </td>
-                <td className="px-3 py-3">
                   <Pill mini tone={statusTone(item.status)}>
                     {statusLabel[item.status]}
                   </Pill>
-                </td>
-                <td className="px-3 py-3 font-medium text-zinc-900">
-                  {formatMoney(item.amountArs)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+                {item.referenceNote ? (
+                  <p className="rounded-xl bg-[color:var(--surface-soft)]/75 px-2.5 py-2 text-xs text-zinc-600 shadow-[0_10px_24px_-22px_rgba(38,35,33,0.52)]">
+                    {item.referenceNote}
+                  </p>
+                ) : null}
+              </div>
+              <p className="text-lg font-semibold text-zinc-950 md:text-right">
+                {formatMoney(item.amountArs)}
+              </p>
+            </article>
+          ))
+        ) : (
+          <p className={emptyStateClassName}>No hay cobros para mostrar.</p>
+        )}
       </div>
     </section>
   );

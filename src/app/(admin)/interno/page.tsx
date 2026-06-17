@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowRight,
   ClipboardList,
@@ -70,17 +71,17 @@ function getHealthLabel(score: number | null) {
 }
 
 function getToneClasses(tone: Tone) {
-  if (tone === "danger") return "border-rose-200 bg-rose-50/85";
-  if (tone === "warning") return "border-amber-200 bg-amber-50/85";
-  if (tone === "success") return "border-emerald-200 bg-emerald-50/80";
-  if (tone === "info") return "border-sky-200 bg-sky-50/80";
-  return "border-[color:var(--line)] bg-white/90";
+  if (tone === "danger") return "bg-rose-50/85";
+  if (tone === "warning") return "bg-amber-50/85";
+  if (tone === "success") return "bg-emerald-50/80";
+  if (tone === "info") return "bg-sky-50/80";
+  return "bg-white/90";
 }
 
 function ActionCard({ title, detail, value, href, tone }: ActionCardProps) {
   return (
     <Link
-      className={`group flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(40,35,32,0.06)] ${getToneClasses(tone)}`}
+      className={`group flex items-center justify-between gap-3 rounded-[1.6rem] px-4 py-3.5 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.66),0_8px_18px_-18px_rgba(82,74,70,0.42)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_44px_-30px_rgba(38,35,33,0.74),0_12px_24px_-18px_rgba(82,74,70,0.48)] ${getToneClasses(tone)}`}
       href={href}
     >
       <div className="min-w-0">
@@ -97,7 +98,7 @@ function ActionCard({ title, detail, value, href, tone }: ActionCardProps) {
 
 function KpiCard({ title, value, detail, tone = "neutral" }: KpiCardProps) {
   return (
-    <div className={`rounded-2xl border p-4 ${getToneClasses(tone)}`}>
+    <div className={`rounded-[1.6rem] p-4 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.66),0_8px_18px_-18px_rgba(82,74,70,0.42)] ${getToneClasses(tone)}`}>
       <p className="text-xs uppercase tracking-[0.14em] text-zinc-600">{title}</p>
       <p className="mt-2 text-2xl font-semibold text-[color:var(--chocolate-deep)]">{value}</p>
       <p className="mt-1 text-sm text-zinc-600">{detail}</p>
@@ -108,7 +109,7 @@ function KpiCard({ title, value, detail, tone = "neutral" }: KpiCardProps) {
 function ModuleCard({ title, value, detail, href, icon: Icon }: ModuleCardProps) {
   return (
     <Link
-      className="group rounded-2xl border border-[color:var(--line)] bg-white/90 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(40,35,32,0.06)]"
+      className="group rounded-[1.6rem] bg-white/90 p-4 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.66),0_8px_18px_-18px_rgba(82,74,70,0.42)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_44px_-30px_rgba(38,35,33,0.74),0_12px_24px_-18px_rgba(82,74,70,0.48)]"
       href={href}
     >
       <div className="flex items-start justify-between gap-3">
@@ -124,6 +125,8 @@ function ModuleCard({ title, value, detail, href, icon: Icon }: ModuleCardProps)
 }
 
 export default async function InternoHomePage() {
+  redirect("/interno/pedidos");
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 

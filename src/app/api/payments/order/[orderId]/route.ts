@@ -1,20 +1,101 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncMercadoPagoPayment } from "@/lib/payments/sync";
+import { syncMercadoPagoPaymentForOrder } from "@/lib/payments/sync";
 
 export const runtime = "nodejs";
+
+function getProviderPaymentDetails(providerPayload: unknown) {
+  const emptyDetails = {
+    receiptUrl: null as string | null,
+    reference: null as string | null,
+    financialInstitution: null as string | null,
+  };
+
+  if (!providerPayload || typeof providerPayload !== "object" || Array.isArray(providerPayload)) {
+    return emptyDetails;
+  }
+
+  const transactionDetails = (providerPayload as Record<string, unknown>)
+    .transaction_details;
+  if (
+    !transactionDetails ||
+    typeof transactionDetails !== "object" ||
+    Array.isArray(transactionDetails)
+  ) {
+    return emptyDetails;
+  }
+
+  const details = transactionDetails as Record<string, unknown>;
+
+  return {
+    receiptUrl:
+      typeof details.external_resource_url === "string"
+        ? details.external_resource_url
+        : null,
+    reference:
+      typeof details.payment_method_reference_id === "string"
+        ? details.payment_method_reference_id
+        : null,
+    financialInstitution:
+      typeof details.financial_institution === "string"
+        ? details.financial_institution
+        : null,
+  };
+}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ orderId: string }> },
 ) {
   const { orderId } = await params;
+  const receiptCode = req.nextUrl.searchParams.get("receiptCode")?.trim();
   const syncPaymentId = req.nextUrl.searchParams.get("syncPaymentId")?.trim();
+
+  if (!receiptCode) {
+    return NextResponse.json(
+      { error: "Falta verificar el comprobante del pedido" },
+      { status: 400 },
+    );
+  }
+
+  if (syncPaymentId && !/^\d{1,32}$/.test(syncPaymentId)) {
+    return NextResponse.json(
+      { error: "Identificador de pago invalido" },
+      { status: 400 },
+    );
+  }
+
+  const loadOrder = () =>
+    prisma.order.findFirst({
+      where: {
+        id: orderId,
+        publicReceiptCode: receiptCode,
+      },
+      include: {
+        customer: true,
+        items: {
+          orderBy: [{ createdAt: "asc" as const }],
+          include: {
+            flavor: true,
+            size: true,
+          },
+        },
+        payments: {
+          orderBy: [{ createdAt: "asc" as const }],
+        },
+      },
+    });
+
+  let order = await loadOrder();
+  if (!order) {
+    return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+  }
 
   if (syncPaymentId) {
     try {
-      await syncMercadoPagoPayment(syncPaymentId);
+      await syncMercadoPagoPaymentForOrder(syncPaymentId, order.id);
+      order = await loadOrder();
     } catch (error) {
       console.error("No se pudo sincronizar el pago de Mercado Pago", {
         error,
@@ -23,23 +104,6 @@ export async function GET(
       });
     }
   }
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      customer: true,
-      items: {
-        orderBy: [{ createdAt: "asc" }],
-        include: {
-          flavor: true,
-          size: true,
-        },
-      },
-      payments: {
-        orderBy: [{ createdAt: "asc" }],
-      },
-    },
-  });
 
   if (!order) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
@@ -87,7 +151,7 @@ export async function GET(
       providerPreferenceId: payment.providerPreferenceId,
       providerPaymentId: payment.providerPaymentId,
       statusDetail: payment.statusDetail,
-      providerPayload: payment.providerPayload,
+      ...getProviderPaymentDetails(payment.providerPayload),
     })),
   });
 }

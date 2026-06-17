@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   CalendarDays,
@@ -117,7 +117,9 @@ type OrderPaymentsSnapshot = {
     providerPreferenceId: string | null;
     providerPaymentId: string | null;
     statusDetail: string | null;
-    providerPayload: Record<string, unknown> | null;
+    receiptUrl: string | null;
+    reference: string | null;
+    financialInstitution: string | null;
   }>;
 };
 
@@ -255,27 +257,6 @@ const getDayBlockingReason = (day: AvailabilityDay, now: Date) => {
 
   return null;
 };
-
-function getReceiptUrlFromPayload(
-  providerPayload: Record<string, unknown> | null,
-) {
-  if (!providerPayload) return null;
-
-  const transactionDetails = providerPayload.transaction_details;
-  if (
-    transactionDetails &&
-    typeof transactionDetails === "object" &&
-    !Array.isArray(transactionDetails)
-  ) {
-    const externalResourceUrl = (transactionDetails as Record<string, unknown>)
-      .external_resource_url;
-    if (typeof externalResourceUrl === "string" && externalResourceUrl.trim()) {
-      return externalResourceUrl;
-    }
-  }
-
-  return null;
-}
 
 function toDisplayDate(date: string) {
   const value = date.includes("T") ? date : `${date}T12:00:00`;
@@ -425,7 +406,10 @@ export function OrderAssistant() {
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [loadingPaymentView, setLoadingPaymentView] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submittedCode, setSubmittedCode] = useState<string | null>(null);
+  const [submittedCode, setSubmittedCode] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("code");
+  });
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return new URLSearchParams(window.location.search).get("order");
@@ -504,45 +488,6 @@ export function OrderAssistant() {
   }, []);
 
   useEffect(() => {
-    if (!createdOrderId) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      setLoadingPaymentView(true);
-      try {
-        const snapshot = await refreshPaymentSnapshot(createdOrderId, {
-          syncPaymentId: returnPaymentId,
-        });
-        if (cancelled) return;
-
-        const hasApprovedPayment = snapshot.payments.some(
-          (payment) => payment.status === "APPROVED",
-        );
-
-        if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
-          await refreshCheckoutSession(createdOrderId);
-        }
-      } catch (error) {
-        if (cancelled) return;
-        setSubmitError(
-          sanitizeUiMessage(
-            error instanceof Error ? error.message : "No se pudo cargar el pedido",
-          ),
-        );
-      } finally {
-        if (!cancelled) {
-          setLoadingPaymentView(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [createdOrderId, returnPaymentId, returnPaymentState]);
-
-  useEffect(() => {
     if (!createdOrderId || !loadingPaymentView) return;
 
     scrollPageToTop("auto");
@@ -605,8 +550,7 @@ export function OrderAssistant() {
 
   const receiptCode = paymentSnapshot?.order.publicReceiptCode ?? submittedCode;
   const paymentReceiptUrl =
-    paymentResult?.receiptUrl ??
-    getReceiptUrlFromPayload(primaryPayment?.providerPayload ?? null);
+    paymentResult?.receiptUrl ?? primaryPayment?.receiptUrl ?? null;
   const currentPaymentStatus = paymentResult?.status ?? primaryPayment?.status ?? null;
   const currentPaymentDetail = paymentResult?.statusDetail ?? primaryPayment?.statusDetail ?? null;
   const hasApprovedPayment =
@@ -761,13 +705,29 @@ export function OrderAssistant() {
     setStep((current) => Math.max(current - 1, 0) as StepIndex);
   }
 
-  async function refreshCheckoutSession(orderId: string) {
+  const getCurrentReceiptCode = useCallback(
+    (override?: string | null) => override ?? submittedCode,
+    [submittedCode],
+  );
+
+  const refreshCheckoutSession = useCallback(async (
+    orderId: string,
+    receiptCodeOverride?: string | null,
+  ) => {
+    const currentReceiptCode = getCurrentReceiptCode(receiptCodeOverride);
+    if (!currentReceiptCode) {
+      throw new Error("No se pudo verificar el comprobante del pedido.");
+    }
+
     const checkoutResponse = await fetch("/api/payments/checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ orderId }),
+      body: JSON.stringify({
+        orderId,
+        receiptCode: currentReceiptCode,
+      }),
     });
 
     const checkoutResult = (await checkoutResponse.json().catch(() => null)) as
@@ -786,22 +746,27 @@ export function OrderAssistant() {
     setCheckoutSession(checkoutResult);
     setSubmittedCode(checkoutResult.receiptCode);
     return checkoutResult;
-  }
+  }, [getCurrentReceiptCode]);
 
-  async function refreshPaymentSnapshot(
+  const refreshPaymentSnapshot = useCallback(async (
     orderId: string,
     options?: {
+      receiptCode?: string | null;
       syncPaymentId?: string | null;
     },
-  ) {
+  ) => {
+    const currentReceiptCode = getCurrentReceiptCode(options?.receiptCode);
+    if (!currentReceiptCode) {
+      throw new Error("No se pudo verificar el comprobante del pedido.");
+    }
+
     const searchParams = new URLSearchParams();
+    searchParams.set("receiptCode", currentReceiptCode);
     if (options?.syncPaymentId) {
       searchParams.set("syncPaymentId", options.syncPaymentId);
     }
 
-    const requestPath = searchParams.size
-      ? `/api/payments/order/${orderId}?${searchParams.toString()}`
-      : `/api/payments/order/${orderId}`;
+    const requestPath = `/api/payments/order/${orderId}?${searchParams.toString()}`;
 
     const response = await fetch(requestPath, {
       cache: "no-store",
@@ -836,7 +801,52 @@ export function OrderAssistant() {
       }, {}),
     );
     return payload;
-  }
+  }, [getCurrentReceiptCode]);
+
+  useEffect(() => {
+    if (!createdOrderId) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      setLoadingPaymentView(true);
+      try {
+        const snapshot = await refreshPaymentSnapshot(createdOrderId, {
+          syncPaymentId: returnPaymentId,
+        });
+        if (cancelled) return;
+
+        const hasApprovedPayment = snapshot.payments.some(
+          (payment) => payment.status === "APPROVED",
+        );
+
+        if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
+          await refreshCheckoutSession(createdOrderId);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setSubmitError(
+          sanitizeUiMessage(
+            error instanceof Error ? error.message : "No se pudo cargar el pedido",
+          ),
+        );
+      } finally {
+        if (!cancelled) {
+          setLoadingPaymentView(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    createdOrderId,
+    refreshCheckoutSession,
+    refreshPaymentSnapshot,
+    returnPaymentId,
+    returnPaymentState,
+  ]);
 
   function resetPaymentFlow(targetStep: StepIndex, message: string | null = null) {
     setCreatedOrderId(null);
@@ -854,6 +864,7 @@ export function OrderAssistant() {
 
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("order");
+    nextUrl.searchParams.delete("code");
     nextUrl.searchParams.delete("payment");
     nextUrl.searchParams.delete("payment_id");
     nextUrl.searchParams.delete("collection_id");
@@ -982,11 +993,19 @@ export function OrderAssistant() {
 
       const nextUrl = new URL(window.location.href);
       nextUrl.searchParams.set("order", createOrderResult.orderId);
+      if (createOrderResult.publicReceiptCode) {
+        nextUrl.searchParams.set("code", createOrderResult.publicReceiptCode);
+      }
       nextUrl.searchParams.delete("payment");
       window.history.replaceState({}, "", nextUrl);
 
-      await refreshCheckoutSession(createOrderResult.orderId);
-      await refreshPaymentSnapshot(createOrderResult.orderId);
+      await refreshCheckoutSession(
+        createOrderResult.orderId,
+        createOrderResult.publicReceiptCode ?? null,
+      );
+      await refreshPaymentSnapshot(createOrderResult.orderId, {
+        receiptCode: createOrderResult.publicReceiptCode ?? null,
+      });
 
       requestAnimationFrame(() => {
         document

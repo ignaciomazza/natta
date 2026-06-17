@@ -15,6 +15,7 @@ type MoneyInputProps = {
   className?: string;
   name?: string;
   id?: string;
+  disabled?: boolean;
 };
 
 function formatThousands(value: string) {
@@ -63,6 +64,7 @@ export function MoneyInput({
   className,
   name,
   id,
+  disabled,
 }: MoneyInputProps) {
   return (
     <div className="relative">
@@ -71,6 +73,7 @@ export function MoneyInput({
       </span>
       <input
         className={`${inputClassName} pl-8 ${className ?? ""}`}
+        disabled={disabled}
         id={id}
         inputMode="decimal"
         name={name}

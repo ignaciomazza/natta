@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   CalendarDays,
+  BadgeDollarSign,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   Coins,
-  LayoutDashboard,
-  Sparkles,
   ShoppingBasket,
   Truck,
   UsersRound,
@@ -31,10 +30,9 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/interno", label: "Resumen", icon: LayoutDashboard },
-  { href: "/interno/foco-hoy", label: "Foco de hoy", icon: Sparkles },
   { href: "/interno/pedidos", label: "Pedidos", icon: ClipboardList },
   { href: "/interno/cupos", label: "Cupos", icon: CalendarDays },
+  { href: "/interno/precios", label: "Precios", icon: BadgeDollarSign },
   { href: "/interno/clientes", label: "Clientes", icon: UsersRound },
   { href: "/interno/proveedores", label: "Proveedores", icon: Truck },
   { href: "/interno/compras", label: "Compras", icon: ShoppingBasket },
@@ -88,7 +86,7 @@ export function AdminShell({ userName, children }: Props) {
       ) : null}
 
       <aside
-        className={`fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] w-[17.5rem] rounded-3xl border border-[color:var(--line)] bg-[color:var(--milk)]/95 p-3 shadow-[0_10px_30px_rgba(43,26,24,0.12)] backdrop-blur transition-transform duration-200 ${
+        className={`fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] w-[17.5rem] rounded-[2rem] bg-[color:var(--milk)]/95 p-3 shadow-[0_24px_60px_-34px_rgba(38,35,33,0.62),0_12px_26px_-18px_rgba(82,74,70,0.45)] backdrop-blur transition-transform duration-200 ${
           menuOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
         }`}
       >
@@ -120,7 +118,7 @@ export function AdminShell({ userName, children }: Props) {
                 <Link
                   className={`flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-sm transition ${
                     active
-                      ? "border-[color:var(--accent)] bg-[color:var(--accent-strong)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                      ? "border-transparent bg-[color:var(--accent-strong)] text-white"
                       : "border-transparent text-zinc-700 hover:border-[color:var(--line)] hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--chocolate-deep)]"
                   }`}
                   href={item.href}
@@ -156,10 +154,12 @@ export function AdminShell({ userName, children }: Props) {
         </button>
       ) : null}
 
-      <div className="px-4 py-4 md:px-6 md:py-6">
+      <div className="px-4 py-4 md:py-6">
         <main
-          className={`min-h-[calc(100vh-2rem)] min-w-0 space-y-8 p-1 transition-[margin] duration-200 sm:p-2 lg:p-3 ${
-            menuOpen ? "lg:ml-[19rem]" : "lg:ml-0"
+          className={`min-h-[calc(100vh-2rem)] min-w-0 space-y-8 transition-[margin,padding] duration-200 ${
+            menuOpen
+              ? "p-1 sm:p-2 lg:ml-[18.5rem] lg:p-0"
+              : "px-1 pb-1 pt-16 sm:px-2 sm:pb-2 lg:ml-0 lg:px-0 lg:pb-0 lg:pt-16"
           }`}
         >
           {children}

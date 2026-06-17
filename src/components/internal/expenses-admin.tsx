@@ -7,12 +7,13 @@ import {
   Disclosure,
   Pill,
   SectionTitle,
-  SelectField,
   buttonSoftClassName,
+  emptyStateClassName,
   fieldLabelClassName,
   inputClassName,
-  tableShellClassName,
+  listCardClassName,
 } from "@/components/internal/ui";
+import { SelectField, SelectOption } from "@/components/internal/select-field";
 
 type ExpenseStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "REFUNDED";
 type ExpenseCategory = "INGREDIENTS" | "OPERATIONS" | "MARKETING" | "LOGISTICS" | "OTHER";
@@ -161,7 +162,6 @@ export function ExpensesAdmin() {
   return (
     <section className="space-y-5">
       <SectionTitle
-        description="Seguimiento simple de egresos operativos."
         icon={Receipt}
         title="Gastos"
       />
@@ -173,7 +173,6 @@ export function ExpensesAdmin() {
       </div>
 
       <Disclosure
-        description="Filtrá por categoría para enfocar la vista diaria."
         title="Filtros de gastos"
         variant="dashed"
       >
@@ -183,17 +182,17 @@ export function ExpensesAdmin() {
             onChange={(value) => setCategoryFilter(value as "ALL" | ExpenseCategory)}
             value={categoryFilter}
           >
-            <option value="ALL">Todas</option>
+            <SelectOption value="ALL">Todas</SelectOption>
             {categories.map((option) => (
-              <option key={option} value={option}>
+              <SelectOption key={option} value={option}>
                 {categoryLabel[option]}
-              </option>
+              </SelectOption>
             ))}
           </SelectField>
         </label>
       </Disclosure>
 
-      <Disclosure description="Cargá un gasto con categoría y estado." title="Nuevo gasto" variant="dashed">
+      <Disclosure title="Nuevo gasto" variant="dashed">
         <form className="grid gap-3 md:grid-cols-2 md:items-end" onSubmit={onSubmit}>
           <label className={fieldLabelClassName}>
             Descripción
@@ -224,9 +223,9 @@ export function ExpensesAdmin() {
               value={category}
             >
               {categories.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {categoryLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -237,9 +236,9 @@ export function ExpensesAdmin() {
               value={paymentMethod}
             >
               {paymentMethods.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {methodLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -247,9 +246,9 @@ export function ExpensesAdmin() {
             Estado
             <SelectField onChange={(value) => setStatus(value as ExpenseStatus)} value={status}>
               {statuses.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {statusLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -266,66 +265,44 @@ export function ExpensesAdmin() {
         </p>
       ) : null}
 
-      <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 px-3 md:hidden">
-        {visibleItems.map((item) => (
-          <article className="py-3" key={item.id}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
-                {item.description}
+      <div className="space-y-3">
+        {visibleItems.length ? (
+          visibleItems.map((item) => (
+            <article
+              className={`${listCardClassName} md:grid-cols-[minmax(7rem,0.7fr)_minmax(0,1.45fr)_minmax(0,1.15fr)_minmax(0,0.85fr)_auto] md:items-center`}
+              key={item.id}
+            >
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Fecha</p>
+                <p className="mt-1 text-sm font-medium text-[color:var(--chocolate-deep)]">
+                  {formatDate(item.occurredAt)}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Descripción</p>
+                <p className="mt-1 text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                  {item.description}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Pill mini>{categoryLabel[item.category]}</Pill>
+                <Pill mini tone="info">
+                  {methodLabel[item.paymentMethod]}
+                </Pill>
+              </div>
+              <div className="flex items-center">
+                <Pill mini tone={statusTone(item.status)}>
+                  {statusLabel[item.status]}
+                </Pill>
+              </div>
+              <p className="text-lg font-semibold text-zinc-950 md:text-right">
+                {formatMoney(item.amountArs)}
               </p>
-              <Pill mini tone={statusTone(item.status)}>
-                {statusLabel[item.status]}
-              </Pill>
-            </div>
-            <p className="mt-1 text-xs text-zinc-500">{formatDate(item.occurredAt)}</p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700">
-              <Pill mini>{categoryLabel[item.category]}</Pill>
-              <Pill mini tone="info">
-                {methodLabel[item.paymentMethod]}
-              </Pill>
-            </div>
-            <p className="mt-3 font-medium text-zinc-900">{formatMoney(item.amountArs)}</p>
-          </article>
-        ))}
-      </div>
-
-      <div className={tableShellClassName}>
-        <table className="min-w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
-              <th className="px-3 py-3">Fecha</th>
-              <th className="px-3 py-3">Descripción</th>
-              <th className="px-3 py-3">Categoría</th>
-              <th className="px-3 py-3">Método</th>
-              <th className="px-3 py-3">Estado</th>
-              <th className="px-3 py-3">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems.map((item) => (
-              <tr className="border-b border-[#e2ddd9] transition" key={item.id}>
-                <td className="px-3 py-3">{formatDate(item.occurredAt)}</td>
-                <td className="px-3 py-3">{item.description}</td>
-                <td className="px-3 py-3">
-                  <Pill mini>{categoryLabel[item.category]}</Pill>
-                </td>
-                <td className="px-3 py-3">
-                  <Pill mini tone="info">
-                    {methodLabel[item.paymentMethod]}
-                  </Pill>
-                </td>
-                <td className="px-3 py-3">
-                  <Pill mini tone={statusTone(item.status)}>
-                    {statusLabel[item.status]}
-                  </Pill>
-                </td>
-                <td className="px-3 py-3 font-medium text-zinc-900">
-                  {formatMoney(item.amountArs)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </article>
+          ))
+        ) : (
+          <p className={emptyStateClassName}>No hay gastos para mostrar.</p>
+        )}
       </div>
     </section>
   );

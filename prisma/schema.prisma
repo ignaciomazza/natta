@@ -67,16 +67,18 @@ model User {
 }
 
 model Flavor {
-  id          String      @id @default(cuid())
-  slug        String      @unique
-  name        String
-  description String
-  isActive    Boolean     @default(true)
-  note        String?
-  prices      Price[]
-  orderItems  OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                    String                       @id @default(cuid())
+  slug                  String                       @unique
+  name                  String
+  description           String
+  isActive              Boolean                      @default(true)
+  note                  String?
+  prices                Price[]
+  orderItems            OrderItem[]
+  weekdayCapacityRules  WeekdayFlavorCapacityRule[]
+  dateCapacityOverrides DateFlavorCapacityOverride[]
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
 }
 
 model Size {
@@ -121,6 +123,19 @@ model WeekdayCapacityRule {
   @@unique([weekday])
 }
 
+model WeekdayFlavorCapacityRule {
+  id        String   @id @default(cuid())
+  weekday   Int
+  flavorId  String
+  maxUnits  Int
+  flavor    Flavor   @relation(fields: [flavorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([weekday, flavorId])
+  @@index([flavorId])
+}
+
 model DateCapacityOverride {
   id        String   @id @default(cuid())
   date      DateTime @unique @db.Date
@@ -129,6 +144,22 @@ model DateCapacityOverride {
   note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model DateFlavorCapacityOverride {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  flavorId  String
+  maxUnits  Int?
+  isClosed  Boolean  @default(false)
+  note      String?
+  flavor    Flavor   @relation(fields: [flavorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, flavorId])
+  @@index([flavorId])
+  @@index([date])
 }
 
 model Customer {
@@ -209,9 +240,9 @@ model Payment {
   customerPhone       String?
   referenceNote       String?
   provider            String?
-  externalReference   String?
+  externalReference   String?       @unique
   providerPreferenceId String?
-  providerPaymentId   String?
+  providerPaymentId   String?       @unique
   providerPayload     Json?
   statusDetail        String?
   createdAt           DateTime      @default(now())
@@ -222,7 +253,6 @@ model Payment {
   @@index([orderId])
   @@index([customerId])
   @@index([status])
-  @@index([externalReference])
 }
 
 model Supplier {

@@ -7,12 +7,13 @@ import {
   Disclosure,
   Pill,
   SectionTitle,
-  SelectField,
   buttonSoftClassName,
+  emptyStateClassName,
   fieldLabelClassName,
   inputClassName,
-  tableShellClassName,
+  listCardClassName,
 } from "@/components/internal/ui";
+import { SelectField, SelectOption } from "@/components/internal/select-field";
 
 type Supplier = {
   id: string;
@@ -134,7 +135,6 @@ export function PurchasesAdmin() {
   return (
     <section className="space-y-5">
       <SectionTitle
-        description="Registro operativo-financiero de compras."
         icon={PackageSearch}
         title="Compras"
       />
@@ -145,7 +145,6 @@ export function PurchasesAdmin() {
       </div>
 
       <Disclosure
-        description="Carga una compra rápida con proveedor, método y monto."
         title="Nueva compra"
         variant="dashed"
       >
@@ -153,11 +152,11 @@ export function PurchasesAdmin() {
           <label className={fieldLabelClassName}>
             Proveedor
             <SelectField onChange={setSupplierId} value={supplierId}>
-              <option value="">Sin proveedor</option>
+              <SelectOption value="">Sin proveedor</SelectOption>
               {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
+                <SelectOption key={supplier.id} value={supplier.id}>
                   {supplier.name}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -190,9 +189,9 @@ export function PurchasesAdmin() {
               value={paymentMethod}
             >
               {paymentMethods.map((option) => (
-                <option key={option} value={option}>
+                <SelectOption key={option} value={option}>
                   {methodLabel[option]}
-                </option>
+                </SelectOption>
               ))}
             </SelectField>
           </label>
@@ -209,53 +208,44 @@ export function PurchasesAdmin() {
         </p>
       ) : null}
 
-      <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 px-3 md:hidden">
-        {items.map((item) => (
-          <article className="py-3" key={item.id}>
-            <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
-              {item.description}
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">{formatDate(item.purchasedAt)}</p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-700">
-              <Pill mini>{item.supplier?.name || "Sin proveedor"}</Pill>
-              <Pill mini tone="info">
-                {methodLabel[item.paymentMethod]}
-              </Pill>
-            </div>
-            <p className="mt-3 font-medium text-zinc-900">{formatMoney(item.amountArs)}</p>
-          </article>
-        ))}
-      </div>
-
-      <div className={tableShellClassName}>
-        <table className="min-w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
-              <th className="px-3 py-3">Fecha</th>
-              <th className="px-3 py-3">Proveedor</th>
-              <th className="px-3 py-3">Descripción</th>
-              <th className="px-3 py-3">Método</th>
-              <th className="px-3 py-3">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr className="border-b border-[#e2ddd9] transition" key={item.id}>
-                <td className="px-3 py-3">{formatDate(item.purchasedAt)}</td>
-                <td className="px-3 py-3">{item.supplier?.name || "-"}</td>
-                <td className="px-3 py-3">{item.description}</td>
-                <td className="px-3 py-3">
-                  <Pill mini tone="info">
-                    {methodLabel[item.paymentMethod]}
-                  </Pill>
-                </td>
-                <td className="px-3 py-3 font-medium text-zinc-900">
-                  {formatMoney(item.amountArs)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {items.length ? (
+          items.map((item) => (
+            <article
+              className={`${listCardClassName} md:grid-cols-[minmax(7rem,0.7fr)_minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.85fr)_auto] md:items-center`}
+              key={item.id}
+            >
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Fecha</p>
+                <p className="mt-1 text-sm font-medium text-[color:var(--chocolate-deep)]">
+                  {formatDate(item.purchasedAt)}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Proveedor</p>
+                <p className="mt-1 truncate text-sm text-zinc-700">
+                  {item.supplier?.name || "Sin proveedor"}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Descripción</p>
+                <p className="mt-1 text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                  {item.description}
+                </p>
+              </div>
+              <div className="flex items-center">
+                <Pill mini tone="info">
+                  {methodLabel[item.paymentMethod]}
+                </Pill>
+              </div>
+              <p className="text-lg font-semibold text-zinc-950 md:text-right">
+                {formatMoney(item.amountArs)}
+              </p>
+            </article>
+          ))
+        ) : (
+          <p className={emptyStateClassName}>No hay compras para mostrar.</p>
+        )}
       </div>
     </section>
   );

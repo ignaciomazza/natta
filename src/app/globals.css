@@ -149,6 +149,10 @@ summary,
   mix-blend-mode: multiply;
 }
 
+.hero-product-piece--sticker {
+  filter: drop-shadow(0 14px 20px rgba(43, 26, 24, 0.1));
+}
+
 @media (min-width: 768px) {
   .hero-product-piece--hide-desktop {
     display: none;

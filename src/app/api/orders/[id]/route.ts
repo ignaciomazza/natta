@@ -107,3 +107,42 @@ export async function PATCH(
     return NextResponse.json({ error: "No se pudo actualizar pedido" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireAuth(req);
+    const { id } = await params;
+
+    const existing = await prisma.order.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    }
+
+    if (existing.status !== "CANCELLED") {
+      return NextResponse.json(
+        { error: "Solo se pueden eliminar pedidos cancelados" },
+        { status: 409 },
+      );
+    }
+
+    await prisma.order.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    logServerError("api.orders.id.delete", error);
+    return NextResponse.json({ error: "No se pudo eliminar pedido" }, { status: 500 });
+  }
+}

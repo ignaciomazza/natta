@@ -13,7 +13,8 @@
     "db:studio": "prisma studio",
     "bootstrap:local-db": "node --import tsx scripts/bootstrap-local-db.ts",
     "assets:optimize": "node scripts/optimize-static-images.mjs",
-    "assets:placeholder": "node scripts/generate-placeholder-assets.mjs"
+    "assets:placeholder": "node scripts/generate-placeholder-assets.mjs",
+    "security:smoke": "node --import tsx scripts/payment-security-smoke-tests.ts"
   },
   "prisma": {
     "seed": "node --import tsx prisma/seed.ts"
@@ -23,7 +24,7 @@
     "bcrypt": "^6.0.0",
     "jose": "^6.1.3",
     "lucide-react": "^1.14.0",
-    "next": "16.2.4",
+    "next": "^16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.3.5"
@@ -35,10 +36,13 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "^16.2.9",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.14"
   }
 }

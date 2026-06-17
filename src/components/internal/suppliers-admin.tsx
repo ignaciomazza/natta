@@ -6,12 +6,13 @@ import {
   Disclosure,
   Pill,
   SectionTitle,
-  SelectField,
   buttonSoftClassName,
+  emptyStateClassName,
   fieldLabelClassName,
   inputClassName,
-  tableShellClassName,
+  listCardClassName,
 } from "@/components/internal/ui";
+import { SelectField, SelectOption } from "@/components/internal/select-field";
 
 type Supplier = {
   id: string;
@@ -145,7 +146,6 @@ export function SuppliersAdmin() {
   return (
     <section className="space-y-6">
       <SectionTitle
-        description="Alta y mantenimiento de proveedores para compras."
         icon={Handshake}
         title="Proveedores"
       />
@@ -157,7 +157,6 @@ export function SuppliersAdmin() {
       </div>
 
       <Disclosure
-        description="Filtrá por estado o texto libre para encontrar proveedores."
         title="Filtros de proveedores"
         variant="dashed"
       >
@@ -180,16 +179,15 @@ export function SuppliersAdmin() {
               onChange={(value) => setActiveFilter(value as ActiveFilter)}
               value={activeFilter}
             >
-              <option value="ALL">Todos</option>
-              <option value="ACTIVE">Activos</option>
-              <option value="INACTIVE">Inactivos</option>
+              <SelectOption value="ALL">Todos</SelectOption>
+              <SelectOption value="ACTIVE">Activos</SelectOption>
+              <SelectOption value="INACTIVE">Inactivos</SelectOption>
             </SelectField>
           </label>
         </div>
       </Disclosure>
 
       <Disclosure
-        description="Carga un proveedor nuevo para usar en compras."
         title="Nuevo proveedor"
         variant="dashed"
       >
@@ -245,72 +243,42 @@ export function SuppliersAdmin() {
         </p>
       ) : null}
 
-      <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 px-3 md:hidden">
-        {visibleItems.map((item) => (
-          <article className="space-y-2 py-3" key={item.id}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-semibold text-[color:var(--chocolate-deep)]">{item.name}</p>
-                <p className="text-xs text-zinc-500">{item.contactName || "Sin contacto"}</p>
-              </div>
-              <Pill mini tone={item.isActive ? "success" : "warning"}>
-                {item.isActive ? "Activo" : "Inactivo"}
-              </Pill>
-            </div>
-            <p className="text-sm text-zinc-700">{item.email || "Sin email"}</p>
-            <p className="text-sm text-zinc-700">{item.phone || "Sin teléfono"}</p>
-            <button
-              className={buttonSoftClassName}
-              disabled={updatingId === item.id}
-              onClick={() => void toggleActive(item)}
-              type="button"
+      <div className="space-y-3">
+        {visibleItems.length ? (
+          visibleItems.map((item) => (
+            <article
+              className={`${listCardClassName} md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto] md:items-center`}
+              key={item.id}
             >
-              {item.isActive ? "Desactivar" : "Activar"}
-            </button>
-          </article>
-        ))}
-      </div>
-
-      <div className={tableShellClassName}>
-        <table className="min-w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
-              <th className="px-3 py-3">Proveedor</th>
-              <th className="px-3 py-3">Contacto</th>
-              <th className="px-3 py-3">Estado</th>
-              <th className="px-3 py-3">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems.map((item) => (
-              <tr className="border-b border-[#e2ddd9] transition" key={item.id}>
-                <td className="px-3 py-3">
-                  <p className="font-medium text-zinc-900">{item.name}</p>
-                  <p className="text-xs text-zinc-500">{item.email || "Sin email"}</p>
-                </td>
-                <td className="px-3 py-3">
-                  <p>{item.contactName || "-"}</p>
-                  <p className="text-xs text-zinc-500">{item.phone || "Sin teléfono"}</p>
-                </td>
-                <td className="px-3 py-3">
-                  <Pill mini tone={item.isActive ? "success" : "warning"}>
-                    {item.isActive ? "Activo" : "Inactivo"}
-                  </Pill>
-                </td>
-                <td className="px-3 py-3">
-                  <button
-                    className={`${buttonSoftClassName} !h-9 !px-3`}
-                    disabled={updatingId === item.id}
-                    onClick={() => void toggleActive(item)}
-                    type="button"
-                  >
-                    {item.isActive ? "Desactivar" : "Activar"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              <div className="min-w-0">
+                <p className="font-semibold text-[color:var(--chocolate-deep)]">{item.name}</p>
+                <p className="mt-1 truncate text-sm text-zinc-700">{item.email || "Sin email"}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Contacto</p>
+                <p className="mt-1 text-sm text-zinc-700">{item.contactName || "Sin contacto"}</p>
+                <p className="mt-0.5 text-xs text-zinc-500">{item.phone || "Sin teléfono"}</p>
+              </div>
+              <div className="flex items-center">
+                <Pill mini tone={item.isActive ? "success" : "warning"}>
+                  {item.isActive ? "Activo" : "Inactivo"}
+                </Pill>
+              </div>
+              <div className="flex md:justify-end">
+                <button
+                  className={`${buttonSoftClassName} w-full md:w-auto`}
+                  disabled={updatingId === item.id}
+                  onClick={() => void toggleActive(item)}
+                  type="button"
+                >
+                  {item.isActive ? "Desactivar" : "Activar"}
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className={emptyStateClassName}>No hay proveedores para mostrar.</p>
+        )}
       </div>
     </section>
   );

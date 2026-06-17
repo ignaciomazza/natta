@@ -167,6 +167,7 @@ export function getMercadoPagoTicketExpirationDate() {
 
 export async function createMercadoPagoPreference(input: {
   orderId: string;
+  receiptCode: string;
   externalReference: string;
   title: string;
   amountArs: number;
@@ -175,6 +176,14 @@ export async function createMercadoPagoPreference(input: {
   environment?: MercadoPagoEnvironment;
 }) {
   const appUrl = getAppUrl();
+  const getBackUrl = (payment: "success" | "failure" | "pending") => {
+    const params = new URLSearchParams({
+      order: input.orderId,
+      code: input.receiptCode,
+      payment,
+    });
+    return `${appUrl}/pedido?${params.toString()}`;
+  };
 
   return mercadoPagoRequest<MercadoPagoPreferenceResponse>(
     "/checkout/preferences",
@@ -201,9 +210,9 @@ export async function createMercadoPagoPreference(input: {
         ],
         notification_url: `${appUrl}/api/payments/webhook`,
         back_urls: {
-          success: `${appUrl}/pedido?order=${input.orderId}&payment=success`,
-          failure: `${appUrl}/pedido?order=${input.orderId}&payment=failure`,
-          pending: `${appUrl}/pedido?order=${input.orderId}&payment=pending`,
+          success: getBackUrl("success"),
+          failure: getBackUrl("failure"),
+          pending: getBackUrl("pending"),
         },
         auto_return: "approved",
       }),

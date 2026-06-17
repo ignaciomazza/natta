@@ -8,9 +8,10 @@ import {
   SectionTitle,
   buttonSoftClassName,
   controlRowClassName,
+  emptyStateClassName,
   fieldLabelClassName,
   inputClassName,
-  tableShellClassName,
+  listCardClassName,
 } from "@/components/internal/ui";
 
 type Customer = {
@@ -85,7 +86,6 @@ export function CustomersAdmin() {
   return (
     <section className="space-y-6">
       <SectionTitle
-        description="Alta y búsqueda de clientes."
         icon={UsersRound}
         title="Clientes"
       />
@@ -95,7 +95,6 @@ export function CustomersAdmin() {
       </div>
 
       <Disclosure
-        description="Buscá clientes por nombre, teléfono o email."
         title="Filtros de clientes"
         variant="dashed"
       >
@@ -121,7 +120,6 @@ export function CustomersAdmin() {
       </Disclosure>
 
       <Disclosure
-        description="Carga rápida para cliente nuevo."
         title="Nuevo cliente"
         variant="dashed"
       >
@@ -165,43 +163,30 @@ export function CustomersAdmin() {
         </p>
       ) : null}
 
-      <div className="divide-y divide-[color:var(--line)] rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 px-3 md:hidden">
-        {items.map((item) => (
-          <article className="py-3" key={item.id}>
-            <div>
-              <p className="font-semibold text-[color:var(--chocolate-deep)]">{item.name}</p>
-              <p className="text-xs text-zinc-500">{item.phone}</p>
-            </div>
-            <p className="mt-2 text-sm text-zinc-700">{item.email || "Sin email"}</p>
-            <p className="text-sm text-zinc-700">{item.address || "Sin dirección"}</p>
-          </article>
-        ))}
-      </div>
-
-      <div className={tableShellClassName}>
-        <table className="min-w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[color:var(--line)] text-left text-xs uppercase tracking-[0.12em] text-zinc-500">
-              <th className="px-3 py-3">Cliente</th>
-              <th className="px-3 py-3">Contacto</th>
-              <th className="px-3 py-3">Dirección</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr className="border-b border-[#e2ddd9] transition" key={item.id}>
-                <td className="px-3 py-3">
-                  <p className="font-medium text-zinc-900">{item.name}</p>
-                </td>
-                <td className="px-3 py-3">
-                  <p>{item.phone}</p>
-                  <p className="text-xs text-zinc-500">{item.email || "Sin email"}</p>
-                </td>
-                <td className="px-3 py-3">{item.address || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {items.length ? (
+          items.map((item) => (
+            <article
+              className={`${listCardClassName} md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] md:items-center`}
+              key={item.id}
+            >
+              <div className="min-w-0">
+                <p className="font-semibold text-[color:var(--chocolate-deep)]">{item.name}</p>
+                <p className="mt-1 text-sm text-zinc-700">{item.phone}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Contacto</p>
+                <p className="mt-1 truncate text-sm text-zinc-700">{item.email || "Sin email"}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">Dirección</p>
+                <p className="mt-1 text-sm text-zinc-700">{item.address || "Sin dirección"}</p>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className={emptyStateClassName}>No hay clientes para mostrar.</p>
+        )}
       </div>
     </section>
   );
