@@ -16,9 +16,6 @@
     "assets:placeholder": "node scripts/generate-placeholder-assets.mjs",
     "security:smoke": "node --import tsx scripts/payment-security-smoke-tests.ts"
   },
-  "prisma": {
-    "seed": "node --import tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
@@ -35,6 +32,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.6.1",
     "eslint": "^9",
     "eslint-config-next": "^16.2.9",
     "prisma": "^6.19.3",
