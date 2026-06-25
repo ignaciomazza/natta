@@ -5,7 +5,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/tenant";
 import { logServerError } from "@/lib/server/log";
-import { createPaymentExternalReference, createPublicReceiptCode, paymentKindByMode, calculateOrderTotals } from "@/lib/orders";
+import {
+  calculateOrderTotals,
+  createPaymentExternalReference,
+  createPublicReceiptCode,
+  paymentKindByOrderPaymentOption,
+  resolveOrderPaymentOption,
+} from "@/lib/orders";
 import { validateCapacityForOrder } from "@/lib/capacity";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
 import { isCatalogPairAvailable } from "@/lib/catalog-db";
@@ -19,6 +25,7 @@ const orderCreateSchema = z.object({
   }),
   deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   fulfillmentMode: z.enum(["pickup", "delivery"]),
+  paymentOption: z.enum(["deposit", "full"]).optional(),
   notes: z.string().max(1000).optional(),
   items: z
     .array(
@@ -149,6 +156,7 @@ export async function POST(req: NextRequest) {
     const body = orderCreateSchema.parse(await req.json());
 
     const mode = mapFulfillmentMode(body.fulfillmentMode);
+    const paymentOption = resolveOrderPaymentOption(mode, body.paymentOption);
     const pairKeys = body.items.map((item) => `${item.flavorId}::${item.sizeId}`);
     const prices = await prisma.price.findMany({
       where: {
@@ -210,7 +218,7 @@ export async function POST(req: NextRequest) {
       })),
     });
 
-    const totals = calculateOrderTotals(mode, orderItems);
+    const totals = calculateOrderTotals(mode, orderItems, paymentOption);
 
     const customer = await prisma.customer.upsert({
       where: {
@@ -270,7 +278,7 @@ export async function POST(req: NextRequest) {
       data: {
         orderId: order.id,
         customerId: customer.id,
-        kind: paymentKindByMode(mode),
+        kind: paymentKindByOrderPaymentOption(mode, paymentOption),
         status: "PENDING",
         method: PaymentMethod.MERCADO_PAGO,
         amountArs: order.amountDueNowArs,

@@ -113,6 +113,7 @@ export async function GET(
     order: {
       id: order.id,
       status: order.status,
+      amountDueNowArs: order.amountDueNowArs,
       amountPaidArs: order.amountPaidArs,
       amountBalanceArs: order.amountBalanceArs,
       subtotalArs: order.subtotalArs,

@@ -18,6 +18,22 @@ assert.equal(pickupTotals.subtotalArs, 23000);
 assert.equal(pickupTotals.amountDueNowArs, 11500);
 assert.equal(pickupTotals.amountBalanceArs, 11500);
 
+const pickupFullTotals = calculateOrderTotals(
+  "PICKUP",
+  [
+    {
+      flavorId: "flavor",
+      sizeId: "size",
+      quantity: 1,
+      unitPriceArs: 23000,
+    },
+  ],
+  "full",
+);
+assert.equal(pickupFullTotals.subtotalArs, 23000);
+assert.equal(pickupFullTotals.amountDueNowArs, 23000);
+assert.equal(pickupFullTotals.amountBalanceArs, 0);
+
 const deliveryTotals = calculateOrderTotals("DELIVERY", [
   {
     flavorId: "flavor",
@@ -78,4 +94,3 @@ assert.equal(normalizeProviderAmountArs(-1), null);
 assert.equal(normalizeProviderAmountArs(undefined), null);
 
 console.log("Payment security smoke tests passed");
-

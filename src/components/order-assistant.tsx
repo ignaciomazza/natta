@@ -79,6 +79,7 @@ type OrderPaymentsSnapshot = {
   order: {
     id: string;
     status: string;
+    amountDueNowArs: number;
     amountPaidArs: number;
     amountBalanceArs: number;
     subtotalArs: number;
@@ -142,6 +143,7 @@ type QuantityMap = Record<string, number>;
 type StepIndex = 0 | 1 | 2 | 3;
 type AssistantView = "builder" | "payment" | "success";
 type PaymentChoice = "wallet" | "card";
+type PaymentAmountChoice = "deposit" | "full";
 type FlavorPhoto = {
   src: string;
   alt: string;
@@ -323,7 +325,7 @@ function getDueCopy(
     return `Pagás la seña desde la web. Saldo al retirar: ${formatMoney(balanceArs)}.`;
   }
 
-  return "Pagás la seña desde la web.";
+  return "Pagás el total desde la web. No queda saldo al retirar.";
 }
 
 function getReturnStateMessage(returnState: string | null) {
@@ -395,6 +397,8 @@ export function OrderAssistant() {
   const [quantities, setQuantities] = useState<QuantityMap>({});
   const [date, setDate] = useState("");
   const [mode, setMode] = useState<FulfillmentMode>("pickup");
+  const [paymentAmountChoice, setPaymentAmountChoice] =
+    useState<PaymentAmountChoice>("deposit");
   const [customer, setCustomer] = useState({
     name: "",
     phone: "",
@@ -523,7 +527,11 @@ export function OrderAssistant() {
 
   const totalUnits = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalArs = selectedItems.reduce((sum, item) => sum + item.subtotalArs, 0);
-  const dueNowArs = mode === "pickup" ? Math.ceil(totalArs / 2) : totalArs;
+  const resolvedPaymentAmountChoice =
+    mode === "pickup" ? paymentAmountChoice : "full";
+  const pickupDepositArs = Math.ceil(totalArs / 2);
+  const dueNowArs =
+    resolvedPaymentAmountChoice === "deposit" ? pickupDepositArs : totalArs;
   const balanceArs = Math.max(0, totalArs - dueNowArs);
 
   const availabilityReference = new Date();
@@ -577,7 +585,14 @@ export function OrderAssistant() {
   const summaryMode = paymentSnapshot?.order.fulfillmentMode ?? mode;
   const summaryTotalArs = paymentSnapshot?.order.subtotalArs ?? totalArs;
   const summaryBalanceArs = paymentSnapshot?.order.amountBalanceArs ?? balanceArs;
-  const summaryDueNowArs = checkoutSession?.amountArs ?? dueNowArs;
+  const snapshotAmountRequiredArs = paymentSnapshot
+    ? Math.max(
+        0,
+        paymentSnapshot.order.amountDueNowArs - paymentSnapshot.order.amountPaidArs,
+      )
+    : null;
+  const summaryDueNowArs =
+    checkoutSession?.amountArs ?? snapshotAmountRequiredArs ?? dueNowArs;
   const summaryPaidArs =
     paymentSnapshot?.order.amountPaidArs ??
     (paymentResult?.status === "APPROVED" ? paymentResult.amountArs : 0);
@@ -784,6 +799,11 @@ export function OrderAssistant() {
     const deliveryDate = payload.order.deliveryDate.split("T")[0] ?? payload.order.deliveryDate;
     setDate(deliveryDate);
     setMode(isDeliveryMode(payload.order.fulfillmentMode) ? "delivery" : "pickup");
+    setPaymentAmountChoice(
+      !isDeliveryMode(payload.order.fulfillmentMode) && payload.order.amountBalanceArs > 0
+        ? "deposit"
+        : "full",
+    );
     setCustomer({
       name: payload.order.customer.name,
       phone: payload.order.customer.phone,
@@ -816,11 +836,7 @@ export function OrderAssistant() {
         });
         if (cancelled) return;
 
-        const hasApprovedPayment = snapshot.payments.some(
-          (payment) => payment.status === "APPROVED",
-        );
-
-        if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
+        if (snapshot.order.amountPaidArs < snapshot.order.amountDueNowArs) {
           await refreshCheckoutSession(createdOrderId);
         }
       } catch (error) {
@@ -955,6 +971,7 @@ export function OrderAssistant() {
       const orderPayload = {
         deliveryDate: date,
         fulfillmentMode: mode,
+        paymentOption: resolvedPaymentAmountChoice,
         customer: {
           name: customer.name,
           phone: customer.phone,
@@ -1033,11 +1050,7 @@ export function OrderAssistant() {
       const snapshot = await refreshPaymentSnapshot(createdOrderId, {
         syncPaymentId: returnPaymentId,
       });
-      const hasApprovedPayment = snapshot.payments.some(
-        (payment) => payment.status === "APPROVED",
-      );
-
-      if (snapshot.order.amountBalanceArs > 0 && !hasApprovedPayment) {
+      if (snapshot.order.amountPaidArs < snapshot.order.amountDueNowArs) {
         await refreshCheckoutSession(createdOrderId);
       }
     } catch (error) {
@@ -1402,7 +1415,7 @@ export function OrderAssistant() {
                 >
                   <MapPin className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
                   <span className="block font-semibold">Retiro Devoto</span>
-                  <span className="mt-1 block text-sm opacity-80">Seña desde la web del 50%</span>
+                  <span className="mt-1 block text-sm opacity-80">50% o total desde la web</span>
                 </button>
                 <button
                   className={`order-card rounded-[1rem] p-3 text-left transition sm:rounded-[1.35rem] sm:p-4 ${
@@ -1519,6 +1532,57 @@ export function OrderAssistant() {
                     <strong className="font-mono">{formatMoney(summaryTotalArs)}</strong>
                   </div>
                 </div>
+
+                {mode === "pickup" ? (
+                  <div className="mt-4 rounded-2xl bg-[var(--milk)] p-3 shadow-[0_6px_16px_rgba(43,26,24,0.06)] sm:mt-5 sm:p-4">
+                    <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--sage)] sm:text-xs sm:tracking-[0.2em]">
+                      Forma de abono
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                      <button
+                        className={`rounded-2xl px-3 py-3 text-left transition ${
+                          paymentAmountChoice === "deposit"
+                            ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_8px_20px_rgba(43,26,24,0.14)]"
+                            : "bg-white/68 text-[var(--chocolate)] shadow-[0_4px_12px_rgba(43,26,24,0.045)] hover:bg-white"
+                        }`}
+                        onClick={() => setPaymentAmountChoice("deposit")}
+                        type="button"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          <ReceiptText className="h-4 w-4 shrink-0" />
+                          50% ahora
+                        </span>
+                        <span className="mt-1 block font-mono text-xs opacity-80">
+                          {formatMoney(pickupDepositArs)}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 opacity-75">
+                          El resto al retirar.
+                        </span>
+                      </button>
+
+                      <button
+                        className={`rounded-2xl px-3 py-3 text-left transition ${
+                          paymentAmountChoice === "full"
+                            ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_8px_20px_rgba(43,26,24,0.14)]"
+                            : "bg-white/68 text-[var(--chocolate)] shadow-[0_4px_12px_rgba(43,26,24,0.045)] hover:bg-white"
+                        }`}
+                        onClick={() => setPaymentAmountChoice("full")}
+                        type="button"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          <CreditCard className="h-4 w-4 shrink-0" />
+                          100% ahora
+                        </span>
+                        <span className="mt-1 block font-mono text-xs opacity-80">
+                          {formatMoney(totalArs)}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 opacity-75">
+                          Sin saldo pendiente.
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 rounded-2xl bg-[var(--milk)] p-3 shadow-[0_6px_16px_rgba(43,26,24,0.06)] sm:mt-5 sm:p-4">
                   <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--sage)] sm:text-xs sm:tracking-[0.2em]">

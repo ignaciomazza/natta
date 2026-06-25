@@ -8,17 +8,29 @@ export type BuildOrderInputItem = {
   unitPriceArs: number;
 };
 
+export type OrderPaymentOption = "deposit" | "full";
+
+export function resolveOrderPaymentOption(
+  mode: FulfillmentMode,
+  option?: OrderPaymentOption,
+): OrderPaymentOption {
+  if (mode === "DELIVERY") return "full";
+  return option === "full" ? "full" : "deposit";
+}
+
 export function calculateOrderTotals(
   mode: FulfillmentMode,
   items: BuildOrderInputItem[],
+  paymentOption?: OrderPaymentOption,
 ) {
   const subtotalArs = items.reduce(
     (sum, item) => sum + item.quantity * item.unitPriceArs,
     0,
   );
 
+  const resolvedPaymentOption = resolveOrderPaymentOption(mode, paymentOption);
   const amountDueNowArs =
-    mode === "PICKUP" ? Math.ceil(subtotalArs / 2) : subtotalArs;
+    resolvedPaymentOption === "deposit" ? Math.ceil(subtotalArs / 2) : subtotalArs;
 
   return {
     subtotalArs,
@@ -27,8 +39,26 @@ export function calculateOrderTotals(
   };
 }
 
+export function paymentKindByOrderPaymentOption(
+  mode: FulfillmentMode,
+  option?: OrderPaymentOption,
+): PaymentKind {
+  return resolveOrderPaymentOption(mode, option) === "deposit" ? "DEPOSIT" : "FULL";
+}
+
 export function paymentKindByMode(mode: FulfillmentMode): PaymentKind {
-  return mode === "PICKUP" ? "DEPOSIT" : "FULL";
+  return paymentKindByOrderPaymentOption(mode);
+}
+
+export function paymentKindByOrderTotals(order: {
+  fulfillmentMode: FulfillmentMode;
+  amountBalanceArs: number;
+}): PaymentKind {
+  if (order.fulfillmentMode === "PICKUP" && order.amountBalanceArs > 0) {
+    return "DEPOSIT";
+  }
+
+  return "FULL";
 }
 
 export function nextOrderStatusFromPayment(

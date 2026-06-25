@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       receiptCode: order.publicReceiptCode,
       externalReference: pendingPayment.externalReference ?? `natta_${order.id}`,
       title:
-        order.fulfillmentMode === "PICKUP"
+        pendingPayment.kind === "DEPOSIT"
           ? `Seña pedido Natta ${order.publicReceiptCode}`
           : `Pago pedido Natta ${order.publicReceiptCode}`,
       amountArs: pendingPayment.amountArs,

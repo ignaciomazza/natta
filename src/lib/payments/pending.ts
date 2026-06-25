@@ -2,7 +2,7 @@ import type { FulfillmentMode, Payment, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   createPaymentExternalReference,
-  paymentKindByMode,
+  paymentKindByOrderTotals,
 } from "@/lib/orders";
 
 type OrderForPendingPayment = {
@@ -11,6 +11,7 @@ type OrderForPendingPayment = {
   fulfillmentMode: FulfillmentMode;
   amountDueNowArs: number;
   amountPaidArs: number;
+  amountBalanceArs: number;
   customer: {
     name: string;
     phone: string;
@@ -46,7 +47,7 @@ export async function getOrCreatePendingPaymentForOrder(
     data: {
       orderId: order.id,
       customerId: order.customerId,
-      kind: paymentKindByMode(order.fulfillmentMode),
+      kind: paymentKindByOrderTotals(order),
       status: "PENDING",
       method: "MERCADO_PAGO",
       amountArs,
@@ -57,4 +58,3 @@ export async function getOrCreatePendingPaymentForOrder(
     },
   });
 }
-
