@@ -8,7 +8,6 @@ import {
   Toggle,
   buttonGhostClassName,
   buttonSoftClassName,
-  controlRowClassName,
   fieldLabelClassName,
   inputClassName,
 } from "@/components/internal/ui";
@@ -496,48 +495,46 @@ function UnitCounter({
   return (
     <div className="min-w-0">
       <p className={fieldLabelClassName}>{label}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <div
-          className={`inline-grid h-12 grid-cols-[2.75rem_minmax(5rem,7rem)_2.75rem] overflow-hidden rounded-[1.35rem] bg-white/85 shadow-[0_10px_24px_rgba(43,26,24,0.07)] ring-1 ring-[rgba(94,83,76,0.13)] ${
-            disabled ? "opacity-55" : ""
-          }`}
-        >
-          <button
-            aria-label="Restar cupo"
-            className="inline-flex items-center justify-center text-zinc-600 transition hover:bg-[color:var(--surface-soft)] disabled:cursor-not-allowed disabled:text-zinc-300"
-            disabled={!canDecrease}
-            onClick={() => step(-1)}
-            type="button"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <input
-            className="min-w-0 bg-transparent px-1 text-center text-sm font-semibold text-[color:var(--chocolate-deep)] outline-none placeholder:font-normal placeholder:text-zinc-400 disabled:cursor-not-allowed"
-            disabled={disabled}
-            inputMode="numeric"
-            onChange={(event) => onChange(sanitizeUnitInput(event.target.value))}
-            pattern="[0-9]*"
-            placeholder={placeholder}
-            value={isEmpty ? "" : value}
-          />
-          <button
-            aria-label="Sumar cupo"
-            className="inline-flex items-center justify-center text-zinc-600 transition hover:bg-[color:var(--surface-soft)] disabled:cursor-not-allowed disabled:text-zinc-300"
-            disabled={disabled}
-            onClick={() => step(1)}
-            type="button"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-
+      <div
+        className={`mt-2 grid h-12 w-full min-w-[12rem] max-w-[18rem] grid-cols-[2.65rem_minmax(4.5rem,1fr)_2.65rem_2.65rem] overflow-hidden rounded-[1.35rem] bg-white/85 shadow-[0_10px_24px_rgba(43,26,24,0.07)] ring-1 ring-[rgba(94,83,76,0.13)] ${
+          disabled ? "opacity-55" : ""
+        }`}
+      >
         <button
-          className="h-12 rounded-[1.35rem] border border-transparent px-3 text-sm text-zinc-600 transition hover:border-[color:var(--line)] hover:text-[color:var(--chocolate-deep)] disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label="Restar cupo"
+          className="inline-flex items-center justify-center text-zinc-600 transition hover:bg-[color:var(--surface-soft)] disabled:cursor-not-allowed disabled:text-zinc-300"
+          disabled={!canDecrease}
+          onClick={() => step(-1)}
+          type="button"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <input
+          className="min-w-0 bg-transparent px-1 text-center text-sm font-semibold text-[color:var(--chocolate-deep)] outline-none placeholder:font-normal placeholder:text-zinc-400 disabled:cursor-not-allowed"
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(event) => onChange(sanitizeUnitInput(event.target.value))}
+          pattern="[0-9]*"
+          placeholder={placeholder}
+          value={isEmpty ? "" : value}
+        />
+        <button
+          aria-label="Sumar cupo"
+          className="inline-flex items-center justify-center text-zinc-600 transition hover:bg-[color:var(--surface-soft)] disabled:cursor-not-allowed disabled:text-zinc-300"
+          disabled={disabled}
+          onClick={() => step(1)}
+          type="button"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          aria-label="Liberar cupo"
+          className="inline-flex items-center justify-center border-l border-[color:var(--line)]/75 text-zinc-500 transition hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--chocolate-deep)] disabled:cursor-not-allowed disabled:text-zinc-300"
           disabled={disabled || isEmpty}
           onClick={() => onChange("")}
           type="button"
         >
-          Libre
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
@@ -1025,7 +1022,7 @@ export function CapacityAdmin() {
       </div>
 
       <div className="space-y-6">
-        <section className="rounded-[1.6rem] bg-[color:var(--milk)]/92 p-4 shadow-[0_18px_40px_-32px_rgba(38,35,33,0.72),0_8px_20px_-18px_rgba(82,74,70,0.5)]">
+        <section className="rounded-[1.6rem] bg-[color:var(--milk)]/92 p-5 shadow-[0_18px_40px_-32px_rgba(38,35,33,0.72),0_8px_20px_-18px_rgba(82,74,70,0.5)]">
           <button
             aria-controls="regla-semanal-contenido"
             aria-expanded={weeklyPanelOpen}
@@ -1061,7 +1058,7 @@ export function CapacityAdmin() {
                   : "pointer-events-none overflow-hidden"
               }
             >
-              <form className="space-y-5" onSubmit={saveWeekday}>
+              <form className="space-y-6" onSubmit={saveWeekday}>
                 <div className="flex flex-wrap gap-2">
                   {weekdayOptions.map((option) => (
                     <button
@@ -1079,7 +1076,7 @@ export function CapacityAdmin() {
                   ))}
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)] sm:items-end">
+                <div className="grid gap-4 xl:grid-cols-[minmax(18rem,40rem)_minmax(20rem,1fr)] xl:items-end">
                   <label className={`${fieldLabelClassName} block`}>
                     Cupo máximo general
                     <input
@@ -1092,7 +1089,7 @@ export function CapacityAdmin() {
                     />
                   </label>
 
-                  <div className={controlRowClassName}>
+                  <div className="flex min-h-12 flex-wrap items-center gap-4">
                     <Toggle
                       checked={weekdayAutoCapacity}
                       label="Cupo auto"
@@ -1111,7 +1108,7 @@ export function CapacityAdmin() {
                   </div>
                 </div>
 
-                <div className="border-t border-[color:var(--line)] pt-4">
+                <div className="border-t border-[color:var(--line)] pt-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
@@ -1127,7 +1124,7 @@ export function CapacityAdmin() {
 
                   {selectedWeeklyFlavor ? (
                     <>
-                      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(14rem,0.9fr)_auto] lg:items-end lg:justify-start">
+                      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(18rem,1fr)_minmax(12rem,18rem)] xl:items-end">
                         <FlavorPicker
                           label="Sabor"
                           onOpenChange={setWeeklyFlavorPickerOpen}
@@ -1160,16 +1157,13 @@ export function CapacityAdmin() {
                       </div>
 
                       {selectedWeeklyFlavor.sizes.length ? (
-                        <div className="mt-4 border-t border-[color:var(--line)] pt-4">
+                        <div className="mt-5 border-t border-[color:var(--line)] pt-5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                               Cupos por tamaño
                             </p>
-                            <Pill mini tone="info">
-                              Heredan si quedan libres
-                            </Pill>
                           </div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             {selectedWeeklyFlavor.sizes.map((size) => (
                               <UnitCounter
                                 disabled={!weekdayOpen}
@@ -1227,11 +1221,7 @@ export function CapacityAdmin() {
                               </button>
                             ))}
                           </>
-                        ) : (
-                          <p className="text-sm text-zinc-500">
-                            Sin sabores con cupo específico.
-                          </p>
-                        )}
+                        ) : null}
                       </div>
                     </>
                   ) : (
@@ -1336,9 +1326,7 @@ export function CapacityAdmin() {
                           </Pill>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-sm text-zinc-500">Sin cupos específicos cargados</p>
-                    )}
+                    ) : null}
                   </div>
 
                   <button
@@ -1370,7 +1358,7 @@ export function CapacityAdmin() {
           <section
             aria-labelledby="exception-title"
             aria-modal="true"
-            className="relative z-10 max-h-[min(92vh,58rem)] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-[color:var(--milk)] p-5 shadow-[0_28px_70px_-36px_rgba(38,35,33,0.72),0_16px_34px_-22px_rgba(82,74,70,0.48)] sm:p-6"
+            className="relative z-10 max-h-[min(92vh,58rem)] w-full max-w-6xl overflow-y-auto rounded-[2rem] bg-[color:var(--milk)] p-5 shadow-[0_28px_70px_-36px_rgba(38,35,33,0.72),0_16px_34px_-22px_rgba(82,74,70,0.48)] sm:p-6"
             role="dialog"
           >
             <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] pb-4">
@@ -1399,8 +1387,8 @@ export function CapacityAdmin() {
               </button>
             </div>
 
-            <form className="mt-5 space-y-5" onSubmit={saveException}>
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] sm:items-end">
+            <form className="mt-5 space-y-6" onSubmit={saveException}>
+              <div className="grid gap-5 lg:grid-cols-[minmax(18rem,1fr)_20rem] lg:items-end">
                 <label className={`${fieldLabelClassName} block`}>
                   Cupo máximo general
                   <input
@@ -1426,7 +1414,7 @@ export function CapacityAdmin() {
                   />
                 </label>
 
-                <div className="text-sm text-zinc-700 sm:border-l sm:border-[color:var(--line)] sm:pl-4">
+                <div className="text-sm text-zinc-700 lg:border-l lg:border-[color:var(--line)] lg:pl-5">
                   <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                     Estado actual
                   </p>
@@ -1449,8 +1437,8 @@ export function CapacityAdmin() {
                 </div>
               </div>
 
-              <div className="border-t border-[color:var(--line)] pt-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="border-t border-[color:var(--line)] pt-5">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
                   <div>
                     <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                       Cupos por sabor de esta fecha
@@ -1495,7 +1483,7 @@ export function CapacityAdmin() {
 
                 {selectedExceptionFlavor ? (
                   <>
-                    <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(14rem,0.9fr)_auto_minmax(0,1fr)] lg:items-end">
+                    <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(18rem,1fr)_minmax(12rem,18rem)_minmax(14rem,0.8fr)] xl:items-end">
                       <FlavorPicker
                         label="Sabor"
                         onOpenChange={setExceptionFlavorPickerOpen}
@@ -1534,7 +1522,7 @@ export function CapacityAdmin() {
                         value={selectedExceptionFlavor.maxInput}
                       />
 
-                      <div className="pb-1">
+                      <div className="pb-1 xl:pl-2">
                         <div className="flex flex-wrap items-center gap-3">
                           <Toggle
                             checked={selectedExceptionFlavor.isClosed}
@@ -1566,19 +1554,16 @@ export function CapacityAdmin() {
                     </div>
 
                     {selectedExceptionFlavor.sizes.length ? (
-                      <div className="mt-4 border-t border-[color:var(--line)] pt-4">
+                      <div className="mt-5 border-t border-[color:var(--line)] pt-5">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                             Cupos por tamaño de este sabor
                           </p>
-                          <Pill mini tone="info">
-                            Heredan si quedan libres
-                          </Pill>
                         </div>
-                        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        <div className="mt-4 grid gap-x-8 gap-y-5 xl:grid-cols-2">
                           {selectedExceptionFlavor.sizes.map((size) => (
                             <div
-                              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                              className="grid gap-3 sm:grid-cols-[minmax(12rem,18rem)_minmax(12rem,1fr)] sm:items-end"
                               key={size.sizeId}
                             >
                               <UnitCounter
@@ -1642,7 +1627,7 @@ export function CapacityAdmin() {
                       </div>
                     ) : null}
 
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
                       {exceptionSpecificFlavors.length ? (
                         exceptionSpecificFlavors.map((flavor) => (
                           <button
@@ -1659,11 +1644,7 @@ export function CapacityAdmin() {
                             {formatExceptionFlavorChip(flavor)}
                           </button>
                         ))
-                      ) : (
-                        <p className="text-sm text-zinc-500">
-                          Sin cupos específicos para esta fecha.
-                        </p>
-                      )}
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -1671,7 +1652,7 @@ export function CapacityAdmin() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--line)] pt-4">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--line)] pt-5">
                 <button
                   className={buttonSoftClassName}
                   disabled={savingException}
