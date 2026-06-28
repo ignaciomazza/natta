@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Minus, Plus, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Minus, Plus, SquarePen, X } from "lucide-react";
 import {
   Pill,
   SectionTitle,
@@ -1034,6 +1034,9 @@ export function CapacityAdmin() {
               <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
                 Regla semanal
               </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Base por día para cupos generales, sabores y tamaños.
+              </p>
             </div>
             <ChevronDown
               className={`mt-0.5 h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-300 ${
@@ -1330,11 +1333,12 @@ export function CapacityAdmin() {
                   </div>
 
                   <button
-                    className={`${buttonSoftClassName} whitespace-nowrap`}
+                    className={`${buttonSoftClassName} inline-flex items-center gap-2 whitespace-nowrap`}
                     onClick={() => openExceptionEditor(item)}
                     type="button"
                   >
-                    Editar fecha
+                    <SquarePen className="h-4 w-4" />
+                    Editar
                   </button>
                 </article>
               );
