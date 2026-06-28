@@ -27,6 +27,21 @@ export type FlavorCapacityDay = {
   source: "none" | "weekday" | "override";
   hasOverride: boolean;
   overrideNote: string | null;
+  sizes: FlavorSizeCapacityDay[];
+};
+
+export type FlavorSizeCapacityDay = {
+  sizeId: string;
+  sizeSlug: string;
+  sizeName: string;
+  isClosed: boolean;
+  maxUnits: number | null;
+  weekdayMaxUnits: number | null;
+  bookedUnits: number;
+  availableUnits: number | null;
+  source: "none" | "weekday" | "override";
+  hasOverride: boolean;
+  overrideNote: string | null;
 };
 
 function toDateOnlyString(date: Date) {
@@ -95,8 +110,17 @@ export async function getCapacityCalendar(input?: {
     return toDateOnlyString(cursor);
   });
 
-  const [rules, overrides, flavorRules, flavorOverrides, activeFlavors, orderItems] =
-    await Promise.all([
+  const [
+    rules,
+    overrides,
+    flavorRules,
+    flavorOverrides,
+    flavorSizeRules,
+    flavorSizeOverrides,
+    activeFlavors,
+    activePrices,
+    orderItems,
+  ] = await Promise.all([
     prisma.weekdayCapacityRule.findMany(),
     prisma.dateCapacityOverride.findMany({
       where: {
@@ -121,6 +145,21 @@ export async function getCapacityCalendar(input?: {
       }),
       [],
     ),
+    withMissingCapacityTableFallback(
+      () => prisma.weekdayFlavorSizeCapacityRule.findMany(),
+      [],
+    ),
+    withMissingCapacityTableFallback(
+      () => prisma.dateFlavorSizeCapacityOverride.findMany({
+        where: {
+          date: {
+            gte: new Date(`${dateList[0]}T00:00:00`),
+            lte: new Date(`${dateList[dateList.length - 1]}T23:59:59`),
+          },
+        },
+      }),
+      [],
+    ),
     prisma.flavor.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
@@ -128,6 +167,23 @@ export async function getCapacityCalendar(input?: {
         id: true,
         slug: true,
         name: true,
+      },
+    }),
+    prisma.price.findMany({
+      where: {
+        flavor: { isActive: true },
+        size: { isActive: true },
+      },
+      select: {
+        flavorId: true,
+        size: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            sortOrder: true,
+          },
+        },
       },
     }),
     prisma.orderItem.findMany({
@@ -144,6 +200,7 @@ export async function getCapacityCalendar(input?: {
       },
       select: {
         flavorId: true,
+        sizeId: true,
         quantity: true,
         order: {
           select: {
@@ -156,6 +213,7 @@ export async function getCapacityCalendar(input?: {
 
   const bookedUnitsByDate = new Map<string, number>();
   const bookedUnitsByDateAndFlavor = new Map<string, number>();
+  const bookedUnitsByDateFlavorAndSize = new Map<string, number>();
   for (const item of orderItems) {
     const key = toDateOnlyString(item.order.deliveryDate);
     const current = bookedUnitsByDate.get(key) ?? 0;
@@ -164,6 +222,23 @@ export async function getCapacityCalendar(input?: {
     const flavorKey = `${key}::${item.flavorId}`;
     const currentFlavor = bookedUnitsByDateAndFlavor.get(flavorKey) ?? 0;
     bookedUnitsByDateAndFlavor.set(flavorKey, currentFlavor + item.quantity);
+
+    const sizeKey = `${flavorKey}::${item.sizeId}`;
+    const currentSize = bookedUnitsByDateFlavorAndSize.get(sizeKey) ?? 0;
+    bookedUnitsByDateFlavorAndSize.set(sizeKey, currentSize + item.quantity);
+  }
+
+  const sizesByFlavor = new Map<
+    string,
+    Array<{ id: string; slug: string; name: string; sortOrder: number }>
+  >();
+  for (const price of activePrices) {
+    const current = sizesByFlavor.get(price.flavorId) ?? [];
+    current.push(price.size);
+    sizesByFlavor.set(price.flavorId, current);
+  }
+  for (const sizes of sizesByFlavor.values()) {
+    sizes.sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
   }
 
   const ruleByWeekday = new Map(rules.map((rule) => [rule.weekday, rule]));
@@ -176,6 +251,18 @@ export async function getCapacityCalendar(input?: {
   const flavorOverrideByDateAndFlavor = new Map(
     flavorOverrides.map((override) => [
       `${toDateOnlyString(override.date)}::${override.flavorId}`,
+      override,
+    ]),
+  );
+  const flavorSizeRuleByWeekdayFlavorAndSize = new Map(
+    flavorSizeRules.map((rule) => [
+      `${rule.weekday}::${rule.flavorId}::${rule.sizeId}`,
+      rule,
+    ]),
+  );
+  const flavorSizeOverrideByDateFlavorAndSize = new Map(
+    flavorSizeOverrides.map((override) => [
+      `${toDateOnlyString(override.date)}::${override.flavorId}::${override.sizeId}`,
       override,
     ]),
   );
@@ -224,6 +311,48 @@ export async function getCapacityCalendar(input?: {
       const flavorAvailableUnits = flavorMaxUnits === null
         ? null
         : Math.max(0, flavorMaxUnits - flavorBookedUnits);
+      const sizes: FlavorSizeCapacityDay[] = (sizesByFlavor.get(flavor.id) ?? []).map(
+        (size) => {
+          const sizeKey = `${flavorKey}::${size.id}`;
+          const weekdaySizeRule = flavorSizeRuleByWeekdayFlavorAndSize.get(
+            `${weekday}::${flavor.id}::${size.id}`,
+          );
+          const sizeOverride = flavorSizeOverrideByDateFlavorAndSize.get(sizeKey);
+          const sizeBookedUnits =
+            bookedUnitsByDateFlavorAndSize.get(sizeKey) ?? 0;
+          const hasSizeOverride =
+            Boolean(sizeOverride) &&
+            (sizeOverride?.isClosed === true ||
+              sizeOverride?.maxUnits !== null ||
+              Boolean(sizeOverride?.note));
+          const sizeWeekdayMaxUnits = weekdaySizeRule?.maxUnits ?? null;
+          const sizeIsClosed = flavorIsClosed || sizeOverride?.isClosed === true;
+          const sizeMaxUnits = sizeIsClosed
+            ? 0
+            : (sizeOverride?.maxUnits ?? sizeWeekdayMaxUnits);
+          const sizeAvailableUnits = sizeMaxUnits === null
+            ? null
+            : Math.max(0, sizeMaxUnits - sizeBookedUnits);
+
+          return {
+            sizeId: size.id,
+            sizeSlug: size.slug,
+            sizeName: size.name,
+            isClosed: sizeIsClosed,
+            maxUnits: sizeMaxUnits,
+            weekdayMaxUnits: sizeWeekdayMaxUnits,
+            bookedUnits: sizeBookedUnits,
+            availableUnits: sizeIsClosed ? 0 : sizeAvailableUnits,
+            source: hasSizeOverride
+              ? "override"
+              : sizeWeekdayMaxUnits !== null
+                ? "weekday"
+                : "none",
+            hasOverride: hasSizeOverride,
+            overrideNote: hasSizeOverride ? (sizeOverride?.note ?? null) : null,
+          };
+        },
+      );
 
       return {
         flavorId: flavor.id,
@@ -241,6 +370,7 @@ export async function getCapacityCalendar(input?: {
             : "none",
         hasOverride: hasFlavorOverride,
         overrideNote: hasFlavorOverride ? (flavorOverride?.note ?? null) : null,
+        sizes,
       };
     });
 
@@ -270,24 +400,57 @@ export async function validateCapacityForOrder(input: {
     flavorId: string;
     quantity: number;
   }>;
+  requestedFlavorSizeUnits?: Array<{
+    flavorId: string;
+    sizeId: string;
+    quantity: number;
+  }>;
 }) {
   const date = input.deliveryDate;
   const weekday = getWeekdayFromDateString(date);
+  const dateAtNoon = getDateAtNoon(date);
   const requestedByFlavor = new Map<string, number>();
+  const hasExplicitFlavorUnits = Boolean(input.requestedFlavorUnits?.length);
   for (const item of input.requestedFlavorUnits ?? []) {
     const current = requestedByFlavor.get(item.flavorId) ?? 0;
     requestedByFlavor.set(item.flavorId, current + item.quantity);
   }
-  const requestedFlavorIds = [...requestedByFlavor.keys()];
+  const requestedByFlavorAndSize = new Map<
+    string,
+    { flavorId: string; sizeId: string; quantity: number }
+  >();
+  for (const item of input.requestedFlavorSizeUnits ?? []) {
+    const key = `${item.flavorId}::${item.sizeId}`;
+    const current = requestedByFlavorAndSize.get(key);
+    requestedByFlavorAndSize.set(key, {
+      flavorId: item.flavorId,
+      sizeId: item.sizeId,
+      quantity: (current?.quantity ?? 0) + item.quantity,
+    });
 
-  const [rule, override, existingItems, flavorRules, flavorOverrides] =
-    await Promise.all([
+    if (!hasExplicitFlavorUnits) {
+      const currentFlavor = requestedByFlavor.get(item.flavorId) ?? 0;
+      requestedByFlavor.set(item.flavorId, currentFlavor + item.quantity);
+    }
+  }
+  const requestedFlavorIds = [...requestedByFlavor.keys()];
+  const requestedFlavorSizePairs = [...requestedByFlavorAndSize.values()];
+
+  const [
+    rule,
+    override,
+    existingItems,
+    flavorRules,
+    flavorOverrides,
+    flavorSizeRules,
+    flavorSizeOverrides,
+  ] = await Promise.all([
     prisma.weekdayCapacityRule.findUnique({
       where: { weekday },
     }),
     prisma.dateCapacityOverride.findUnique({
       where: {
-        date: getDateAtNoon(date),
+        date: dateAtNoon,
       },
     }),
     prisma.orderItem.findMany({
@@ -296,11 +459,12 @@ export async function validateCapacityForOrder(input: {
           status: {
             not: "CANCELLED",
           },
-          deliveryDate: getDateAtNoon(date),
+          deliveryDate: dateAtNoon,
         },
       },
       select: {
         flavorId: true,
+        sizeId: true,
         quantity: true,
       },
     }),
@@ -325,6 +489,34 @@ export async function validateCapacityForOrder(input: {
               flavorId: {
                 in: requestedFlavorIds,
               },
+            },
+          }),
+          [],
+        )
+      : Promise.resolve([]),
+    requestedFlavorSizePairs.length
+      ? withMissingCapacityTableFallback(
+          () => prisma.weekdayFlavorSizeCapacityRule.findMany({
+            where: {
+              weekday,
+              OR: requestedFlavorSizePairs.map((item) => ({
+                flavorId: item.flavorId,
+                sizeId: item.sizeId,
+              })),
+            },
+          }),
+          [],
+        )
+      : Promise.resolve([]),
+    requestedFlavorSizePairs.length
+      ? withMissingCapacityTableFallback(
+          () => prisma.dateFlavorSizeCapacityOverride.findMany({
+            where: {
+              date: dateAtNoon,
+              OR: requestedFlavorSizePairs.map((item) => ({
+                flavorId: item.flavorId,
+                sizeId: item.sizeId,
+              })),
             },
           }),
           [],
@@ -391,6 +583,45 @@ export async function validateCapacityForOrder(input: {
       const flavorBookedUnits = bookedByFlavor.get(flavorId) ?? 0;
       if (flavorBookedUnits + requestedUnits > flavorMaxUnits) {
         throw new Error("FLAVOR_CAPACITY_EXCEEDED");
+      }
+    }
+  }
+
+  if (requestedByFlavorAndSize.size > 0) {
+    const bookedByFlavorAndSize = new Map<string, number>();
+    for (const item of existingItems) {
+      const key = `${item.flavorId}::${item.sizeId}`;
+      const current = bookedByFlavorAndSize.get(key) ?? 0;
+      bookedByFlavorAndSize.set(key, current + item.quantity);
+    }
+
+    const flavorSizeRuleByKey = new Map(
+      flavorSizeRules.map((item) => [
+        `${item.flavorId}::${item.sizeId}`,
+        item,
+      ]),
+    );
+    const flavorSizeOverrideByKey = new Map(
+      flavorSizeOverrides.map((item) => [
+        `${item.flavorId}::${item.sizeId}`,
+        item,
+      ]),
+    );
+
+    for (const item of requestedByFlavorAndSize.values()) {
+      const key = `${item.flavorId}::${item.sizeId}`;
+      const sizeRule = flavorSizeRuleByKey.get(key);
+      const sizeOverride = flavorSizeOverrideByKey.get(key);
+      const sizeMaxUnits =
+        sizeOverride?.isClosed === true
+          ? 0
+          : (sizeOverride?.maxUnits ?? sizeRule?.maxUnits ?? null);
+
+      if (sizeMaxUnits === null) continue;
+
+      const sizeBookedUnits = bookedByFlavorAndSize.get(key) ?? 0;
+      if (sizeBookedUnits + item.quantity > sizeMaxUnits) {
+        throw new Error("FLAVOR_SIZE_CAPACITY_EXCEEDED");
       }
     }
   }

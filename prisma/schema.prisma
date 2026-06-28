@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -67,34 +67,38 @@ model User {
 }
 
 model Flavor {
-  id                    String                       @id @default(cuid())
-  slug                  String                       @unique
-  name                  String
-  description           String
-  isActive              Boolean                      @default(true)
-  note                  String?
-  prices                Price[]
-  orderItems            OrderItem[]
-  weekdayCapacityRules  WeekdayFlavorCapacityRule[]
-  dateCapacityOverrides DateFlavorCapacityOverride[]
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
+  id                        String                           @id @default(cuid())
+  slug                      String                           @unique
+  name                      String
+  description               String
+  isActive                  Boolean                          @default(true)
+  note                      String?
+  prices                    Price[]
+  orderItems                OrderItem[]
+  weekdayCapacityRules      WeekdayFlavorCapacityRule[]
+  dateCapacityOverrides     DateFlavorCapacityOverride[]
+  weekdaySizeCapacityRules  WeekdayFlavorSizeCapacityRule[]
+  dateSizeCapacityOverrides DateFlavorSizeCapacityOverride[]
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
 }
 
 model Size {
-  id          String      @id @default(cuid())
-  slug        String      @unique
-  name        String
-  description String
-  servings    String
-  diameterCm  Int?
-  grams       Int?
-  sortOrder   Int         @default(0)
-  isActive    Boolean     @default(true)
-  prices      Price[]
-  orderItems  OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                          String                           @id @default(cuid())
+  slug                        String                           @unique
+  name                        String
+  description                 String
+  servings                    String
+  diameterCm                  Int?
+  grams                       Int?
+  sortOrder                   Int                              @default(0)
+  isActive                    Boolean                          @default(true)
+  prices                      Price[]
+  orderItems                  OrderItem[]
+  weekdayFlavorCapacityRules  WeekdayFlavorSizeCapacityRule[]
+  dateFlavorCapacityOverrides DateFlavorSizeCapacityOverride[]
+  createdAt                   DateTime                         @default(now())
+  updatedAt                   DateTime                         @updatedAt
 }
 
 model Price {
@@ -136,6 +140,22 @@ model WeekdayFlavorCapacityRule {
   @@index([flavorId])
 }
 
+model WeekdayFlavorSizeCapacityRule {
+  id        String   @id @default(cuid())
+  weekday   Int
+  flavorId  String
+  sizeId    String
+  maxUnits  Int
+  flavor    Flavor   @relation(fields: [flavorId], references: [id], onDelete: Cascade)
+  size      Size     @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([weekday, flavorId, sizeId])
+  @@index([flavorId])
+  @@index([sizeId])
+}
+
 model DateCapacityOverride {
   id        String   @id @default(cuid())
   date      DateTime @unique @db.Date
@@ -162,18 +182,37 @@ model DateFlavorCapacityOverride {
   @@index([date])
 }
 
-model Customer {
+model DateFlavorSizeCapacityOverride {
   id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  flavorId  String
+  sizeId    String
+  maxUnits  Int?
+  isClosed  Boolean  @default(false)
+  note      String?
+  flavor    Flavor   @relation(fields: [flavorId], references: [id], onDelete: Cascade)
+  size      Size     @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, flavorId, sizeId])
+  @@index([flavorId])
+  @@index([sizeId])
+  @@index([date])
+}
+
+model Customer {
+  id        String    @id @default(cuid())
   name      String
   phone     String
   email     String?
   address   String?
   notes     String?
-  isActive  Boolean  @default(true)
+  isActive  Boolean   @default(true)
   orders    Order[]
   payments  Payment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@unique([phone])
   @@index([name])
@@ -225,30 +264,33 @@ model OrderItem {
   updatedAt    DateTime @updatedAt
 
   @@index([orderId])
+  @@index([flavorId])
+  @@index([sizeId])
+  @@index([flavorId, sizeId])
 }
 
 model Payment {
-  id                  String        @id @default(cuid())
-  orderId             String?
-  customerId          String?
-  kind                PaymentKind
-  status              PaymentStatus @default(PENDING)
-  method              PaymentMethod @default(MANUAL)
-  amountArs           Int
-  paidAt              DateTime?
-  customerName        String?
-  customerPhone       String?
-  referenceNote       String?
-  provider            String?
-  externalReference   String?       @unique
+  id                   String        @id @default(cuid())
+  orderId              String?
+  customerId           String?
+  kind                 PaymentKind
+  status               PaymentStatus @default(PENDING)
+  method               PaymentMethod @default(MANUAL)
+  amountArs            Int
+  paidAt               DateTime?
+  customerName         String?
+  customerPhone        String?
+  referenceNote        String?
+  provider             String?
+  externalReference    String?       @unique
   providerPreferenceId String?
-  providerPaymentId   String?       @unique
-  providerPayload     Json?
-  statusDetail        String?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  order               Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  customer            Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  providerPaymentId    String?       @unique
+  providerPayload      Json?
+  statusDetail         String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  order                Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  customer             Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([customerId])
@@ -288,24 +330,24 @@ model Purchase {
 }
 
 model Expense {
-  id            String        @id @default(cuid())
-  occurredAt    DateTime      @default(now())
+  id            String          @id @default(cuid())
+  occurredAt    DateTime        @default(now())
   description   String
   category      ExpenseCategory @default(OTHER)
   amountArs     Int
-  paymentMethod PaymentMethod @default(MANUAL)
-  status        PaymentStatus @default(APPROVED)
+  paymentMethod PaymentMethod   @default(MANUAL)
+  status        PaymentStatus   @default(APPROVED)
   notes         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([occurredAt])
   @@index([category])
 }
 
 model MercadoPagoWebhookEvent {
-  id           String                 @id @default(cuid())
-  eventId      String?                @unique
+  id           String                   @id @default(cuid())
+  eventId      String?                  @unique
   topic        String?
   action       String?
   resourceId   String?
@@ -315,8 +357,8 @@ model MercadoPagoWebhookEvent {
   status       MercadoPagoWebhookStatus @default(RECEIVED)
   errorMessage String?
   processedAt  DateTime?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
 
   @@index([topic, resourceId])
   @@index([status])

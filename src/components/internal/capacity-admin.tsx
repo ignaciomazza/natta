@@ -17,6 +17,14 @@ type FlavorOption = {
   id: string;
   slug: string;
   name: string;
+  sizes: SizeOption[];
+};
+
+type SizeOption = {
+  id: string;
+  slug: string;
+  name: string;
+  sortOrder: number;
 };
 
 type WeekdayRuleItem = {
@@ -33,6 +41,27 @@ type WeekdayFlavorRuleItem = {
   maxUnits: number;
 };
 
+type WeekdayFlavorSizeRuleItem = {
+  weekday: number;
+  flavorId: string;
+  sizeId: string;
+  maxUnits: number;
+};
+
+type FlavorSizeCapacityItem = {
+  sizeId: string;
+  sizeSlug: string;
+  sizeName: string;
+  isClosed: boolean;
+  maxUnits: number | null;
+  weekdayMaxUnits: number | null;
+  bookedUnits: number;
+  availableUnits: number | null;
+  source: "none" | "weekday" | "override";
+  hasOverride: boolean;
+  overrideNote: string | null;
+};
+
 type FlavorCapacityItem = {
   flavorId: string;
   flavorSlug: string;
@@ -45,6 +74,7 @@ type FlavorCapacityItem = {
   source: "none" | "weekday" | "override";
   hasOverride: boolean;
   overrideNote: string | null;
+  sizes: FlavorSizeCapacityItem[];
 };
 
 type CapacityItem = {
@@ -65,6 +95,19 @@ type CalendarPayload = {
   flavors: FlavorOption[];
   weekdayRules: WeekdayRuleItem[];
   weekdayFlavorRules: WeekdayFlavorRuleItem[];
+  weekdayFlavorSizeRules: WeekdayFlavorSizeRuleItem[];
+};
+
+type ExceptionSizeEditor = {
+  sizeId: string;
+  sizeName: string;
+  bookedUnits: number;
+  currentMaxUnits: number | null;
+  inheritedMaxUnits: number | null;
+  source: "none" | "weekday" | "override";
+  hasOverride: boolean;
+  isClosed: boolean;
+  maxInput: string;
 };
 
 type ExceptionFlavorEditor = {
@@ -77,6 +120,7 @@ type ExceptionFlavorEditor = {
   hasOverride: boolean;
   isClosed: boolean;
   maxInput: string;
+  sizes: ExceptionSizeEditor[];
 };
 
 type ExceptionEditor = {
@@ -156,10 +200,24 @@ function formatDraftUnits(value: string | undefined) {
   return parsed === null ? "Libre" : String(parsed);
 }
 
+function capacitySizeKey(flavorId: string, sizeId: string) {
+  return `${flavorId}::${sizeId}`;
+}
+
+function countSpecificSizeDrafts(
+  flavor: FlavorOption,
+  sizeCaps: Record<string, string>,
+) {
+  return flavor.sizes.filter((size) =>
+    hasSpecificDraft(sizeCaps[capacitySizeKey(flavor.id, size.id)]),
+  ).length;
+}
+
 function getWeekdayDraft(
   selectedWeekday: number,
   rules: WeekdayRuleItem[],
   flavorRules: WeekdayFlavorRuleItem[],
+  flavorSizeRules: WeekdayFlavorSizeRuleItem[],
   flavors: FlavorOption[],
 ) {
   const rule = rules.find((item) => item.weekday === selectedWeekday);
@@ -171,11 +229,28 @@ function getWeekdayDraft(
       return [flavor.id, flavorRule ? String(flavorRule.maxUnits) : ""];
     }),
   );
+  const flavorSizeCaps = Object.fromEntries(
+    flavors.flatMap((flavor) =>
+      flavor.sizes.map((size) => {
+        const sizeRule = flavorSizeRules.find(
+          (item) =>
+            item.weekday === selectedWeekday &&
+            item.flavorId === flavor.id &&
+            item.sizeId === size.id,
+        );
+        return [
+          capacitySizeKey(flavor.id, size.id),
+          sizeRule ? String(sizeRule.maxUnits) : "",
+        ];
+      }),
+    ),
+  );
 
   return {
     isOpen: rule?.isOpen ?? selectedWeekday !== 0,
     maxUnits: rule?.maxUnits ?? (selectedWeekday === 0 ? 0 : 20),
     flavorCaps,
+    flavorSizeCaps,
   };
 }
 
@@ -186,7 +261,12 @@ function formatFlavorCapacity(flavor: FlavorCapacityItem) {
   return `${flavor.bookedUnits}/${flavor.maxUnits}`;
 }
 
-function getFlavorPillTone(flavor: FlavorCapacityItem) {
+function getFlavorPillTone(flavor: {
+  isClosed: boolean;
+  availableUnits: number | null;
+  hasOverride: boolean;
+  maxUnits: number | null;
+}) {
   if (flavor.isClosed || flavor.availableUnits === 0) return "danger" as const;
   if (flavor.hasOverride) return "warning" as const;
   if (flavor.maxUnits !== null) return "info" as const;
@@ -200,15 +280,44 @@ function visibleFlavorCaps(item: CapacityItem) {
   return constrained.slice(0, 5);
 }
 
+function visibleFlavorSizeCaps(item: CapacityItem) {
+  const constrained = item.flavors.flatMap((flavor) =>
+    flavor.sizes
+      .filter((size) => size.maxUnits !== null || size.bookedUnits > 0)
+      .map((size) => ({
+        ...size,
+        flavorId: flavor.flavorId,
+        flavorName: flavor.flavorName,
+      })),
+  );
+  return constrained.slice(0, 6);
+}
+
 function formatExceptionFlavorMeta(flavor: ExceptionFlavorEditor) {
+  const sizeDrafts = flavor.sizes.filter(
+    (size) => size.isClosed || hasSpecificDraft(size.maxInput),
+  ).length;
   if (flavor.isClosed) return `${flavor.bookedUnits} reservadas · cerrado`;
   if (hasSpecificDraft(flavor.maxInput)) {
     return `${flavor.bookedUnits} reservadas · cupo ${formatDraftUnits(flavor.maxInput)}`;
+  }
+  if (sizeDrafts > 0) {
+    return `${flavor.bookedUnits} reservadas · ${sizeDrafts} tamaños`;
   }
   if (flavor.inheritedMaxUnits !== null) {
     return `${flavor.bookedUnits} reservadas · hereda ${flavor.inheritedMaxUnits}`;
   }
   return `${flavor.bookedUnits} reservadas · libre`;
+}
+
+function formatExceptionFlavorChip(flavor: ExceptionFlavorEditor) {
+  if (flavor.isClosed) return "cerrado";
+  if (hasSpecificDraft(flavor.maxInput)) return formatDraftUnits(flavor.maxInput);
+  const sizeDrafts = flavor.sizes.filter(
+    (size) => size.isClosed || hasSpecificDraft(size.maxInput),
+  ).length;
+  if (sizeDrafts > 0) return `${sizeDrafts} tamaños`;
+  return "Libre";
 }
 
 type FlavorPickerOption = {
@@ -373,6 +482,9 @@ export function CapacityAdmin() {
   const [weekdayFlavorRules, setWeekdayFlavorRules] = useState<
     WeekdayFlavorRuleItem[]
   >([]);
+  const [weekdayFlavorSizeRules, setWeekdayFlavorSizeRules] = useState<
+    WeekdayFlavorSizeRuleItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingWeekday, setSavingWeekday] = useState(false);
@@ -382,6 +494,9 @@ export function CapacityAdmin() {
   const [weekdayOpen, setWeekdayOpen] = useState(true);
   const [weekdayMax, setWeekdayMax] = useState(20);
   const [weekdayFlavorCaps, setWeekdayFlavorCaps] = useState<Record<string, string>>({});
+  const [weekdayFlavorSizeCaps, setWeekdayFlavorSizeCaps] = useState<
+    Record<string, string>
+  >({});
   const [weeklyPanelOpen, setWeeklyPanelOpen] = useState(false);
   const [weeklyFlavorPickerOpen, setWeeklyFlavorPickerOpen] = useState(false);
   const [selectedWeeklyFlavorId, setSelectedWeeklyFlavorId] = useState<string | null>(
@@ -400,17 +515,20 @@ export function CapacityAdmin() {
     nextWeekday: number,
     nextRules = weekdayRules,
     nextFlavorRules = weekdayFlavorRules,
+    nextFlavorSizeRules = weekdayFlavorSizeRules,
     nextFlavors = flavors,
   ) => {
     const draft = getWeekdayDraft(
       nextWeekday,
       nextRules,
       nextFlavorRules,
+      nextFlavorSizeRules,
       nextFlavors,
     );
     setWeekdayOpen(draft.isOpen);
     setWeekdayMax(draft.maxUnits);
     setWeekdayFlavorCaps(draft.flavorCaps);
+    setWeekdayFlavorSizeCaps(draft.flavorSizeCaps);
   };
 
   const load = async () => {
@@ -428,16 +546,19 @@ export function CapacityAdmin() {
       setFlavors(payload.flavors);
       setWeekdayRules(payload.weekdayRules);
       setWeekdayFlavorRules(payload.weekdayFlavorRules);
+      setWeekdayFlavorSizeRules(payload.weekdayFlavorSizeRules);
 
       const draft = getWeekdayDraft(
         weekday,
         payload.weekdayRules,
         payload.weekdayFlavorRules,
+        payload.weekdayFlavorSizeRules,
         payload.flavors,
       );
       setWeekdayOpen(draft.isOpen);
       setWeekdayMax(draft.maxUnits);
       setWeekdayFlavorCaps(draft.flavorCaps);
+      setWeekdayFlavorSizeCaps(draft.flavorSizeCaps);
       setSelectedWeeklyFlavorId((previous) =>
         payload.flavors.some((flavor) => flavor.id === previous)
           ? previous
@@ -511,6 +632,29 @@ export function CapacityAdmin() {
         throw new Error("No se pudieron guardar algunos cupos por sabor");
       }
 
+      const sizeResponses = await Promise.all(
+        flavors.flatMap((flavor) =>
+          flavor.sizes.map((size) =>
+            fetch("/api/capacity/flavor-size-rule", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                weekday,
+                flavorId: flavor.id,
+                sizeId: size.id,
+                maxUnits: parseOptionalUnits(
+                  weekdayFlavorSizeCaps[capacitySizeKey(flavor.id, size.id)] ?? "",
+                ),
+              }),
+            }),
+          ),
+        ),
+      );
+
+      if (sizeResponses.some((item) => !item.ok)) {
+        throw new Error("No se pudieron guardar algunos cupos por tamaño");
+      }
+
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
@@ -532,6 +676,17 @@ export function CapacityAdmin() {
     }));
   };
 
+  const updateWeekdayFlavorSizeCap = (
+    flavorId: string,
+    sizeId: string,
+    value: string,
+  ) => {
+    setWeekdayFlavorSizeCaps((prev) => ({
+      ...prev,
+      [capacitySizeKey(flavorId, sizeId)]: value,
+    }));
+  };
+
   const updateExceptionFlavor = (
     flavorId: string,
     updater: (flavor: ExceptionFlavorEditor) => ExceptionFlavorEditor,
@@ -548,6 +703,19 @@ export function CapacityAdmin() {
     );
   };
 
+  const updateExceptionSize = (
+    flavorId: string,
+    sizeId: string,
+    updater: (size: ExceptionSizeEditor) => ExceptionSizeEditor,
+  ) => {
+    updateExceptionFlavor(flavorId, (flavor) => ({
+      ...flavor,
+      sizes: flavor.sizes.map((size) =>
+        size.sizeId === sizeId ? updater(size) : size,
+      ),
+    }));
+  };
+
   const openExceptionEditor = (item: CapacityItem) => {
     const nextFlavors = item.flavors.map((flavor) => ({
       flavorId: flavor.flavorId,
@@ -562,11 +730,31 @@ export function CapacityAdmin() {
         flavor.source === "override" && !flavor.isClosed && flavor.maxUnits !== null
           ? String(flavor.maxUnits)
           : "",
+      sizes: flavor.sizes.map((size) => ({
+        sizeId: size.sizeId,
+        sizeName: size.sizeName,
+        bookedUnits: size.bookedUnits,
+        currentMaxUnits: size.maxUnits,
+        inheritedMaxUnits: size.weekdayMaxUnits,
+        source: size.source,
+        hasOverride: size.hasOverride,
+        isClosed: size.source === "override" && size.isClosed,
+        maxInput:
+          size.source === "override" && !size.isClosed && size.maxUnits !== null
+            ? String(size.maxUnits)
+            : "",
+      })),
     }));
 
     setSelectedExceptionFlavorId(
       nextFlavors.find(
-        (flavor) => flavor.isClosed || flavor.hasOverride || hasSpecificDraft(flavor.maxInput),
+        (flavor) =>
+          flavor.isClosed ||
+          flavor.hasOverride ||
+          hasSpecificDraft(flavor.maxInput) ||
+          flavor.sizes.some(
+            (size) => size.isClosed || size.hasOverride || hasSpecificDraft(size.maxInput),
+          ),
       )?.flavorId ??
         nextFlavors[0]?.flavorId ??
         null,
@@ -631,6 +819,32 @@ export function CapacityAdmin() {
         throw new Error("No se pudieron guardar algunos cupos por sabor");
       }
 
+      const sizeResponses = await Promise.all(
+        exceptionEditor.flavors.flatMap((flavor) =>
+          flavor.sizes.map((size) => {
+            const maxUnits = parseOptionalUnits(size.maxInput);
+            const clear = !size.isClosed && maxUnits === null;
+
+            return fetch("/api/capacity/flavor-size-override", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                date: exceptionEditor.date,
+                flavorId: flavor.flavorId,
+                sizeId: size.sizeId,
+                clear,
+                isClosed: size.isClosed,
+                maxUnits: size.isClosed ? 0 : maxUnits,
+              }),
+            });
+          }),
+        ),
+      );
+
+      if (sizeResponses.some((item) => !item.ok)) {
+        throw new Error("No se pudieron guardar algunas excepciones por tamaño");
+      }
+
       await load();
       setExceptionEditor(null);
       setExceptionFlavorPickerOpen(false);
@@ -649,11 +863,17 @@ export function CapacityAdmin() {
     const flavorLimitedDays = items.filter((item) =>
       item.flavors.some((flavor) => flavor.maxUnits !== null),
     ).length;
+    const sizeLimitedDays = items.filter((item) =>
+      item.flavors.some((flavor) =>
+        flavor.sizes.some((size) => size.maxUnits !== null),
+      ),
+    ).length;
     return {
       total: items.length,
       withOverride,
       closed,
       flavorLimitedDays,
+      sizeLimitedDays,
     };
   }, [items]);
 
@@ -665,6 +885,19 @@ export function CapacityAdmin() {
   const weeklySpecificCaps = flavors.filter((flavor) =>
     hasSpecificDraft(weekdayFlavorCaps[flavor.id]),
   );
+  const weeklySpecificSizeCaps = flavors.flatMap((flavor) =>
+    flavor.sizes
+      .filter((size) =>
+        hasSpecificDraft(weekdayFlavorSizeCaps[capacitySizeKey(flavor.id, size.id)]),
+      )
+      .map((size) => ({
+        flavorId: flavor.id,
+        flavorName: flavor.name,
+        sizeId: size.id,
+        sizeName: size.name,
+        value: weekdayFlavorSizeCaps[capacitySizeKey(flavor.id, size.id)],
+      })),
+  );
   const selectedExceptionFlavor =
     exceptionEditor?.flavors.find(
       (flavor) => flavor.flavorId === selectedExceptionFlavorId,
@@ -673,7 +906,12 @@ export function CapacityAdmin() {
     null;
   const exceptionSpecificFlavors =
     exceptionEditor?.flavors.filter(
-      (flavor) => flavor.isClosed || hasSpecificDraft(flavor.maxInput),
+      (flavor) =>
+        flavor.isClosed ||
+        hasSpecificDraft(flavor.maxInput) ||
+        flavor.sizes.some(
+          (size) => size.isClosed || hasSpecificDraft(size.maxInput),
+        ),
     ) ?? [];
 
   return (
@@ -694,6 +932,7 @@ export function CapacityAdmin() {
         <Pill tone="warning">Días cerrados: {summary.closed}</Pill>
         <Pill tone="info">Con excepción: {summary.withOverride}</Pill>
         <Pill tone="success">Con cupo por sabor: {summary.flavorLimitedDays}</Pill>
+        <Pill tone="success">Con cupo por tamaño: {summary.sizeLimitedDays}</Pill>
       </div>
 
       <div className="space-y-6">
@@ -780,9 +1019,9 @@ export function CapacityAdmin() {
                         Cupos por sabor
                       </p>
                     </div>
-                    {weeklySpecificCaps.length ? (
+                    {weeklySpecificCaps.length || weeklySpecificSizeCaps.length ? (
                       <Pill mini tone="success">
-                        {weeklySpecificCaps.length} configurados
+                        {weeklySpecificCaps.length + weeklySpecificSizeCaps.length} configurados
                       </Pill>
                     ) : null}
                   </div>
@@ -800,8 +1039,12 @@ export function CapacityAdmin() {
                             name: flavor.name,
                             meta: hasSpecificDraft(weekdayFlavorCaps[flavor.id])
                               ? `Cupo ${formatDraftUnits(weekdayFlavorCaps[flavor.id])}`
-                              : "Hereda cupo general",
-                            marked: hasSpecificDraft(weekdayFlavorCaps[flavor.id]),
+                              : countSpecificSizeDrafts(flavor, weekdayFlavorSizeCaps) > 0
+                                ? `${countSpecificSizeDrafts(flavor, weekdayFlavorSizeCaps)} tamaños configurados`
+                                : "Hereda cupo general",
+                            marked:
+                              hasSpecificDraft(weekdayFlavorCaps[flavor.id]) ||
+                              countSpecificSizeDrafts(flavor, weekdayFlavorSizeCaps) > 0,
                           }))}
                           selectedId={selectedWeeklyFlavor.id}
                           selectedName={selectedWeeklyFlavor.name}
@@ -817,22 +1060,74 @@ export function CapacityAdmin() {
                         />
                       </div>
 
+                      {selectedWeeklyFlavor.sizes.length ? (
+                        <div className="mt-4 border-t border-[color:var(--line)] pt-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
+                              Cupos por tamaño
+                            </p>
+                            <Pill mini tone="info">
+                              Heredan si quedan libres
+                            </Pill>
+                          </div>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {selectedWeeklyFlavor.sizes.map((size) => (
+                              <UnitCounter
+                                disabled={!weekdayOpen}
+                                key={size.id}
+                                label={size.name}
+                                onChange={(value) =>
+                                  updateWeekdayFlavorSizeCap(
+                                    selectedWeeklyFlavor.id,
+                                    size.id,
+                                    value,
+                                  )
+                                }
+                                value={
+                                  weekdayFlavorSizeCaps[
+                                    capacitySizeKey(selectedWeeklyFlavor.id, size.id)
+                                  ] ?? ""
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {weeklySpecificCaps.length ? (
-                          weeklySpecificCaps.map((flavor) => (
-                            <button
-                              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition ${
-                                selectedWeeklyFlavor.id === flavor.id
-                                  ? "border-[color:var(--accent)] bg-[color:var(--surface-soft)] text-[color:var(--chocolate-deep)]"
-                                  : "border-[#ddd2c5] bg-[#f4efea] text-[#665c57] hover:border-[color:var(--accent)]"
-                              }`}
-                              key={flavor.id}
-                              onClick={() => setSelectedWeeklyFlavorId(flavor.id)}
-                              type="button"
-                            >
-                              {flavor.name}: {formatDraftUnits(weekdayFlavorCaps[flavor.id])}
-                            </button>
-                          ))
+                        {weeklySpecificCaps.length || weeklySpecificSizeCaps.length ? (
+                          <>
+                            {weeklySpecificCaps.map((flavor) => (
+                              <button
+                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                                  selectedWeeklyFlavor.id === flavor.id
+                                    ? "border-[color:var(--accent)] bg-[color:var(--surface-soft)] text-[color:var(--chocolate-deep)]"
+                                    : "border-[#ddd2c5] bg-[#f4efea] text-[#665c57] hover:border-[color:var(--accent)]"
+                                }`}
+                                key={flavor.id}
+                                onClick={() => setSelectedWeeklyFlavorId(flavor.id)}
+                                type="button"
+                              >
+                                {flavor.name}:{" "}
+                                {formatDraftUnits(weekdayFlavorCaps[flavor.id])}
+                              </button>
+                            ))}
+                            {weeklySpecificSizeCaps.map((item) => (
+                              <button
+                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                                  selectedWeeklyFlavor.id === item.flavorId
+                                    ? "border-[color:var(--accent)] bg-[color:var(--surface-soft)] text-[color:var(--chocolate-deep)]"
+                                    : "border-[#ddd2c5] bg-[#f4efea] text-[#665c57] hover:border-[color:var(--accent)]"
+                                }`}
+                                key={`${item.flavorId}-${item.sizeId}`}
+                                onClick={() => setSelectedWeeklyFlavorId(item.flavorId)}
+                                type="button"
+                              >
+                                {item.flavorName} {item.sizeName}:{" "}
+                                {formatDraftUnits(item.value)}
+                              </button>
+                            ))}
+                          </>
                         ) : (
                           <p className="text-sm text-zinc-500">
                             Sin sabores con cupo específico.
@@ -863,6 +1158,7 @@ export function CapacityAdmin() {
           ) : (
             items.map((item) => {
               const flavorCaps = visibleFlavorCaps(item);
+              const sizeCaps = visibleFlavorSizeCaps(item);
 
               return (
                 <article
@@ -912,7 +1208,7 @@ export function CapacityAdmin() {
                   </div>
 
                   <div className="min-w-0">
-                    {flavorCaps.length ? (
+                    {flavorCaps.length || sizeCaps.length ? (
                       <div className="flex flex-wrap gap-2">
                         {flavorCaps.map((flavor) => (
                           <Pill
@@ -923,9 +1219,21 @@ export function CapacityAdmin() {
                             {flavor.flavorName}: {formatFlavorCapacity(flavor)}
                           </Pill>
                         ))}
+                        {sizeCaps.map((size) => (
+                          <Pill
+                            key={`${size.flavorId}-${size.sizeId}`}
+                            mini
+                            tone={getFlavorPillTone(size)}
+                          >
+                            {size.flavorName} {size.sizeName}:{" "}
+                            {size.maxUnits === null
+                              ? `${size.bookedUnits} reservadas`
+                              : `${size.bookedUnits}/${size.maxUnits}`}
+                          </Pill>
+                        ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-zinc-500">Sin cupos por sabor cargados</p>
+                      <p className="text-sm text-zinc-500">Sin cupos específicos cargados</p>
                     )}
                   </div>
 
@@ -1062,7 +1370,13 @@ export function CapacityAdmin() {
                           id: flavor.flavorId,
                           name: flavor.flavorName,
                           meta: formatExceptionFlavorMeta(flavor),
-                          marked: flavor.isClosed || hasSpecificDraft(flavor.maxInput),
+                          marked:
+                            flavor.isClosed ||
+                            hasSpecificDraft(flavor.maxInput) ||
+                            flavor.sizes.some(
+                              (size) =>
+                                size.isClosed || hasSpecificDraft(size.maxInput),
+                            ),
                         }))}
                         selectedId={selectedExceptionFlavor.flavorId}
                         selectedName={selectedExceptionFlavor.flavorName}
@@ -1116,6 +1430,83 @@ export function CapacityAdmin() {
                       </div>
                     </div>
 
+                    {selectedExceptionFlavor.sizes.length ? (
+                      <div className="mt-4 border-t border-[color:var(--line)] pt-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
+                            Cupos por tamaño de este sabor
+                          </p>
+                          <Pill mini tone="info">
+                            Heredan si quedan libres
+                          </Pill>
+                        </div>
+                        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                          {selectedExceptionFlavor.sizes.map((size) => (
+                            <div
+                              className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                              key={size.sizeId}
+                            >
+                              <UnitCounter
+                                disabled={
+                                  exceptionEditor.isClosed ||
+                                  selectedExceptionFlavor.isClosed ||
+                                  size.isClosed
+                                }
+                                label={size.sizeName}
+                                onChange={(value) =>
+                                  updateExceptionSize(
+                                    selectedExceptionFlavor.flavorId,
+                                    size.sizeId,
+                                    (current) => ({
+                                      ...current,
+                                      maxInput: value,
+                                    }),
+                                  )
+                                }
+                                placeholder={
+                                  size.inheritedMaxUnits === null
+                                    ? "Libre"
+                                    : String(size.inheritedMaxUnits)
+                                }
+                                value={size.maxInput}
+                              />
+
+                              <div className="pb-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Toggle
+                                    checked={size.isClosed}
+                                    label="Cerrar"
+                                    onChange={(checked) =>
+                                      updateExceptionSize(
+                                        selectedExceptionFlavor.flavorId,
+                                        size.sizeId,
+                                        (current) => ({
+                                          ...current,
+                                          isClosed: checked,
+                                          maxInput: checked ? "" : current.maxInput,
+                                        }),
+                                      )
+                                    }
+                                  />
+                                  {size.hasOverride ? (
+                                    <Pill mini tone="warning">
+                                      Fecha
+                                    </Pill>
+                                  ) : null}
+                                </div>
+                                <p className="mt-2 text-xs text-zinc-500">
+                                  {size.bookedUnits} reservadas
+                                  {size.currentMaxUnits !== null
+                                    ? ` · cupo actual ${size.currentMaxUnits}`
+                                    : " · sin cupo específico"}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div className="mt-3 flex flex-wrap gap-2">
                       {exceptionSpecificFlavors.length ? (
                         exceptionSpecificFlavors.map((flavor) => (
@@ -1130,9 +1521,7 @@ export function CapacityAdmin() {
                             type="button"
                           >
                             {flavor.flavorName}:{" "}
-                            {flavor.isClosed
-                              ? "cerrado"
-                              : formatDraftUnits(flavor.maxInput)}
+                            {formatExceptionFlavorChip(flavor)}
                           </button>
                         ))
                       ) : (

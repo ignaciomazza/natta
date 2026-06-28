@@ -216,6 +216,11 @@ export async function POST(req: NextRequest) {
         flavorId: item.flavorId,
         quantity: item.quantity,
       })),
+      requestedFlavorSizeUnits: orderItems.map((item) => ({
+        flavorId: item.flavorId,
+        sizeId: item.sizeId,
+        quantity: item.quantity,
+      })),
     });
 
     const totals = calculateOrderTotals(mode, orderItems, paymentOption);
@@ -323,6 +328,9 @@ export async function POST(req: NextRequest) {
       }
       if (error.message === "FLAVOR_CAPACITY_EXCEEDED") {
         return NextResponse.json({ error: "No hay cupo suficiente para uno de los sabores en esa fecha" }, { status: 409 });
+      }
+      if (error.message === "FLAVOR_SIZE_CAPACITY_EXCEEDED") {
+        return NextResponse.json({ error: "No hay cupo suficiente para uno de los tamaños en esa fecha" }, { status: 409 });
       }
       if (error.message === "CUTOFF_REACHED") {
         return NextResponse.json({ error: "Horario de corte alcanzado" }, { status: 400 });

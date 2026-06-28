@@ -17,7 +17,14 @@ export async function GET(req: NextRequest) {
     const daysParam = req.nextUrl.searchParams.get("days");
     const days = daysParam ? Number(daysParam) : undefined;
 
-    const [calendar, weekdayRules, weekdayFlavorRules, flavors] = await Promise.all([
+    const [
+      calendar,
+      weekdayRules,
+      weekdayFlavorRules,
+      weekdayFlavorSizeRules,
+      flavors,
+      prices,
+    ] = await Promise.all([
       getCapacityCalendar({ from, days }),
       prisma.weekdayCapacityRule.findMany({
         orderBy: { weekday: "asc" },
@@ -40,6 +47,22 @@ export async function GET(req: NextRequest) {
         }),
         [],
       ),
+      withMissingCapacityTableFallback(
+        () => prisma.weekdayFlavorSizeCapacityRule.findMany({
+          orderBy: [
+            { weekday: "asc" },
+            { flavor: { name: "asc" } },
+            { size: { sortOrder: "asc" } },
+          ],
+          select: {
+            weekday: true,
+            flavorId: true,
+            sizeId: true,
+            maxUnits: true,
+          },
+        }),
+        [],
+      ),
       prisma.flavor.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
@@ -49,13 +72,50 @@ export async function GET(req: NextRequest) {
           name: true,
         },
       }),
+      prisma.price.findMany({
+        where: {
+          flavor: { isActive: true },
+          size: { isActive: true },
+        },
+        select: {
+          flavorId: true,
+          size: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              sortOrder: true,
+            },
+          },
+        },
+      }),
     ]);
+
+    const sizesByFlavor = new Map<
+      string,
+      Array<{ id: string; slug: string; name: string; sortOrder: number }>
+    >();
+    for (const price of prices) {
+      const current = sizesByFlavor.get(price.flavorId) ?? [];
+      current.push(price.size);
+      sizesByFlavor.set(price.flavorId, current);
+    }
+    for (const sizes of sizesByFlavor.values()) {
+      sizes.sort(
+        (left, right) =>
+          left.sortOrder - right.sortOrder || left.name.localeCompare(right.name),
+      );
+    }
 
     return NextResponse.json({
       items: calendar,
-      flavors,
+      flavors: flavors.map((flavor) => ({
+        ...flavor,
+        sizes: sizesByFlavor.get(flavor.id) ?? [],
+      })),
       weekdayRules,
       weekdayFlavorRules,
+      weekdayFlavorSizeRules,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
