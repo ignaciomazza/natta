@@ -5,6 +5,8 @@ export type CapacityDay = {
   weekday: number;
   isOpen: boolean;
   maxUnits: number;
+  manualMaxUnits: number;
+  isAutoCapacity: boolean;
   bookedUnits: number;
   availableUnits: number;
   minLeadTimeDays: number;
@@ -44,6 +46,38 @@ export type FlavorSizeCapacityDay = {
   overrideNote: string | null;
 };
 
+type AutoCapacityFlavor = {
+  isClosed: boolean;
+  maxUnits: number | null;
+  sizes: Array<{
+    isClosed: boolean;
+    maxUnits: number | null;
+  }>;
+};
+
+function getAutoCapacityMaxUnits(flavors: AutoCapacityFlavor[]) {
+  return flavors.reduce((total, flavor) => {
+    if (flavor.isClosed) return total;
+
+    const openSizes = flavor.sizes.filter((size) => !size.isClosed);
+    const cappedSizes = openSizes.filter((size) => size.maxUnits !== null);
+    const sizeMaxUnits = cappedSizes.reduce(
+      (sum, size) => sum + (size.maxUnits ?? 0),
+      0,
+    );
+
+    if (flavor.maxUnits !== null) {
+      return total + (
+        openSizes.length > 0 && cappedSizes.length === openSizes.length
+          ? Math.min(flavor.maxUnits, sizeMaxUnits)
+          : flavor.maxUnits
+      );
+    }
+
+    return total + sizeMaxUnits;
+  }, 0);
+}
+
 function toDateOnlyString(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -56,7 +90,7 @@ function isMissingTableError(error: unknown) {
     error && typeof error === "object" && "code" in error
       ? String((error as { code?: unknown }).code)
       : "";
-  return code === "P2021";
+  return code === "P2021" || code === "P2022";
 }
 
 export function isCapacitySchemaUnavailableError(error: unknown) {
@@ -273,6 +307,7 @@ export async function getCapacityCalendar(input?: {
     const override = overrideByDate.get(date);
     const bookedUnits = bookedUnitsByDate.get(date) ?? 0;
     const baseIsOpen = weekdayRule?.isOpen ?? weekday !== 0;
+    const baseIsAutoCapacity = weekdayRule?.isAutoCapacity ?? false;
     const baseMaxUnits =
       typeof weekdayRule?.maxUnits === "number" ? weekdayRule.maxUnits : 20;
 
@@ -283,14 +318,10 @@ export async function getCapacityCalendar(input?: {
           ? true
           : baseIsOpen;
 
-    const maxUnits =
-      override?.maxUnits ??
-      baseMaxUnits;
-
-    const hasMeaningfulOverride =
-      Boolean(override) && (isOpen !== baseIsOpen || maxUnits !== baseMaxUnits);
-
-    const availableUnits = isOpen ? Math.max(0, maxUnits - bookedUnits) : 0;
+    const isAutoCapacity = override
+      ? override.isAutoCapacity
+      : baseIsAutoCapacity;
+    const manualMaxUnits = override?.maxUnits ?? baseMaxUnits;
     const flavors: FlavorCapacityDay[] = activeFlavors.map((flavor) => {
       const flavorKey = `${date}::${flavor.id}`;
       const weekdayFlavorRule = flavorRuleByWeekdayAndFlavor.get(
@@ -373,12 +404,26 @@ export async function getCapacityCalendar(input?: {
         sizes,
       };
     });
+    const maxUnits = isOpen
+      ? isAutoCapacity
+        ? getAutoCapacityMaxUnits(flavors)
+        : manualMaxUnits
+      : 0;
+    const hasMeaningfulOverride =
+      Boolean(override) &&
+      (isOpen !== baseIsOpen ||
+        manualMaxUnits !== baseMaxUnits ||
+        isAutoCapacity !== baseIsAutoCapacity);
+
+    const availableUnits = isOpen ? Math.max(0, maxUnits - bookedUnits) : 0;
 
     return {
       date,
       weekday,
       isOpen,
       maxUnits,
+      manualMaxUnits,
+      isAutoCapacity,
       bookedUnits,
       availableUnits,
       minLeadTimeDays: weekdayRule?.minLeadTimeDays ?? 2,
@@ -433,9 +478,6 @@ export async function validateCapacityForOrder(input: {
       requestedByFlavor.set(item.flavorId, currentFlavor + item.quantity);
     }
   }
-  const requestedFlavorIds = [...requestedByFlavor.keys()];
-  const requestedFlavorSizePairs = [...requestedByFlavorAndSize.values()];
-
   const [
     rule,
     override,
@@ -444,6 +486,7 @@ export async function validateCapacityForOrder(input: {
     flavorOverrides,
     flavorSizeRules,
     flavorSizeOverrides,
+    activePrices,
   ] = await Promise.all([
     prisma.weekdayCapacityRule.findUnique({
       where: { weekday },
@@ -468,60 +511,40 @@ export async function validateCapacityForOrder(input: {
         quantity: true,
       },
     }),
-    requestedFlavorIds.length
-      ? withMissingCapacityTableFallback(
-          () => prisma.weekdayFlavorCapacityRule.findMany({
-            where: {
-              weekday,
-              flavorId: {
-                in: requestedFlavorIds,
-              },
-            },
-          }),
-          [],
-        )
-      : Promise.resolve([]),
-    requestedFlavorIds.length
-      ? withMissingCapacityTableFallback(
-          () => prisma.dateFlavorCapacityOverride.findMany({
-            where: {
-              date: getDateAtNoon(date),
-              flavorId: {
-                in: requestedFlavorIds,
-              },
-            },
-          }),
-          [],
-        )
-      : Promise.resolve([]),
-    requestedFlavorSizePairs.length
-      ? withMissingCapacityTableFallback(
-          () => prisma.weekdayFlavorSizeCapacityRule.findMany({
-            where: {
-              weekday,
-              OR: requestedFlavorSizePairs.map((item) => ({
-                flavorId: item.flavorId,
-                sizeId: item.sizeId,
-              })),
-            },
-          }),
-          [],
-        )
-      : Promise.resolve([]),
-    requestedFlavorSizePairs.length
-      ? withMissingCapacityTableFallback(
-          () => prisma.dateFlavorSizeCapacityOverride.findMany({
-            where: {
-              date: dateAtNoon,
-              OR: requestedFlavorSizePairs.map((item) => ({
-                flavorId: item.flavorId,
-                sizeId: item.sizeId,
-              })),
-            },
-          }),
-          [],
-        )
-      : Promise.resolve([]),
+    withMissingCapacityTableFallback(
+      () => prisma.weekdayFlavorCapacityRule.findMany({
+        where: { weekday },
+      }),
+      [],
+    ),
+    withMissingCapacityTableFallback(
+      () => prisma.dateFlavorCapacityOverride.findMany({
+        where: { date: dateAtNoon },
+      }),
+      [],
+    ),
+    withMissingCapacityTableFallback(
+      () => prisma.weekdayFlavorSizeCapacityRule.findMany({
+        where: { weekday },
+      }),
+      [],
+    ),
+    withMissingCapacityTableFallback(
+      () => prisma.dateFlavorSizeCapacityOverride.findMany({
+        where: { date: dateAtNoon },
+      }),
+      [],
+    ),
+    prisma.price.findMany({
+      where: {
+        flavor: { isActive: true },
+        size: { isActive: true },
+      },
+      select: {
+        flavorId: true,
+        sizeId: true,
+      },
+    }),
   ]);
 
   const minimumDate = getDefaultMinDate(new Date(), rule?.minLeadTimeDays ?? 2);
@@ -547,9 +570,62 @@ export async function validateCapacityForOrder(input: {
     throw new Error("DATE_CLOSED");
   }
 
-  const maxUnits =
+  const flavorRuleById = new Map(flavorRules.map((item) => [item.flavorId, item]));
+  const flavorOverrideById = new Map(
+    flavorOverrides.map((item) => [item.flavorId, item]),
+  );
+  const flavorSizeRuleByKey = new Map(
+    flavorSizeRules.map((item) => [
+      `${item.flavorId}::${item.sizeId}`,
+      item,
+    ]),
+  );
+  const flavorSizeOverrideByKey = new Map(
+    flavorSizeOverrides.map((item) => [
+      `${item.flavorId}::${item.sizeId}`,
+      item,
+    ]),
+  );
+
+  const isAutoCapacity = override
+    ? override.isAutoCapacity
+    : (rule?.isAutoCapacity ?? false);
+  const manualMaxUnits =
     override?.maxUnits ??
     (typeof rule?.maxUnits === "number" ? rule.maxUnits : 20);
+  const autoFlavors = new Map<string, AutoCapacityFlavor>();
+  for (const price of activePrices) {
+    const flavorRule = flavorRuleById.get(price.flavorId);
+    const flavorOverride = flavorOverrideById.get(price.flavorId);
+    const flavorMaxUnits =
+      flavorOverride?.isClosed === true
+        ? 0
+        : (flavorOverride?.maxUnits ?? flavorRule?.maxUnits ?? null);
+    const flavorIsClosed = flavorOverride?.isClosed === true;
+    const sizeKey = `${price.flavorId}::${price.sizeId}`;
+    const sizeRule = flavorSizeRuleByKey.get(sizeKey);
+    const sizeOverride = flavorSizeOverrideByKey.get(sizeKey);
+    const sizeIsClosed = flavorIsClosed || sizeOverride?.isClosed === true;
+    const sizeMaxUnits = sizeIsClosed
+      ? 0
+      : (sizeOverride?.maxUnits ?? sizeRule?.maxUnits ?? null);
+    const current = autoFlavors.get(price.flavorId) ?? {
+      isClosed: flavorIsClosed,
+      maxUnits: flavorMaxUnits,
+      sizes: [],
+    };
+
+    current.isClosed = current.isClosed || flavorIsClosed;
+    current.maxUnits = flavorMaxUnits;
+    current.sizes.push({
+      isClosed: sizeIsClosed,
+      maxUnits: sizeMaxUnits,
+    });
+    autoFlavors.set(price.flavorId, current);
+  }
+  const maxUnits = isAutoCapacity
+    ? getAutoCapacityMaxUnits([...autoFlavors.values()])
+    : manualMaxUnits;
 
   const bookedUnits = existingItems.reduce((sum, item) => sum + item.quantity, 0);
   const nextUnits = bookedUnits + input.requestedUnits;
@@ -564,11 +640,6 @@ export async function validateCapacityForOrder(input: {
       const current = bookedByFlavor.get(item.flavorId) ?? 0;
       bookedByFlavor.set(item.flavorId, current + item.quantity);
     }
-
-    const flavorRuleById = new Map(flavorRules.map((item) => [item.flavorId, item]));
-    const flavorOverrideById = new Map(
-      flavorOverrides.map((item) => [item.flavorId, item]),
-    );
 
     for (const [flavorId, requestedUnits] of requestedByFlavor) {
       const flavorRule = flavorRuleById.get(flavorId);
@@ -595,27 +666,24 @@ export async function validateCapacityForOrder(input: {
       bookedByFlavorAndSize.set(key, current + item.quantity);
     }
 
-    const flavorSizeRuleByKey = new Map(
-      flavorSizeRules.map((item) => [
-        `${item.flavorId}::${item.sizeId}`,
-        item,
-      ]),
-    );
-    const flavorSizeOverrideByKey = new Map(
-      flavorSizeOverrides.map((item) => [
-        `${item.flavorId}::${item.sizeId}`,
-        item,
-      ]),
-    );
-
     for (const item of requestedByFlavorAndSize.values()) {
       const key = `${item.flavorId}::${item.sizeId}`;
       const sizeRule = flavorSizeRuleByKey.get(key);
       const sizeOverride = flavorSizeOverrideByKey.get(key);
+      const flavorRule = flavorRuleById.get(item.flavorId);
+      const flavorOverride = flavorOverrideById.get(item.flavorId);
+      const flavorMaxUnits =
+        flavorOverride?.isClosed === true
+          ? 0
+          : (flavorOverride?.maxUnits ?? flavorRule?.maxUnits ?? null);
       const sizeMaxUnits =
         sizeOverride?.isClosed === true
           ? 0
           : (sizeOverride?.maxUnits ?? sizeRule?.maxUnits ?? null);
+
+      if (isAutoCapacity && flavorMaxUnits === null && sizeMaxUnits === null) {
+        throw new Error("FLAVOR_SIZE_CAPACITY_EXCEEDED");
+      }
 
       if (sizeMaxUnits === null) continue;
 

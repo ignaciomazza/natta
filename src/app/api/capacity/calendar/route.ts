@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
           weekday: true,
           isOpen: true,
           maxUnits: true,
+          isAutoCapacity: true,
           minLeadTimeDays: true,
           cutoffHour: true,
         },

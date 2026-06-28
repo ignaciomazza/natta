@@ -119,6 +119,7 @@ model WeekdayCapacityRule {
   weekday         Int
   isOpen          Boolean  @default(true)
   maxUnits        Int      @default(20)
+  isAutoCapacity  Boolean  @default(false)
   minLeadTimeDays Int      @default(2)
   cutoffHour      Int      @default(10)
   createdAt       DateTime @default(now())
@@ -157,13 +158,14 @@ model WeekdayFlavorSizeCapacityRule {
 }
 
 model DateCapacityOverride {
-  id        String   @id @default(cuid())
-  date      DateTime @unique @db.Date
-  maxUnits  Int?
-  isClosed  Boolean  @default(false)
-  note      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  date           DateTime @unique @db.Date
+  maxUnits       Int?
+  isAutoCapacity Boolean  @default(false)
+  isClosed       Boolean  @default(false)
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model DateFlavorCapacityOverride {

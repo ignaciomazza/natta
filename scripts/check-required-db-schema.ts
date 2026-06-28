@@ -42,8 +42,18 @@ const requiredUniqueIndexes = [
   { table: "Payment", columns: ["providerPaymentId"] },
 ] as const;
 
+const requiredColumns = [
+  { table: "WeekdayCapacityRule", column: "isAutoCapacity" },
+  { table: "DateCapacityOverride", column: "isAutoCapacity" },
+] as const;
+
 type TableRow = {
   table_name: string;
+};
+
+type ColumnRow = {
+  table_name: string;
+  column_name: string;
 };
 
 type UniqueIndexRow = {
@@ -56,12 +66,17 @@ function uniqueIndexKey(table: string, columns: readonly string[]) {
 }
 
 async function main() {
-  const [tableRows, uniqueIndexRows] = await Promise.all([
+  const [tableRows, columnRows, uniqueIndexRows] = await Promise.all([
     prisma.$queryRaw<TableRow[]>`
     SELECT table_name
     FROM information_schema.tables
     WHERE table_schema = 'public'
       AND table_type = 'BASE TABLE'
+  `,
+    prisma.$queryRaw<ColumnRow[]>`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
   `,
     prisma.$queryRaw<UniqueIndexRow[]>`
     SELECT
@@ -84,11 +99,19 @@ async function main() {
   ]);
 
   const existingTables = new Set(tableRows.map((row) => row.table_name));
+  const existingColumns = new Set(
+    columnRows.map((row) => `${row.table_name}:${row.column_name}`),
+  );
   const existingUniqueIndexes = new Set(
     uniqueIndexRows.map((row) => uniqueIndexKey(row.table_name, row.columns)),
   );
   const missingTables = requiredTables.filter(
     (table) => !existingTables.has(table),
+  );
+  const missingColumns = requiredColumns.filter(
+    (column) =>
+      existingTables.has(column.table) &&
+      !existingColumns.has(`${column.table}:${column.column}`),
   );
   const missingUniqueIndexes = requiredUniqueIndexes.filter(
     (index) =>
@@ -96,12 +119,23 @@ async function main() {
       !existingUniqueIndexes.has(uniqueIndexKey(index.table, index.columns)),
   );
 
-  if (missingTables.length > 0 || missingUniqueIndexes.length > 0) {
+  if (
+    missingTables.length > 0 ||
+    missingColumns.length > 0 ||
+    missingUniqueIndexes.length > 0
+  ) {
     if (missingTables.length > 0) {
     console.error("Faltan tablas requeridas en la base:");
     for (const table of missingTables) {
       console.error(`- ${table}`);
     }
+    }
+
+    if (missingColumns.length > 0) {
+      console.error("Faltan columnas requeridas en la base:");
+      for (const column of missingColumns) {
+        console.error(`- ${column.table}.${column.column}`);
+      }
     }
 
     if (missingUniqueIndexes.length > 0) {

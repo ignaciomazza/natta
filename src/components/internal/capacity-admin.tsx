@@ -31,6 +31,7 @@ type WeekdayRuleItem = {
   weekday: number;
   isOpen: boolean;
   maxUnits: number;
+  isAutoCapacity: boolean;
   minLeadTimeDays: number;
   cutoffHour: number;
 };
@@ -82,6 +83,8 @@ type CapacityItem = {
   weekday: number;
   isOpen: boolean;
   maxUnits: number;
+  manualMaxUnits: number;
+  isAutoCapacity: boolean;
   bookedUnits: number;
   availableUnits: number;
   source: "weekday" | "override";
@@ -127,6 +130,7 @@ type ExceptionEditor = {
   date: string;
   isClosed: boolean;
   maxUnits: number;
+  isAutoCapacity: boolean;
   bookedUnits: number;
   availableUnits: number;
   hasOverride: boolean;
@@ -200,6 +204,70 @@ function formatDraftUnits(value: string | undefined) {
   return parsed === null ? "Libre" : String(parsed);
 }
 
+function calculateAutoCapacity(
+  flavors: Array<{
+    isClosed: boolean;
+    maxUnits: number | null;
+    sizes: Array<{ isClosed: boolean; maxUnits: number | null }>;
+  }>,
+) {
+  return flavors.reduce((total, flavor) => {
+    if (flavor.isClosed) return total;
+
+    const openSizes = flavor.sizes.filter((size) => !size.isClosed);
+    const cappedSizes = openSizes.filter((size) => size.maxUnits !== null);
+    const sizeMaxUnits = cappedSizes.reduce(
+      (sum, size) => sum + (size.maxUnits ?? 0),
+      0,
+    );
+
+    if (flavor.maxUnits !== null) {
+      return total + (
+        openSizes.length > 0 && cappedSizes.length === openSizes.length
+          ? Math.min(flavor.maxUnits, sizeMaxUnits)
+          : flavor.maxUnits
+      );
+    }
+
+    return total + sizeMaxUnits;
+  }, 0);
+}
+
+function calculateWeekdayAutoCapacity(
+  flavors: FlavorOption[],
+  flavorCaps: Record<string, string>,
+  sizeCaps: Record<string, string>,
+) {
+  return calculateAutoCapacity(
+    flavors.map((flavor) => ({
+      isClosed: false,
+      maxUnits: parseOptionalUnits(flavorCaps[flavor.id] ?? ""),
+      sizes: flavor.sizes.map((size) => ({
+        isClosed: false,
+        maxUnits: parseOptionalUnits(sizeCaps[capacitySizeKey(flavor.id, size.id)] ?? ""),
+      })),
+    })),
+  );
+}
+
+function calculateExceptionAutoCapacity(flavors: ExceptionFlavorEditor[]) {
+  return calculateAutoCapacity(
+    flavors.map((flavor) => ({
+      isClosed: flavor.isClosed,
+      maxUnits: flavor.isClosed
+        ? 0
+        : (parseOptionalUnits(flavor.maxInput) ?? flavor.inheritedMaxUnits),
+      sizes: flavor.sizes.map((size) => ({
+        isClosed: flavor.isClosed || size.isClosed,
+        maxUnits:
+          flavor.isClosed || size.isClosed
+            ? 0
+            : (parseOptionalUnits(size.maxInput) ?? size.inheritedMaxUnits),
+      })),
+    })),
+  );
+}
+
 function capacitySizeKey(flavorId: string, sizeId: string) {
   return `${flavorId}::${sizeId}`;
 }
@@ -249,6 +317,7 @@ function getWeekdayDraft(
   return {
     isOpen: rule?.isOpen ?? selectedWeekday !== 0,
     maxUnits: rule?.maxUnits ?? (selectedWeekday === 0 ? 0 : 20),
+    isAutoCapacity: rule?.isAutoCapacity ?? false,
     flavorCaps,
     flavorSizeCaps,
   };
@@ -493,6 +562,7 @@ export function CapacityAdmin() {
   const [weekday, setWeekday] = useState(1);
   const [weekdayOpen, setWeekdayOpen] = useState(true);
   const [weekdayMax, setWeekdayMax] = useState(20);
+  const [weekdayAutoCapacity, setWeekdayAutoCapacity] = useState(false);
   const [weekdayFlavorCaps, setWeekdayFlavorCaps] = useState<Record<string, string>>({});
   const [weekdayFlavorSizeCaps, setWeekdayFlavorSizeCaps] = useState<
     Record<string, string>
@@ -527,6 +597,7 @@ export function CapacityAdmin() {
     );
     setWeekdayOpen(draft.isOpen);
     setWeekdayMax(draft.maxUnits);
+    setWeekdayAutoCapacity(draft.isAutoCapacity);
     setWeekdayFlavorCaps(draft.flavorCaps);
     setWeekdayFlavorSizeCaps(draft.flavorSizeCaps);
   };
@@ -557,6 +628,7 @@ export function CapacityAdmin() {
       );
       setWeekdayOpen(draft.isOpen);
       setWeekdayMax(draft.maxUnits);
+      setWeekdayAutoCapacity(draft.isAutoCapacity);
       setWeekdayFlavorCaps(draft.flavorCaps);
       setWeekdayFlavorSizeCaps(draft.flavorSizeCaps);
       setSelectedWeeklyFlavorId((previous) =>
@@ -604,6 +676,7 @@ export function CapacityAdmin() {
           weekday,
           isOpen: weekdayOpen,
           maxUnits: weekdayOpen ? weekdayMax : 0,
+          isAutoCapacity: weekdayOpen ? weekdayAutoCapacity : false,
         }),
       });
 
@@ -763,7 +836,8 @@ export function CapacityAdmin() {
     setExceptionEditor({
       date: item.date,
       isClosed: !item.isOpen,
-      maxUnits: item.maxUnits,
+      maxUnits: item.manualMaxUnits,
+      isAutoCapacity: item.isAutoCapacity,
       bookedUnits: item.bookedUnits,
       availableUnits: item.availableUnits,
       hasOverride: item.hasOverride,
@@ -786,6 +860,9 @@ export function CapacityAdmin() {
           date: exceptionEditor.date,
           isClosed: exceptionEditor.isClosed,
           maxUnits: exceptionEditor.isClosed ? 0 : exceptionEditor.maxUnits,
+          isAutoCapacity: exceptionEditor.isClosed
+            ? false
+            : exceptionEditor.isAutoCapacity,
         }),
       });
 
@@ -882,6 +959,15 @@ export function CapacityAdmin() {
   const selectedWeeklyFlavorValue = selectedWeeklyFlavor
     ? (weekdayFlavorCaps[selectedWeeklyFlavor.id] ?? "")
     : "";
+  const weeklyAutoMaxUnits = useMemo(
+    () =>
+      calculateWeekdayAutoCapacity(
+        flavors,
+        weekdayFlavorCaps,
+        weekdayFlavorSizeCaps,
+      ),
+    [flavors, weekdayFlavorCaps, weekdayFlavorSizeCaps],
+  );
   const weeklySpecificCaps = flavors.filter((flavor) =>
     hasSpecificDraft(weekdayFlavorCaps[flavor.id]),
   );
@@ -904,6 +990,9 @@ export function CapacityAdmin() {
     ) ??
     exceptionEditor?.flavors[0] ??
     null;
+  const exceptionAutoMaxUnits = exceptionEditor
+    ? calculateExceptionAutoCapacity(exceptionEditor.flavors)
+    : 0;
   const exceptionSpecificFlavors =
     exceptionEditor?.flavors.filter(
       (flavor) =>
@@ -995,20 +1084,30 @@ export function CapacityAdmin() {
                     Cupo máximo general
                     <input
                       className={inputClassName}
-                      disabled={!weekdayOpen}
+                      disabled={!weekdayOpen || weekdayAutoCapacity}
                       min={0}
                       onChange={(event) => setWeekdayMax(Number(event.target.value))}
                       type="number"
-                      value={weekdayMax}
+                      value={weekdayAutoCapacity ? weeklyAutoMaxUnits : weekdayMax}
                     />
                   </label>
 
                   <div className={controlRowClassName}>
                     <Toggle
+                      checked={weekdayAutoCapacity}
+                      label="Cupo auto"
+                      onChange={setWeekdayAutoCapacity}
+                    />
+                    <Toggle
                       checked={weekdayOpen}
                       label="Día habilitado"
                       onChange={setWeekdayOpen}
                     />
+                    {weekdayAutoCapacity ? (
+                      <Pill mini tone="info">
+                        Auto: {weeklyAutoMaxUnits}
+                      </Pill>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1188,6 +1287,11 @@ export function CapacityAdmin() {
                       <Pill mini tone={item.isOpen ? "success" : "danger"}>
                         {item.isOpen ? "Abierto" : "Cerrado"}
                       </Pill>
+                      {item.isAutoCapacity ? (
+                        <Pill mini tone="info">
+                          Auto
+                        </Pill>
+                      ) : null}
                       <span className="text-xs text-zinc-500">
                         {item.availableUnits} disponibles
                       </span>
@@ -1301,7 +1405,7 @@ export function CapacityAdmin() {
                   Cupo máximo general
                   <input
                     className={inputClassName}
-                    disabled={exceptionEditor.isClosed}
+                    disabled={exceptionEditor.isClosed || exceptionEditor.isAutoCapacity}
                     min={0}
                     onChange={(event) =>
                       setExceptionEditor((prev) =>
@@ -1314,7 +1418,11 @@ export function CapacityAdmin() {
                       )
                     }
                     type="number"
-                    value={exceptionEditor.maxUnits}
+                    value={
+                      exceptionEditor.isAutoCapacity
+                        ? exceptionAutoMaxUnits
+                        : exceptionEditor.maxUnits
+                    }
                   />
                 </label>
 
@@ -1323,6 +1431,12 @@ export function CapacityAdmin() {
                     Estado actual
                   </p>
                   <div className="mt-2 space-y-1.5">
+                    <p className="flex items-center justify-between">
+                      <span className="text-zinc-600">Modo</span>
+                      <strong>
+                        {exceptionEditor.isAutoCapacity ? "Auto" : "Manual"}
+                      </strong>
+                    </p>
                     <p className="flex items-center justify-between">
                       <span className="text-zinc-600">Reservado</span>
                       <strong>{exceptionEditor.bookedUnits}</strong>
@@ -1341,6 +1455,27 @@ export function CapacityAdmin() {
                     <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                       Cupos por sabor de esta fecha
                     </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Toggle
+                      checked={exceptionEditor.isAutoCapacity}
+                      label="Cupo auto"
+                      onChange={(checked) =>
+                        setExceptionEditor((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                isAutoCapacity: checked,
+                              }
+                            : prev,
+                        )
+                      }
+                    />
+                    {exceptionEditor.isAutoCapacity ? (
+                      <Pill mini tone="info">
+                        Auto: {exceptionAutoMaxUnits}
+                      </Pill>
+                    ) : null}
                   </div>
                   <Toggle
                     checked={exceptionEditor.isClosed}

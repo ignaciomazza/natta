@@ -9,6 +9,7 @@ const weekdaySchema = z.object({
   weekday: z.number().int().min(0).max(6),
   isOpen: z.boolean().optional(),
   maxUnits: z.number().int().min(0).optional(),
+  isAutoCapacity: z.boolean().optional(),
   minLeadTimeDays: z.number().int().min(0).max(30).optional(),
   cutoffHour: z.number().int().min(0).max(23).optional(),
 });
@@ -25,6 +26,9 @@ export async function PATCH(req: NextRequest) {
       update: {
         ...(body.isOpen !== undefined ? { isOpen: body.isOpen } : {}),
         ...(body.maxUnits !== undefined ? { maxUnits: body.maxUnits } : {}),
+        ...(body.isAutoCapacity !== undefined
+          ? { isAutoCapacity: body.isAutoCapacity }
+          : {}),
         ...(body.minLeadTimeDays !== undefined
           ? { minLeadTimeDays: body.minLeadTimeDays }
           : {}),
@@ -34,6 +38,7 @@ export async function PATCH(req: NextRequest) {
         weekday: body.weekday,
         isOpen: body.isOpen ?? body.weekday !== 0,
         maxUnits: body.maxUnits ?? 20,
+        isAutoCapacity: body.isAutoCapacity ?? false,
         minLeadTimeDays: body.minLeadTimeDays ?? 2,
         cutoffHour: body.cutoffHour ?? 10,
       },

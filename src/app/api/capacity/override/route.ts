@@ -8,6 +8,7 @@ import { logServerError } from "@/lib/server/log";
 const overrideSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   maxUnits: z.number().int().min(0).nullable().optional(),
+  isAutoCapacity: z.boolean().optional(),
   isClosed: z.boolean().optional(),
   note: z.string().max(500).nullable().optional(),
 });
@@ -24,12 +25,16 @@ export async function PATCH(req: NextRequest) {
       where: { date },
       update: {
         ...(body.maxUnits !== undefined ? { maxUnits: body.maxUnits } : {}),
+        ...(body.isAutoCapacity !== undefined
+          ? { isAutoCapacity: body.isAutoCapacity }
+          : {}),
         ...(body.isClosed !== undefined ? { isClosed: body.isClosed } : {}),
         ...(body.note !== undefined ? { note: body.note } : {}),
       },
       create: {
         date,
         maxUnits: body.maxUnits ?? null,
+        isAutoCapacity: body.isAutoCapacity ?? false,
         isClosed: body.isClosed ?? false,
         note: body.note ?? null,
       },
