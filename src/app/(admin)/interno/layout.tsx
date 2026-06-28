@@ -20,10 +20,10 @@ export default async function InternoLayout({
 }: {
   children: ReactNode;
 }) {
-  const user = await requirePageAuth();
+  await requirePageAuth();
 
   return (
-    <AdminShell userName={user.name}>
+    <AdminShell>
       {children}
     </AdminShell>
   );

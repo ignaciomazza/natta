@@ -19,7 +19,6 @@ import {
 import { LogoutButton } from "@/components/internal/logout-button";
 
 type Props = {
-  userName?: string | null;
   children: ReactNode;
 };
 
@@ -47,7 +46,7 @@ function isActiveRoute(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-export function AdminShell({ userName, children }: Props) {
+export function AdminShell({ children }: Props) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -91,15 +90,7 @@ export function AdminShell({ userName, children }: Props) {
         }`}
       >
         <div className="flex h-full flex-col">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-                Natta Gestión
-              </p>
-              <h1 className="truncate text-base font-semibold text-[color:var(--chocolate-deep)]">
-                {userName || "Administrador"}
-              </h1>
-            </div>
+          <div className="flex justify-end">
             <button
               aria-label="Ocultar menú"
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--line)] text-zinc-600 transition hover:border-[color:var(--accent)] hover:text-[color:var(--chocolate-deep)]"
