@@ -142,11 +142,29 @@ async function mercadoPagoRequest<T>(path: string, init: RequestInit = {}) {
   return data;
 }
 
-export function getAppUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
-    "http://localhost:3000"
-  );
+export function getAppUrl(environment = getMercadoPagoEnvironment()) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+
+  if (appUrl) {
+    if (
+      environment === "production" &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(appUrl)
+    ) {
+      throw new MercadoPagoConfigError(
+        "NEXT_PUBLIC_APP_URL no puede apuntar a localhost en production",
+      );
+    }
+
+    return appUrl;
+  }
+
+  if (environment === "production") {
+    throw new MercadoPagoConfigError(
+      "Falta configurar NEXT_PUBLIC_APP_URL en production",
+    );
+  }
+
+  return "http://localhost:3000";
 }
 
 export function getMercadoPagoTicketExpirationDays() {
@@ -175,7 +193,7 @@ export async function createMercadoPagoPreference(input: {
   customerEmail?: string | null;
   environment?: MercadoPagoEnvironment;
 }) {
-  const appUrl = getAppUrl();
+  const appUrl = getAppUrl(input.environment);
   const getBackUrl = (payment: "success" | "failure" | "pending") => {
     const params = new URLSearchParams({
       order: input.orderId,

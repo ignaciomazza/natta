@@ -1,0 +1,14 @@
+.DS_Store
+public/**/*.DS_Store
+
+# Source-only image assets. Optimized public copies remain deployed.
+public/images/Instagram_files/**
+public/images/transparent-images/**
+public/images/menu/*.HEIC
+public/images/menu/*.HEIF
+public/images/menu/*.heic
+public/images/menu/*.heif
+public/images/menu/*.png
+public/images/menu/choco.jpg
+public/images/menu/natta.jpg
+public/images/logo/IMG_*.PNG

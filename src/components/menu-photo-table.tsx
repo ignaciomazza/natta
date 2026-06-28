@@ -371,7 +371,7 @@ function MenuSlideCard({
           alt={photo.alt}
           className="absolute inset-0 h-full w-full object-cover"
           decoding="async"
-          loading="eager"
+          loading="lazy"
           src={photo.src}
         />
       </div>

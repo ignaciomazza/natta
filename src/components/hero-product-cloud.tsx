@@ -521,6 +521,8 @@ export function HeroProductCloud() {
       <div className="hero-product-cloud__stage content-shell relative flex min-h-[calc(100svh-5rem)] items-center justify-center py-8 md:min-h-[calc(100svh-6rem)] md:py-12">
         <div aria-hidden="true" className="hero-product-cloud__pieces">
           {heroPieces.map((piece) => {
+            const shouldPreloadPiece =
+              piece.priority && !piece.hideOnDesktop && !piece.hideOnMobile;
             const rotation =
               piece.rotate + pointer.x * piece.depth * 0.05 - pointer.y * piece.depth * 0.035;
             const baseScale = piece.scale ?? 1;
@@ -594,7 +596,9 @@ export function HeroProductCloud() {
                   alt={piece.alt}
                   className="hero-product-piece__image"
                   decoding="async"
-                  fetchPriority={piece.priority ? "high" : "auto"}
+                  {...(shouldPreloadPiece
+                    ? { fetchPriority: "high" as const }
+                    : { loading: "lazy" as const })}
                   height={piece.naturalHeight}
                   src={piece.src}
                   width={piece.naturalWidth}

@@ -4,16 +4,37 @@ import { ArrowLeft } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { OrderAssistant } from "@/components/order-assistant";
 import { SiteFooter } from "@/components/site-footer";
+import { StructuredData } from "@/components/structured-data";
+import {
+  buildOrderStructuredData,
+  sharedOpenGraph,
+  sharedTwitter,
+  siteConfig,
+} from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Pedido | Natta Vascas",
-  description:
-    "Arma tu pedido de tartas vascas Natta con sabores, fecha, modalidad y pago online.",
+  title: "Pedido",
+  description: siteConfig.orderDescription,
+  alternates: {
+    canonical: "/pedido",
+  },
+  openGraph: {
+    ...sharedOpenGraph,
+    title: "Pedido | Natta Vascas",
+    description: siteConfig.orderDescription,
+    url: "/pedido",
+  },
+  twitter: {
+    ...sharedTwitter,
+    title: "Pedido | Natta Vascas",
+    description: siteConfig.orderDescription,
+  },
 };
 
 export default function PedidoPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[var(--cream-soft)]">
+      <StructuredData data={buildOrderStructuredData()} />
       <header className="fixed inset-x-0 top-0 z-40 border-b border-white/35 bg-[var(--cream-soft)]/86 px-4 py-2 backdrop-blur-xl md:px-8 md:py-2.5">
         <nav className="content-shell flex items-center justify-between gap-4">
           <BrandLoaderLink

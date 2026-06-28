@@ -9,7 +9,9 @@ import { FaqList } from "@/components/faq-list";
 import { HeroProductCloud } from "@/components/hero-product-cloud";
 import { MenuPhotoTable } from "@/components/menu-photo-table";
 import { SiteFooter } from "@/components/site-footer";
+import { StructuredData } from "@/components/structured-data";
 import { cakeSizes } from "@/lib/catalog";
+import { buildHomeStructuredData } from "@/lib/seo";
 
 const staticImageVersion = "20260612-static";
 const optimizedInstagramImage = (file: string) =>
@@ -104,6 +106,7 @@ const faq = [
 export default function Home() {
   return (
     <main className="overflow-hidden">
+      <StructuredData data={buildHomeStructuredData(faq)} />
       <header className="fixed inset-x-0 top-0 z-40 border-b border-[rgba(81,53,48,0.09)] bg-[var(--cream-soft)]/76 px-4 py-2.5 backdrop-blur-2xl md:px-8">
         <nav className="content-shell grid grid-cols-[1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
           <a

@@ -92,9 +92,15 @@ Una vez cargadas `DATABASE_URL` y `DIRECT_URL`, ejecutar contra producción:
 
 ```bash
 npm run prisma:generate
+npm run db:schema:check
 npm run db:push
+npm run db:schema:check
 npm run prisma:seed
 ```
+
+Si `npm run db:schema:check` falla antes de `db:push`, significa que la base
+todavía no tiene todo el esquema que espera el código. En ese caso no es un
+problema de build: hay que aplicar el schema con Prisma antes del lanzamiento.
 
 Eso crea el esquema y deja listos:
 

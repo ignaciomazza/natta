@@ -138,9 +138,25 @@ function getPaymentStatusLabel(status: string) {
   return "En revisión";
 }
 
-export const metadata: Metadata = {
-  title: "Comprobante | Natta",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}): Promise<Metadata> {
+  const { code } = await params;
+
+  return {
+    title: "Comprobante",
+    alternates: {
+      canonical: `/comprobante/${code}`,
+    },
+    robots: {
+      index: false,
+      follow: false,
+      nocache: true,
+    },
+  };
+}
 
 export default async function ComprobantePage({
   params,

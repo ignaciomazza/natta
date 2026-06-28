@@ -3,11 +3,19 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { OrderStatusLookup } from "@/components/order-status-lookup";
 import { SiteFooter } from "@/components/site-footer";
+import { siteConfig } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Estado de pedido | Natta",
-  description:
-    "Consultá el estado de tu pedido Natta con código de comprobante o datos de entrega.",
+  title: "Estado de pedido",
+  description: siteConfig.statusDescription,
+  alternates: {
+    canonical: "/estado-pedido",
+  },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+  },
 };
 
 export default function EstadoPedidoPage() {
