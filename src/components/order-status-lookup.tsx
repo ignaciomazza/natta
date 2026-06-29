@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { getPickupHoursForDate } from "@/lib/pickup-hours";
 
 type LookupMode = "code" | "recovery";
 
@@ -306,6 +307,7 @@ function EmptyResult() {
 
 function OrderStatusResult({ order }: { order: PublicOrderStatus }) {
   const StatusIcon = statusIcon[order.statusTone];
+  const isPickup = order.fulfillmentMode === "Retiro";
 
   return (
     <div className="space-y-7">
@@ -329,7 +331,7 @@ function OrderStatusResult({ order }: { order: PublicOrderStatus }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 sm:gap-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
         <StatusMeta
           label="Entrega"
           value={formatDate(order.deliveryDate)}
@@ -338,6 +340,12 @@ function OrderStatusResult({ order }: { order: PublicOrderStatus }) {
           label="Modalidad"
           value={order.fulfillmentMode}
         />
+        {isPickup ? (
+          <StatusMeta
+            label="Horario"
+            value={getPickupHoursForDate(order.deliveryDate)}
+          />
+        ) : null}
         <StatusMeta
           label="Pagado"
           value={formatMoney(order.amountPaidArs)}

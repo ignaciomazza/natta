@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import {
   BadgeCheck,
   CalendarDays,
+  Clock,
   CreditCard,
   Package,
   Phone,
@@ -11,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
+import { getPickupHoursForDate } from "@/lib/pickup-hours";
 import { prisma } from "@/lib/prisma";
 
 const formatMoney = (value: number) =>
@@ -209,6 +211,7 @@ export default async function ComprobantePage({
   const customerName = order.customer?.name?.trim() || "Sin nombre cargado";
   const customerPhone = order.customer?.phone?.trim() || "Sin teléfono cargado";
   const firstPayment = order.payments[0] ?? null;
+  const isPickup = order.fulfillmentMode === "PICKUP";
 
   return (
     <>
@@ -278,7 +281,7 @@ export default async function ComprobantePage({
                     </h2>
                   </div>
 
-                  <div className="mt-5 grid gap-5 sm:grid-cols-3">
+                  <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-zinc-500">
                         <CalendarDays className="h-4 w-4" strokeWidth={1.9} />
@@ -295,9 +298,21 @@ export default async function ComprobantePage({
                         <span>Modalidad</span>
                       </div>
                       <p className="text-lg font-medium text-zinc-900">
-                        {order.fulfillmentMode === "PICKUP" ? "Retiro" : "Envío"}
+                        {isPickup ? "Retiro" : "Envío"}
                       </p>
                     </div>
+
+                    {isPickup ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-zinc-500">
+                          <Clock className="h-4 w-4" strokeWidth={1.9} />
+                          <span>Horario</span>
+                        </div>
+                        <p className="text-lg font-medium text-zinc-900">
+                          {getPickupHoursForDate(order.deliveryDate)}
+                        </p>
+                      </div>
+                    ) : null}
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-zinc-500">

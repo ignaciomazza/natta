@@ -23,6 +23,11 @@ import {
   X,
 } from "lucide-react";
 import { MercadoPagoCardForm } from "@/components/mercadopago-card-form";
+import {
+  getAvailablePickupCopyForDate,
+  getPickupHoursForDate,
+  PICKUP_HOURS_SUMMARY,
+} from "@/lib/pickup-hours";
 
 type CatalogSize = {
   id: string;
@@ -583,6 +588,7 @@ export function OrderAssistant() {
 
   const summaryDate = paymentSnapshot?.order.deliveryDate ?? date;
   const summaryMode = paymentSnapshot?.order.fulfillmentMode ?? mode;
+  const summaryPickupHours = getPickupHoursForDate(summaryDate);
   const summaryTotalArs = paymentSnapshot?.order.subtotalArs ?? totalArs;
   const summaryBalanceArs = paymentSnapshot?.order.amountBalanceArs ?? balanceArs;
   const snapshotAmountRequiredArs = paymentSnapshot
@@ -671,7 +677,7 @@ export function OrderAssistant() {
             label: "Pedido asistido",
             notes: [
               "Podés combinar sabores y tamaños en un mismo pedido.",
-              "El calendario marca preparación, disponibilidad y domingos cerrados.",
+              PICKUP_HOURS_SUMMARY,
             ],
             title: "Armá tu pedido.",
           };
@@ -1317,7 +1323,7 @@ export function OrderAssistant() {
                     Disponibilidad
                   </p>
                   <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
-                    Las primeras 48 h quedan como preparación. Los domingos no se toman pedidos ni retiros.
+                    Las primeras 48 h quedan como preparación. Retiros de lunes a viernes de 11 a 18 h y sábados de 11 a 14 h. Domingos cerrados.
                   </p>
                 </div>
 
@@ -1380,8 +1386,8 @@ export function OrderAssistant() {
                       <span className="mt-0.5 block text-[0.58rem] uppercase tracking-[0.14em] opacity-70 sm:mt-1 sm:text-xs sm:tracking-[0.16em]">
                         {parts.month}
                       </span>
-                      <span className="mt-1.5 block text-[0.62rem] font-medium sm:mt-3 sm:text-xs">
-                        {blockedReason ?? "Disponible"}
+                      <span className="mt-1.5 block break-words text-[0.62rem] font-medium leading-tight sm:mt-3 sm:text-xs">
+                        {blockedReason ?? getAvailablePickupCopyForDate(day.date)}
                       </span>
                     </button>
                   );
@@ -1527,6 +1533,14 @@ export function OrderAssistant() {
                       {getFulfillmentLabel(summaryMode)}
                     </strong>
                   </div>
+                  {!isDeliveryMode(summaryMode) ? (
+                    <div className="flex justify-between gap-4">
+                      <span>Horario</span>
+                      <strong className="text-right font-medium">
+                        {summaryPickupHours}
+                      </strong>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between gap-4">
                     <span>Total</span>
                     <strong className="font-mono">{formatMoney(summaryTotalArs)}</strong>
@@ -1886,6 +1900,14 @@ export function OrderAssistant() {
                         {getFulfillmentLabel(summaryMode)}
                       </strong>
                     </div>
+                    {!isDeliveryMode(summaryMode) ? (
+                      <div className="flex justify-between gap-4">
+                        <span>Horario</span>
+                        <strong className="text-right font-medium">
+                          {summaryPickupHours}
+                        </strong>
+                      </div>
+                    ) : null}
                     <div className="flex justify-between gap-4">
                       <span>Total</span>
                       <strong className="font-mono">{formatMoney(summaryTotalArs)}</strong>
@@ -1993,6 +2015,14 @@ export function OrderAssistant() {
                     {getFulfillmentLabel(summaryMode)}
                   </strong>
                 </div>
+                {!isDeliveryMode(summaryMode) ? (
+                  <div className="flex justify-between gap-4">
+                    <span>Horario</span>
+                    <strong className="text-right font-medium">
+                      {summaryPickupHours}
+                    </strong>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-4">
                   <span>Total</span>
                   <strong className="font-mono">{formatMoney(summaryTotalArs)}</strong>
