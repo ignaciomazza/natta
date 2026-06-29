@@ -28,6 +28,7 @@ import {
   inputClassName,
 } from "@/components/internal/ui";
 import { SelectField, SelectOption } from "@/components/internal/select-field";
+import { formatDateOnly } from "@/lib/date-only";
 
 type OrderStatus = "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
 type PeriodUnit = "day" | "week" | "month";
@@ -115,11 +116,7 @@ const formatMoney = (value: number) =>
   }).format(value);
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatDateOnly(value);
 }
 
 function getItemCount(items: OrderLineItem[]) {

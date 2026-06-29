@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getDateOnlyString } from "@/lib/date-only";
+import { getDateRange } from "@/lib/capacity";
 import { logServerError } from "@/lib/server/log";
 
 const lookupSchema = z.discriminatedUnion("mode", [
@@ -125,10 +127,7 @@ function phoneMatches(storedPhone: string, inputPhone: string) {
 }
 
 function getDateWindow(date: string) {
-  return {
-    gte: new Date(`${date}T00:00:00`),
-    lte: new Date(`${date}T23:59:59.999`),
-  };
+  return getDateRange(date);
 }
 
 function getStatusCopy(order: PublicOrder) {
@@ -191,7 +190,7 @@ function serializeOrder(order: PublicOrder) {
     statusTone: status.tone,
     statusDetail: status.detail,
     receiptHref: `/comprobante/${order.publicReceiptCode}`,
-    deliveryDate: order.deliveryDate,
+    deliveryDate: getDateOnlyString(order.deliveryDate),
     fulfillmentMode:
       order.fulfillmentMode === "PICKUP" ? "Retiro" : "Envío",
     subtotalArs: order.subtotalArs,

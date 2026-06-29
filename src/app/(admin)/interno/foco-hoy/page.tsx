@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { CalendarClock, Coins, PackageCheck, Target } from "lucide-react";
 import type { Prisma } from "@prisma/client";
+import {
+  addDateOnlyDays,
+  formatDateOnly,
+  getBusinessDateOnlyString,
+  getDateOnlyStart,
+  getDateOnlyString,
+} from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
 import { SectionTitle, buttonSoftClassName, panelClassName } from "@/components/internal/ui";
 
@@ -14,11 +21,11 @@ const formatMoney = (value: number) =>
 const formatNumber = (value: number) => new Intl.NumberFormat("es-AR").format(value);
 
 const formatDate = (value: Date) =>
-  new Intl.DateTimeFormat("es-AR", {
+  formatDateOnly(value, {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
-  }).format(value);
+  });
 
 const formatTime = (value: Date) =>
   new Intl.DateTimeFormat("es-AR", {
@@ -75,14 +82,12 @@ function SummaryCard({ label, value, detail, tone = "neutral" }: SummaryCardProp
 }
 
 export default async function FocoHoyPage() {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-
-  const nextTwoDaysEnd = new Date(todayStart);
-  nextTwoDaysEnd.setDate(nextTwoDaysEnd.getDate() + 3);
+  const today = getBusinessDateOnlyString();
+  const tomorrow = addDateOnlyDays(today, 1);
+  const nextThreeDays = addDateOnlyDays(today, 3);
+  const todayStart = getDateOnlyStart(today);
+  const tomorrowStart = getDateOnlyStart(tomorrow);
+  const nextTwoDaysEnd = getDateOnlyStart(nextThreeDays);
 
   const todayWhere: Prisma.OrderWhereInput = {
     status: { in: ["PENDING", "CONFIRMED"] },
@@ -162,7 +167,7 @@ export default async function FocoHoyPage() {
 
   const prepByDate = new Map<string, PrepDay>();
   for (const row of nextTwoDaysDailyStatus) {
-    const key = row.deliveryDate.toISOString().slice(0, 10);
+    const key = getDateOnlyString(row.deliveryDate);
     const current = prepByDate.get(key) ?? {
       dateLabel: formatDate(row.deliveryDate),
       orders: 0,

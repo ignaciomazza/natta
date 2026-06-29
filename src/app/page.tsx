@@ -7,11 +7,15 @@ import {
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { FaqList } from "@/components/faq-list";
 import { HeroProductCloud } from "@/components/hero-product-cloud";
-import { MenuPhotoTable } from "@/components/menu-photo-table";
+import { MenuPhotoTable, type MenuTableFlavor } from "@/components/menu-photo-table";
+import { SiteLogo } from "@/components/site-logo";
 import { SiteFooter } from "@/components/site-footer";
 import { StructuredData } from "@/components/structured-data";
 import { cakeSizes } from "@/lib/catalog";
+import { getActiveCatalog } from "@/lib/catalog-db";
 import { buildHomeStructuredData } from "@/lib/seo";
+
+export const dynamic = "force-dynamic";
 
 const staticImageVersion = "20260612-static";
 const optimizedInstagramImage = (file: string) =>
@@ -103,17 +107,76 @@ const faq = [
   },
 ];
 
-export default function Home() {
+const menuFlavorOrder = [
+  "natta",
+  "limu",
+  "choco",
+  "tella",
+  "blanca",
+  "tachio",
+  "duo",
+  "argenta",
+  "mocha",
+  "brulee",
+];
+
+function buildMenuFlavors(
+  catalogFlavors: Awaited<ReturnType<typeof getActiveCatalog>>["flavors"],
+): MenuTableFlavor[] {
+  const order = new Map(menuFlavorOrder.map((slug, index) => [slug, index]));
+
+  return catalogFlavors
+    .map((flavor) => {
+      const prices: MenuTableFlavor["prices"] = {
+        latta: null,
+        chica: null,
+        grande: null,
+      };
+
+      for (const price of flavor.prices) {
+        if (
+          price.sizeSlug === "latta" ||
+          price.sizeSlug === "chica" ||
+          price.sizeSlug === "grande"
+        ) {
+          prices[price.sizeSlug] = price.amountArs;
+        }
+      }
+
+      return {
+        id: flavor.id,
+        slug: flavor.slug,
+        name: flavor.name,
+        description: flavor.description,
+        prices,
+      };
+    })
+    .sort(
+      (left, right) =>
+        (order.get(left.slug) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(right.slug) ?? Number.MAX_SAFE_INTEGER) ||
+        left.name.localeCompare(right.name),
+    );
+}
+
+export default async function Home() {
+  const catalog = await getActiveCatalog();
+  const menuFlavors = buildMenuFlavors(catalog.flavors);
+
   return (
     <main className="overflow-hidden">
-      <StructuredData data={buildHomeStructuredData(faq)} />
+      <StructuredData data={buildHomeStructuredData(faq, menuFlavors)} />
       <header className="fixed inset-x-0 top-0 z-40 border-b border-[rgba(81,53,48,0.09)] bg-[var(--cream-soft)]/76 px-4 py-2.5 backdrop-blur-2xl md:px-8">
         <nav className="content-shell grid grid-cols-[1fr_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
           <a
-            className="shrink-0 justify-self-start font-display text-3xl leading-none italic text-[var(--chocolate)] transition hover:text-[var(--chocolate-deep)]"
+            className="group shrink-0 justify-self-start"
             href="#inicio"
+            aria-label="Natta"
           >
-            natta
+            <SiteLogo
+              className="h-10 w-auto transition duration-200 group-hover:scale-[1.03] md:h-11"
+              priority
+            />
           </a>
           <div className="hidden items-center gap-8 justify-self-center text-sm text-[var(--chocolate)]/68 md:flex">
             <a
@@ -398,7 +461,7 @@ export default function Home() {
             </div>
           </div>
 
-          <MenuPhotoTable />
+          <MenuPhotoTable flavors={menuFlavors} />
         </div>
       </section>
 

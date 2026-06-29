@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { formatDateOnly } from "@/lib/date-only";
 import { getPickupHoursForDate } from "@/lib/pickup-hours";
 
 type LookupMode = "code" | "recovery";
@@ -57,11 +58,7 @@ const formatMoney = (value: number) =>
   }).format(value);
 
 const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(value));
+  formatDateOnly(value);
 
 const toneClassName: Record<PublicOrderStatus["statusTone"], string> = {
   pending: "border-amber-200 bg-amber-50 text-amber-700",

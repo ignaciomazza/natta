@@ -55,6 +55,19 @@ type AutoCapacityFlavor = {
   }>;
 };
 
+const businessTimeZone = "America/Argentina/Buenos_Aires";
+const businessDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: businessTimeZone,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const businessHourFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: businessTimeZone,
+  hour: "2-digit",
+  hour12: false,
+});
+
 function getAutoCapacityMaxUnits(flavors: AutoCapacityFlavor[]) {
   return flavors.reduce((total, flavor) => {
     if (flavor.isClosed) return total;
@@ -78,11 +91,62 @@ function getAutoCapacityMaxUnits(flavors: AutoCapacityFlavor[]) {
   }, 0);
 }
 
+function shouldUseAutoCapacity(input: {
+  isOpen: boolean;
+  isAutoCapacity: boolean;
+  manualMaxUnits: number;
+  autoMaxUnits: number;
+}) {
+  if (!input.isOpen) return false;
+  return input.isAutoCapacity || (
+    input.manualMaxUnits <= 0 && input.autoMaxUnits > 0
+  );
+}
+
+function getDateParts(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return { year, month, day };
+}
+
+function getUtcDate(value: string, hour = 12, minute = 0, second = 0, millisecond = 0) {
+  const { year, month, day } = getDateParts(value);
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
+}
+
 function toDateOnlyString(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getUTCDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getBusinessDateString(reference: Date) {
+  const parts = Object.fromEntries(
+    businessDateFormatter
+      .formatToParts(reference)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addDaysToDateString(value: string, days: number) {
+  const date = getDateAtNoon(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toDateOnlyString(date);
+}
+
+export function getDateRange(from: string, to = from) {
+  return {
+    gte: getUtcDate(from, 0),
+    lte: getUtcDate(to, 23, 59, 59, 999),
+  };
+}
+
+export function getBusinessHour(reference = new Date()) {
+  const hour = Number(businessHourFormatter.format(reference));
+  return hour === 24 ? 0 : hour;
 }
 
 function isMissingTableError(error: unknown) {
@@ -114,35 +178,30 @@ export async function withMissingCapacityTableFallback<T>(
 }
 
 export function getDateAtNoon(value: string) {
-  return new Date(`${value}T12:00:00`);
+  return getUtcDate(value);
 }
 
 export function getDefaultMinDate(reference = new Date(), minLeadTimeDays = 2) {
-  const date = new Date(reference);
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + minLeadTimeDays);
-  return date;
+  return getDateAtNoon(
+    addDaysToDateString(getBusinessDateString(reference), minLeadTimeDays),
+  );
 }
 
 export function getWeekdayFromDateString(date: string) {
-  return getDateAtNoon(date).getDay();
+  return getDateAtNoon(date).getUTCDay();
 }
 
 export async function getCapacityCalendar(input?: {
   from?: string;
   days?: number;
 }) {
-  const fromDate = input?.from
-    ? getDateAtNoon(input.from)
-    : getDefaultMinDate(new Date(), 0);
+  const fromDate = input?.from ?? toDateOnlyString(getDefaultMinDate(new Date(), 0));
   const days = Math.max(1, Math.min(input?.days ?? 30, 120));
 
-  const dateList = Array.from({ length: days }, (_, index) => {
-    const cursor = new Date(fromDate);
-    cursor.setDate(fromDate.getDate() + index);
-    cursor.setHours(12, 0, 0, 0);
-    return toDateOnlyString(cursor);
-  });
+  const dateList = Array.from({ length: days }, (_, index) =>
+    addDaysToDateString(fromDate, index),
+  );
+  const dateRange = getDateRange(dateList[0], dateList[dateList.length - 1]);
 
   const [
     rules,
@@ -158,10 +217,7 @@ export async function getCapacityCalendar(input?: {
     prisma.weekdayCapacityRule.findMany(),
     prisma.dateCapacityOverride.findMany({
       where: {
-        date: {
-          gte: new Date(`${dateList[0]}T00:00:00`),
-          lte: new Date(`${dateList[dateList.length - 1]}T23:59:59`),
-        },
+        date: dateRange,
       },
     }),
     withMissingCapacityTableFallback(
@@ -171,10 +227,7 @@ export async function getCapacityCalendar(input?: {
     withMissingCapacityTableFallback(
       () => prisma.dateFlavorCapacityOverride.findMany({
         where: {
-          date: {
-            gte: new Date(`${dateList[0]}T00:00:00`),
-            lte: new Date(`${dateList[dateList.length - 1]}T23:59:59`),
-          },
+          date: dateRange,
         },
       }),
       [],
@@ -186,10 +239,7 @@ export async function getCapacityCalendar(input?: {
     withMissingCapacityTableFallback(
       () => prisma.dateFlavorSizeCapacityOverride.findMany({
         where: {
-          date: {
-            gte: new Date(`${dateList[0]}T00:00:00`),
-            lte: new Date(`${dateList[dateList.length - 1]}T23:59:59`),
-          },
+          date: dateRange,
         },
       }),
       [],
@@ -226,10 +276,7 @@ export async function getCapacityCalendar(input?: {
           status: {
             not: "CANCELLED",
           },
-          deliveryDate: {
-            gte: new Date(`${dateList[0]}T00:00:00`),
-            lte: new Date(`${dateList[dateList.length - 1]}T23:59:59`),
-          },
+          deliveryDate: dateRange,
         },
       },
       select: {
@@ -404,16 +451,23 @@ export async function getCapacityCalendar(input?: {
         sizes,
       };
     });
+    const autoMaxUnits = getAutoCapacityMaxUnits(flavors);
+    const usesAutoCapacity = shouldUseAutoCapacity({
+      isOpen,
+      isAutoCapacity,
+      manualMaxUnits,
+      autoMaxUnits,
+    });
     const maxUnits = isOpen
-      ? isAutoCapacity
-        ? getAutoCapacityMaxUnits(flavors)
+      ? usesAutoCapacity
+        ? autoMaxUnits
         : manualMaxUnits
       : 0;
     const hasMeaningfulOverride =
       Boolean(override) &&
       (isOpen !== baseIsOpen ||
         manualMaxUnits !== baseMaxUnits ||
-        isAutoCapacity !== baseIsAutoCapacity);
+        usesAutoCapacity !== baseIsAutoCapacity);
 
     const availableUnits = isOpen ? Math.max(0, maxUnits - bookedUnits) : 0;
 
@@ -423,7 +477,7 @@ export async function getCapacityCalendar(input?: {
       isOpen,
       maxUnits,
       manualMaxUnits,
-      isAutoCapacity,
+      isAutoCapacity: usesAutoCapacity,
       bookedUnits,
       availableUnits,
       minLeadTimeDays: weekdayRule?.minLeadTimeDays ?? 2,
@@ -556,7 +610,7 @@ export async function validateCapacityForOrder(input: {
 
   const now = new Date();
   const tomorrow = getDefaultMinDate(new Date(), 1);
-  if (date === toDateOnlyString(tomorrow) && now.getHours() >= (rule?.cutoffHour ?? 10)) {
+  if (date === toDateOnlyString(tomorrow) && getBusinessHour(now) >= (rule?.cutoffHour ?? 10)) {
     throw new Error("CUTOFF_REACHED");
   }
 
@@ -623,9 +677,14 @@ export async function validateCapacityForOrder(input: {
     });
     autoFlavors.set(price.flavorId, current);
   }
-  const maxUnits = isAutoCapacity
-    ? getAutoCapacityMaxUnits([...autoFlavors.values()])
-    : manualMaxUnits;
+  const autoMaxUnits = getAutoCapacityMaxUnits([...autoFlavors.values()]);
+  const usesAutoCapacity = shouldUseAutoCapacity({
+    isOpen,
+    isAutoCapacity,
+    manualMaxUnits,
+    autoMaxUnits,
+  });
+  const maxUnits = usesAutoCapacity ? autoMaxUnits : manualMaxUnits;
 
   const bookedUnits = existingItems.reduce((sum, item) => sum + item.quantity, 0);
   const nextUnits = bookedUnits + input.requestedUnits;
@@ -681,7 +740,7 @@ export async function validateCapacityForOrder(input: {
           ? 0
           : (sizeOverride?.maxUnits ?? sizeRule?.maxUnits ?? null);
 
-      if (isAutoCapacity && flavorMaxUnits === null && sizeMaxUnits === null) {
+      if (usesAutoCapacity && flavorMaxUnits === null && sizeMaxUnits === null) {
         throw new Error("FLAVOR_SIZE_CAPACITY_EXCEEDED");
       }
 
@@ -706,5 +765,6 @@ export function formatDateReadable(date: string) {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: businessTimeZone,
   }).format(getDateAtNoon(date));
 }

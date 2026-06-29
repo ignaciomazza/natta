@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { OrderAssistant } from "@/components/order-assistant";
+import { SiteLogo } from "@/components/site-logo";
 import { SiteFooter } from "@/components/site-footer";
 import { StructuredData } from "@/components/structured-data";
 import {
@@ -38,10 +39,14 @@ export default function PedidoPage() {
       <header className="fixed inset-x-0 top-0 z-40 border-b border-white/35 bg-[var(--cream-soft)]/86 px-4 py-2 backdrop-blur-xl md:px-8 md:py-2.5">
         <nav className="content-shell flex items-center justify-between gap-4">
           <BrandLoaderLink
-            className="shrink-0 font-display text-3xl leading-none italic text-[var(--chocolate)]"
+            className="group shrink-0"
             href="/"
+            aria-label="Natta"
           >
-            natta
+            <SiteLogo
+              className="h-10 w-auto transition duration-200 group-hover:scale-[1.03] md:h-11"
+              priority
+            />
           </BrandLoaderLink>
           <div className="hidden items-center gap-7 text-sm text-[var(--chocolate)]/72 md:flex">
             <Link className="transition hover:text-[var(--chocolate)]" href="/#menu">

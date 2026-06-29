@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getDateOnlyString } from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -34,7 +35,7 @@ export async function GET(
       id: order.id,
       code: order.publicReceiptCode,
       status: order.status,
-      deliveryDate: order.deliveryDate,
+      deliveryDate: getDateOnlyString(order.deliveryDate),
       fulfillmentMode: order.fulfillmentMode,
       subtotalArs: order.subtotalArs,
       amountPaidArs: order.amountPaidArs,

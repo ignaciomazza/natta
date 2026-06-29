@@ -12,7 +12,8 @@ import {
   paymentKindByOrderPaymentOption,
   resolveOrderPaymentOption,
 } from "@/lib/orders";
-import { validateCapacityForOrder } from "@/lib/capacity";
+import { getDateOnlyString } from "@/lib/date-only";
+import { getDateAtNoon, getDateRange, validateCapacityForOrder } from "@/lib/capacity";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
 import { isCatalogPairAvailable } from "@/lib/catalog-db";
 
@@ -81,8 +82,8 @@ export async function GET(req: NextRequest) {
       ...(from || to
         ? {
             deliveryDate: {
-              ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
-              ...(to ? { lte: new Date(`${to}T23:59:59`) } : {}),
+              ...(from ? { gte: getDateRange(from).gte } : {}),
+              ...(to ? { lte: getDateRange(to).lte } : {}),
             },
           }
         : {}),
@@ -118,7 +119,7 @@ export async function GET(req: NextRequest) {
         id: order.id,
         status: order.status,
         fulfillmentMode: order.fulfillmentMode,
-        deliveryDate: order.deliveryDate,
+        deliveryDate: getDateOnlyString(order.deliveryDate),
         publicReceiptCode: order.publicReceiptCode,
         subtotalArs: order.subtotalArs,
         amountDueNowArs: order.amountDueNowArs,
@@ -256,7 +257,7 @@ export async function POST(req: NextRequest) {
       data: {
         customerId: customer.id,
         fulfillmentMode: mode,
-        deliveryDate: new Date(`${body.deliveryDate}T12:00:00`),
+        deliveryDate: getDateAtNoon(body.deliveryDate),
         deliveryAddress: body.fulfillmentMode === "delivery" ? body.customer.address?.trim() || null : null,
         notes: body.notes?.trim() || null,
         subtotalArs: totals.subtotalArs,

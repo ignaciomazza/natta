@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
+import { formatDateOnly } from "@/lib/date-only";
 import { getPickupHoursForDate } from "@/lib/pickup-hours";
 import { prisma } from "@/lib/prisma";
 
@@ -23,11 +24,7 @@ const formatMoney = (value: number) =>
   }).format(value);
 
 function formatDate(value: Date) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(value);
+  return formatDateOnly(value);
 }
 
 function formatDateTime(value: Date) {

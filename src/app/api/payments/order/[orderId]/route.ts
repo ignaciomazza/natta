@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getDateOnlyString } from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
 import { syncMercadoPagoPaymentForOrder } from "@/lib/payments/sync";
 
@@ -120,7 +121,7 @@ export async function GET(
       publicReceiptCode: order.publicReceiptCode,
       preferenceId: order.mercadoPagoPreferenceId,
       checkoutUrl: order.mercadoPagoCheckoutUrl,
-      deliveryDate: order.deliveryDate,
+      deliveryDate: getDateOnlyString(order.deliveryDate),
       deliveryAddress: order.deliveryAddress,
       fulfillmentMode: order.fulfillmentMode,
       notes: order.notes,

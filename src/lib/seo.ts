@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cakeSizes, flavors } from "@/lib/catalog";
+import { cakeSizes, flavors, type SizeId } from "@/lib/catalog";
 
 export const siteConfig = {
   name: "Natta Vascas",
@@ -61,13 +61,24 @@ type FaqItem = {
   question: string;
 };
 
+type StructuredMenuFlavor = {
+  slug?: string;
+  id: string;
+  name: string;
+  description: string;
+  prices: Record<SizeId, number | null>;
+};
+
 const businessId = `${siteConfig.url}/#business`;
 const websiteId = `${siteConfig.url}/#website`;
 const homePageId = `${siteConfig.url}/#webpage`;
 const menuId = `${siteConfig.url}/#menu`;
 const faqId = `${siteConfig.url}/#faq`;
 
-export function buildHomeStructuredData(faq: FaqItem[]) {
+export function buildHomeStructuredData(
+  faq: FaqItem[],
+  menuFlavors: StructuredMenuFlavor[] = flavors,
+) {
   const business = {
     "@type": "Bakery",
     "@id": businessId,
@@ -101,9 +112,9 @@ export function buildHomeStructuredData(faq: FaqItem[]) {
     sameAs: [siteConfig.instagram, siteConfig.facebook],
   };
 
-  const menuItems = flavors.map((flavor) => ({
+  const menuItems = menuFlavors.map((flavor) => ({
     "@type": "MenuItem",
-    "@id": `${siteConfig.url}/#menu-${flavor.id}`,
+    "@id": `${siteConfig.url}/#menu-${flavor.slug ?? flavor.id}`,
     name: `Tarta vasca ${flavor.name}`,
     description: flavor.description,
     menuAddOn: cakeSizes.map((size) => ({

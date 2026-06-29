@@ -11,6 +11,12 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
+import {
+  addDateOnlyDays,
+  formatDateOnly,
+  getBusinessDateOnlyString,
+  getDateOnlyStart,
+} from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
 
 type Tone = "neutral" | "warning" | "danger" | "success" | "info";
@@ -127,14 +133,12 @@ function ModuleCard({ title, value, detail, href, icon: Icon }: ModuleCardProps)
 export default async function InternoHomePage() {
   redirect("/interno/pedidos");
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-
-  const nextTwoDaysEnd = new Date(todayStart);
-  nextTwoDaysEnd.setDate(nextTwoDaysEnd.getDate() + 3);
+  const today = getBusinessDateOnlyString();
+  const tomorrow = addDateOnlyDays(today, 1);
+  const nextThreeDays = addDateOnlyDays(today, 3);
+  const todayStart = getDateOnlyStart(today);
+  const tomorrowStart = getDateOnlyStart(tomorrow);
+  const nextTwoDaysEnd = getDateOnlyStart(nextThreeDays);
 
   const [
     orders,
@@ -234,12 +238,12 @@ export default async function InternoHomePage() {
     : null;
   const healthLabel = getHealthLabel(healthScore);
 
-  const todayLabel = new Intl.DateTimeFormat("es-AR", {
+  const todayLabel = formatDateOnly(today, {
     weekday: "long",
     day: "2-digit",
     month: "long",
     year: "numeric",
-  }).format(todayStart);
+  });
 
   return (
     <section className="space-y-7">

@@ -1,4 +1,9 @@
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
+import {
+  addDateOnlyDays,
+  getBusinessDateOnlyString,
+  getDateOnlyWeekday,
+} from "@/lib/date-only";
 
 export type SizeId = "latta" | "chica" | "grande";
 export type FulfillmentMode = "pickup" | "delivery";
@@ -131,9 +136,7 @@ export const formatCurrency = (value: number) =>
   }).format(value);
 
 export const getMinOrderDate = () => {
-  const date = new Date();
-  date.setDate(date.getDate() + 2);
-  return date.toISOString().slice(0, 10);
+  return addDateOnlyDays(getBusinessDateOnlyString(), 2);
 };
 
 export const isSunday = (date: string) => {
@@ -141,5 +144,5 @@ export const isSunday = (date: string) => {
     return false;
   }
 
-  return new Date(`${date}T12:00:00`).getDay() === 0;
+  return getDateOnlyWeekday(date) === 0;
 };

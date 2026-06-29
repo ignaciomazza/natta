@@ -666,14 +666,26 @@ export function CapacityAdmin() {
     setSavingWeekday(true);
 
     try {
+      const autoMaxUnits = calculateWeekdayAutoCapacity(
+        flavors,
+        weekdayFlavorCaps,
+        weekdayFlavorSizeCaps,
+      );
+      const shouldSaveAutoCapacity =
+        weekdayOpen &&
+        (weekdayAutoCapacity || (!weekdayMax && autoMaxUnits > 0));
       const response = await fetch("/api/capacity/weekday", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           weekday,
           isOpen: weekdayOpen,
-          maxUnits: weekdayOpen ? weekdayMax : 0,
-          isAutoCapacity: weekdayOpen ? weekdayAutoCapacity : false,
+          maxUnits: weekdayOpen
+            ? shouldSaveAutoCapacity
+              ? autoMaxUnits
+              : weekdayMax
+            : 0,
+          isAutoCapacity: weekdayOpen ? shouldSaveAutoCapacity : false,
         }),
       });
 
@@ -850,16 +862,25 @@ export function CapacityAdmin() {
     setSavingException(true);
 
     try {
+      const autoMaxUnits = calculateExceptionAutoCapacity(exceptionEditor.flavors);
+      const shouldSaveAutoCapacity =
+        !exceptionEditor.isClosed &&
+        (exceptionEditor.isAutoCapacity ||
+          (!exceptionEditor.maxUnits && autoMaxUnits > 0));
       const response = await fetch("/api/capacity/override", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: exceptionEditor.date,
           isClosed: exceptionEditor.isClosed,
-          maxUnits: exceptionEditor.isClosed ? 0 : exceptionEditor.maxUnits,
+          maxUnits: exceptionEditor.isClosed
+            ? 0
+            : shouldSaveAutoCapacity
+              ? autoMaxUnits
+              : exceptionEditor.maxUnits,
           isAutoCapacity: exceptionEditor.isClosed
             ? false
-            : exceptionEditor.isAutoCapacity,
+            : shouldSaveAutoCapacity,
         }),
       });
 

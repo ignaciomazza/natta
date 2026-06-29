@@ -9,7 +9,16 @@ import {
   useState,
 } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { flavors, formatCurrency, type Flavor, type SizeId } from "@/lib/catalog";
+
+type SizeId = "latta" | "chica" | "grande";
+
+export type MenuTableFlavor = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  prices: Record<SizeId, number | null>;
+};
 
 type ProductPhoto = {
   src: string;
@@ -26,6 +35,13 @@ const sizeLabels: Record<SizeId, string> = {
   chica: "Chica",
   grande: "Grande",
 };
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(value);
 
 const menuPhotoVersion = "20260612-menu-grade";
 const getMenuPhotoSrc = (slug: string) =>
@@ -74,11 +90,11 @@ const productPhotos: Record<string, ProductPhoto> = {
   },
 };
 
-const wrapIndex = (index: number) => (index + flavors.length) % flavors.length;
+const wrapIndex = (index: number, length: number) => (index + length) % length;
 
-const getCenteredIndexes = (centerIndex: number, radius: number) =>
+const getCenteredIndexes = (centerIndex: number, radius: number, length: number) =>
   Array.from({ length: radius * 2 + 1 }, (_, index) =>
-    wrapIndex(centerIndex - radius + index),
+    wrapIndex(centerIndex - radius + index, length),
   );
 
 const getSlidingIndexes = ({
@@ -86,38 +102,40 @@ const getSlidingIndexes = ({
   direction,
   radius,
   targetIndex,
+  length,
 }: {
   activeIndex: number;
   direction: SlideDirection;
   radius: number;
   targetIndex: number;
+  length: number;
 }) => {
   if (direction === "previous") {
     return [
       ...Array.from({ length: radius - 1 }, (_, index) =>
-        wrapIndex(targetIndex - (radius - 1) + index),
+        wrapIndex(targetIndex - (radius - 1) + index, length),
       ),
       targetIndex,
       activeIndex,
       ...Array.from({ length: radius }, (_, index) =>
-        wrapIndex(activeIndex + index + 1),
+        wrapIndex(activeIndex + index + 1, length),
       ),
     ];
   }
 
   return [
     ...Array.from({ length: radius }, (_, index) =>
-      wrapIndex(activeIndex - radius + index),
+      wrapIndex(activeIndex - radius + index, length),
     ),
     activeIndex,
     targetIndex,
     ...Array.from({ length: radius - 1 }, (_, index) =>
-      wrapIndex(targetIndex + index + 1),
+      wrapIndex(targetIndex + index + 1, length),
     ),
   ];
 };
 
-export function MenuPhotoTable() {
+export function MenuPhotoTable({ flavors }: { flavors: MenuTableFlavor[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isDesktopCarousel, setIsDesktopCarousel] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -141,19 +159,23 @@ export function MenuPhotoTable() {
   }, []);
 
   const preloadRadius = isDesktopCarousel ? 2 : 1;
+  const flavorCount = flavors.length;
 
   const visibleIndexes = useMemo(() => {
+    if (!flavorCount) return [];
+
     if (isAnimating && targetIndex !== null) {
       return getSlidingIndexes({
         activeIndex,
         direction: slideOffset === "previous" ? "previous" : "next",
+        length: flavorCount,
         radius: preloadRadius,
         targetIndex,
       });
     }
 
-    return getCenteredIndexes(activeIndex, preloadRadius);
-  }, [activeIndex, isAnimating, preloadRadius, slideOffset, targetIndex]);
+    return getCenteredIndexes(activeIndex, preloadRadius, flavorCount);
+  }, [activeIndex, flavorCount, isAnimating, preloadRadius, slideOffset, targetIndex]);
 
   const visualActiveIndex =
     isAnimating && targetIndex !== null ? targetIndex : activeIndex;
@@ -194,14 +216,14 @@ export function MenuPhotoTable() {
   );
 
   useEffect(() => {
-    if (isPaused || isAnimating) return;
+    if (isPaused || isAnimating || !flavorCount) return;
 
     const interval = window.setInterval(() => {
-      startSlide(wrapIndex(activeIndex + 1), "next");
+      startSlide(wrapIndex(activeIndex + 1, flavorCount), "next");
     }, 4300);
 
     return () => window.clearInterval(interval);
-  }, [activeIndex, isAnimating, isPaused, startSlide]);
+  }, [activeIndex, flavorCount, isAnimating, isPaused, startSlide]);
 
   useEffect(() => {
     return () => {
@@ -214,8 +236,8 @@ export function MenuPhotoTable() {
   const selectFlavor = (nextIndex: number) => {
     if (nextIndex === activeIndex || isAnimatingRef.current) return;
 
-    const forwardDistance = wrapIndex(nextIndex - activeIndex);
-    const backwardDistance = wrapIndex(activeIndex - nextIndex);
+    const forwardDistance = wrapIndex(nextIndex - activeIndex, flavorCount);
+    const backwardDistance = wrapIndex(activeIndex - nextIndex, flavorCount);
 
     startSlide(
       nextIndex,
@@ -224,14 +246,16 @@ export function MenuPhotoTable() {
   };
 
   const goToPrevious = () => {
-    startSlide(wrapIndex(activeIndex - 1), "previous");
+    startSlide(wrapIndex(activeIndex - 1, flavorCount), "previous");
   };
 
   const goToNext = () => {
-    startSlide(wrapIndex(activeIndex + 1), "next");
+    startSlide(wrapIndex(activeIndex + 1, flavorCount), "next");
   };
 
   const activeFlavor = flavors[activeIndex] ?? flavors[0];
+
+  if (!activeFlavor) return null;
 
   return (
     <div
@@ -332,11 +356,11 @@ function MenuSlideCard({
   isActive,
   onSelect,
 }: {
-  flavor: Flavor;
+  flavor: MenuTableFlavor;
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const photo = productPhotos[flavor.id] ?? productPhotos.natta;
+  const photo = productPhotos[flavor.slug] ?? productPhotos.natta;
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (isActive || (event.key !== "Enter" && event.key !== " ")) return;

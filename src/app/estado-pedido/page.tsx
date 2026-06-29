@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
 import { OrderStatusLookup } from "@/components/order-status-lookup";
+import { SiteLogo } from "@/components/site-logo";
 import { SiteFooter } from "@/components/site-footer";
 import { siteConfig } from "@/lib/seo";
 
@@ -25,10 +26,14 @@ export default function EstadoPedidoPage() {
         <header className="border-b border-[rgba(81,53,48,0.09)] bg-[var(--cream-soft)]/82 px-4 py-2.5 backdrop-blur-2xl md:px-8">
           <nav className="content-shell flex items-center justify-between gap-4">
             <BrandLoaderLink
-              className="font-display text-3xl leading-none italic text-[var(--chocolate)] transition hover:text-[var(--chocolate-deep)]"
+              className="group shrink-0"
               href="/"
+              aria-label="Natta"
             >
-              natta
+              <SiteLogo
+                className="h-10 w-auto transition duration-200 group-hover:scale-[1.03] md:h-11"
+                priority
+              />
             </BrandLoaderLink>
             <div className="flex items-center gap-3">
               <BrandLoaderLink
