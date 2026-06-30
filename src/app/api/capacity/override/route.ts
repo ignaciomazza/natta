@@ -10,6 +10,7 @@ const overrideSchema = z.object({
   maxUnits: z.number().int().min(0).nullable().optional(),
   isAutoCapacity: z.boolean().optional(),
   isClosed: z.boolean().optional(),
+  ignoreLeadTime: z.boolean().optional(),
   note: z.string().max(500).nullable().optional(),
 });
 
@@ -29,6 +30,9 @@ export async function PATCH(req: NextRequest) {
           ? { isAutoCapacity: body.isAutoCapacity }
           : {}),
         ...(body.isClosed !== undefined ? { isClosed: body.isClosed } : {}),
+        ...(body.ignoreLeadTime !== undefined
+          ? { ignoreLeadTime: body.ignoreLeadTime }
+          : {}),
         ...(body.note !== undefined ? { note: body.note } : {}),
       },
       create: {
@@ -36,6 +40,7 @@ export async function PATCH(req: NextRequest) {
         maxUnits: body.maxUnits ?? null,
         isAutoCapacity: body.isAutoCapacity ?? false,
         isClosed: body.isClosed ?? false,
+        ignoreLeadTime: body.ignoreLeadTime ?? false,
         note: body.note ?? null,
       },
     });

@@ -163,6 +163,7 @@ model DateCapacityOverride {
   maxUnits       Int?
   isAutoCapacity Boolean  @default(false)
   isClosed       Boolean  @default(false)
+  ignoreLeadTime Boolean  @default(false)
   note           String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

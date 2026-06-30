@@ -10,6 +10,7 @@ export type CapacityDay = {
   bookedUnits: number;
   availableUnits: number;
   minLeadTimeDays: number;
+  ignoreLeadTime: boolean;
   cutoffHour: number;
   source: "weekday" | "override";
   hasOverride: boolean;
@@ -364,6 +365,7 @@ export async function getCapacityCalendar(input?: {
         : override
           ? true
           : baseIsOpen;
+    const ignoreLeadTime = isOpen && override?.ignoreLeadTime === true;
 
     const isAutoCapacity = override
       ? override.isAutoCapacity
@@ -467,7 +469,8 @@ export async function getCapacityCalendar(input?: {
       Boolean(override) &&
       (isOpen !== baseIsOpen ||
         manualMaxUnits !== baseMaxUnits ||
-        usesAutoCapacity !== baseIsAutoCapacity);
+        usesAutoCapacity !== baseIsAutoCapacity ||
+        ignoreLeadTime);
 
     const availableUnits = isOpen ? Math.max(0, maxUnits - bookedUnits) : 0;
 
@@ -480,7 +483,8 @@ export async function getCapacityCalendar(input?: {
       isAutoCapacity: usesAutoCapacity,
       bookedUnits,
       availableUnits,
-      minLeadTimeDays: weekdayRule?.minLeadTimeDays ?? 2,
+      minLeadTimeDays: ignoreLeadTime ? 0 : (weekdayRule?.minLeadTimeDays ?? 2),
+      ignoreLeadTime,
       cutoffHour: weekdayRule?.cutoffHour ?? 10,
       source: hasMeaningfulOverride ? "override" : "weekday",
       hasOverride: hasMeaningfulOverride,
@@ -601,10 +605,11 @@ export async function validateCapacityForOrder(input: {
     }),
   ]);
 
+  const ignoreLeadTime = override?.ignoreLeadTime ?? false;
   const minimumDate = getDefaultMinDate(new Date(), rule?.minLeadTimeDays ?? 2);
   const requestedDate = getDateAtNoon(date);
 
-  if (requestedDate < minimumDate) {
+  if (!ignoreLeadTime && requestedDate < minimumDate) {
     throw new Error("DATE_TOO_SOON");
   }
 

@@ -84,6 +84,8 @@ type CapacityItem = {
   maxUnits: number;
   manualMaxUnits: number;
   isAutoCapacity: boolean;
+  minLeadTimeDays: number;
+  ignoreLeadTime: boolean;
   bookedUnits: number;
   availableUnits: number;
   source: "weekday" | "override";
@@ -130,6 +132,7 @@ type ExceptionEditor = {
   isClosed: boolean;
   maxUnits: number;
   isAutoCapacity: boolean;
+  ignoreLeadTime: boolean;
   bookedUnits: number;
   availableUnits: number;
   hasOverride: boolean;
@@ -847,6 +850,7 @@ export function CapacityAdmin() {
       isClosed: !item.isOpen,
       maxUnits: item.manualMaxUnits,
       isAutoCapacity: item.isAutoCapacity,
+      ignoreLeadTime: item.ignoreLeadTime,
       bookedUnits: item.bookedUnits,
       availableUnits: item.availableUnits,
       hasOverride: item.hasOverride,
@@ -881,6 +885,9 @@ export function CapacityAdmin() {
           isAutoCapacity: exceptionEditor.isClosed
             ? false
             : shouldSaveAutoCapacity,
+          ignoreLeadTime: exceptionEditor.isClosed
+            ? false
+            : exceptionEditor.ignoreLeadTime,
         }),
       });
 
@@ -1290,6 +1297,9 @@ export function CapacityAdmin() {
                         {formatCapacityDate(item.date, true)}
                       </p>
                       {item.hasOverride ? <Pill mini tone="warning">Excepción</Pill> : null}
+                      {item.ignoreLeadTime ? (
+                        <Pill mini tone="info">48 h habilitadas</Pill>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">
                       {weekdayLabel.get(item.weekday) ?? "-"}
@@ -1462,6 +1472,33 @@ export function CapacityAdmin() {
                 </div>
               </div>
 
+              <div className="rounded-[1.3rem] border border-[color:var(--line)] bg-white/55 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                      Preparación de 48 h
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                      Usalo solo cuando quieran tomar pedidos para esta fecha aunque esté dentro del plazo normal.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={!exceptionEditor.isClosed && exceptionEditor.ignoreLeadTime}
+                    label="Habilitar dentro de las 48 h"
+                    onChange={(checked) =>
+                      setExceptionEditor((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              ignoreLeadTime: prev.isClosed ? false : checked,
+                            }
+                          : prev,
+                      )
+                    }
+                  />
+                </div>
+              </div>
+
               <div className="border-t border-[color:var(--line)] pt-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
                   <div>
@@ -1499,6 +1536,7 @@ export function CapacityAdmin() {
                           ? {
                               ...prev,
                               isClosed: checked,
+                              ignoreLeadTime: checked ? false : prev.ignoreLeadTime,
                             }
                           : prev,
                       )

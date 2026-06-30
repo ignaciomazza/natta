@@ -45,6 +45,7 @@ const requiredUniqueIndexes = [
 const requiredColumns = [
   { table: "WeekdayCapacityRule", column: "isAutoCapacity" },
   { table: "DateCapacityOverride", column: "isAutoCapacity" },
+  { table: "DateCapacityOverride", column: "ignoreLeadTime" },
 ] as const;
 
 type TableRow = {
