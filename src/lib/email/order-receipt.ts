@@ -34,6 +34,29 @@ type ResendResponse = {
   name?: string;
 };
 
+export type OrderReceiptEmailSkippedReason =
+  | "ALREADY_SENT"
+  | "AMOUNT_NOT_COVERED"
+  | "INVALID_EMAIL"
+  | "ORDER_CANCELLED"
+  | "ORDER_NOT_FOUND"
+  | "PAYMENT_NOT_APPROVED"
+  | "RECENT_ATTEMPT"
+  | "SEND_FAILED";
+
+export type OrderReceiptEmailResult = {
+  error?: string;
+  resendId?: string | null;
+  sent: boolean;
+  sentTo?: string;
+  skippedReason?: OrderReceiptEmailSkippedReason;
+};
+
+type SendOrderReceiptEmailOptions = {
+  force?: boolean;
+  throwOnError?: boolean;
+};
+
 const RECEIPT_EMAIL_RETRY_AFTER_MS = 10 * 60 * 1000;
 
 function escapeHtml(value: string) {
@@ -379,7 +402,11 @@ async function sendViaResend(input: {
   return payload.id ?? null;
 }
 
-export async function sendOrderReceiptEmailIfNeeded(orderId: string) {
+export async function sendOrderReceiptEmailIfNeeded(
+  orderId: string,
+  options: SendOrderReceiptEmailOptions = {},
+): Promise<OrderReceiptEmailResult> {
+  const force = options.force ?? false;
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
@@ -397,8 +424,21 @@ export async function sendOrderReceiptEmailIfNeeded(orderId: string) {
     },
   });
 
-  if (!order || order.status === "CANCELLED" || order.receiptEmailSentAt) {
-    return;
+  if (!order) {
+    return { sent: false, skippedReason: "ORDER_NOT_FOUND" };
+  }
+
+  if (order.status === "CANCELLED") {
+    return { sent: false, skippedReason: "ORDER_CANCELLED" };
+  }
+
+  if (order.receiptEmailSentAt && !force) {
+    return {
+      resendId: order.receiptEmailResendId,
+      sent: false,
+      sentTo: order.receiptEmailSentTo ?? undefined,
+      skippedReason: "ALREADY_SENT",
+    };
   }
 
   const recipient = order.customer.email?.trim().toLowerCase() ?? "";
@@ -409,39 +449,53 @@ export async function sendOrderReceiptEmailIfNeeded(orderId: string) {
         receiptEmailLastError: "El pedido no tiene email válido para enviar comprobante",
       },
     });
-    return;
+    return { sent: false, skippedReason: "INVALID_EMAIL" };
   }
 
   const hasApprovedPayment = order.payments.some((payment) => payment.status === "APPROVED");
   const hasCoveredDueNow = order.amountPaidArs >= order.amountDueNowArs;
-  if (!hasApprovedPayment || !hasCoveredDueNow) {
-    return;
+  if (!hasApprovedPayment) {
+    return { sent: false, skippedReason: "PAYMENT_NOT_APPROVED" };
+  }
+  if (!hasCoveredDueNow) {
+    return { sent: false, skippedReason: "AMOUNT_NOT_COVERED" };
   }
 
   const retryThreshold = new Date(Date.now() - RECEIPT_EMAIL_RETRY_AFTER_MS);
   const attemptAt = new Date();
-  const claimed = await prisma.order.updateMany({
-    where: {
-      id: order.id,
-      receiptEmailSentAt: null,
-      OR: [
-        { receiptEmailLastAttemptAt: null },
-        { receiptEmailLastAttemptAt: { lt: retryThreshold } },
-      ],
-    },
-    data: {
-      receiptEmailLastAttemptAt: attemptAt,
-    },
-  });
+  if (force) {
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        receiptEmailLastAttemptAt: attemptAt,
+      },
+    });
+  } else {
+    const claimed = await prisma.order.updateMany({
+      where: {
+        id: order.id,
+        receiptEmailSentAt: null,
+        OR: [
+          { receiptEmailLastAttemptAt: null },
+          { receiptEmailLastAttemptAt: { lt: retryThreshold } },
+        ],
+      },
+      data: {
+        receiptEmailLastAttemptAt: attemptAt,
+      },
+    });
 
-  if (claimed.count !== 1) {
-    return;
+    if (claimed.count !== 1) {
+      return { sent: false, skippedReason: "RECENT_ATTEMPT" };
+    }
   }
 
   try {
     const resendId = await sendViaResend({
       html: buildOrderReceiptHtml(order),
-      idempotencyKey: `order-receipt-${order.id}-${order.amountPaidArs}`,
+      idempotencyKey: force
+        ? `order-receipt-manual-${order.id}-${attemptAt.getTime()}`
+        : `order-receipt-${order.id}-${order.amountPaidArs}`,
       subject: `Comprobante Natta ${order.publicReceiptCode}`,
       text: getOrderReceiptText(order),
       to: recipient,
@@ -456,6 +510,11 @@ export async function sendOrderReceiptEmailIfNeeded(orderId: string) {
         receiptEmailSentTo: recipient,
       },
     });
+    return {
+      resendId,
+      sent: true,
+      sentTo: recipient,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo enviar comprobante";
     await prisma.order
@@ -467,5 +526,13 @@ export async function sendOrderReceiptEmailIfNeeded(orderId: string) {
       })
       .catch(() => null);
     logServerError("email.order-receipt", error);
+    if (options.throwOnError) {
+      throw error;
+    }
+    return {
+      error: message,
+      sent: false,
+      skippedReason: "SEND_FAILED",
+    };
   }
 }

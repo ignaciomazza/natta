@@ -125,6 +125,9 @@ export async function GET(req: NextRequest) {
         amountDueNowArs: order.amountDueNowArs,
         amountPaidArs: order.amountPaidArs,
         amountBalanceArs: order.amountBalanceArs,
+        receiptEmailLastError: order.receiptEmailLastError,
+        receiptEmailSentAt: order.receiptEmailSentAt,
+        receiptEmailSentTo: order.receiptEmailSentTo,
         mercadoPagoExternalReference: order.mercadoPagoExternalReference,
         mercadoPagoPreferenceId: order.mercadoPagoPreferenceId,
         customer: {

@@ -10,6 +10,7 @@ import {
   Clock3,
   FileText,
   ListFilter,
+  Mail,
   PackageCheck,
   RefreshCw,
   Search,
@@ -69,8 +70,12 @@ type OrderItem = {
   mercadoPagoExternalReference: string | null;
   mercadoPagoPreferenceId: string | null;
   subtotalArs: number;
+  amountDueNowArs: number;
   amountPaidArs: number;
   amountBalanceArs: number;
+  receiptEmailLastError: string | null;
+  receiptEmailSentAt: string | null;
+  receiptEmailSentTo: string | null;
   customer: {
     name: string;
     phone: string;
@@ -134,6 +139,15 @@ const formatMoney = (value: number) =>
 
 function formatDate(value: string) {
   return formatDateOnly(value);
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(new Date(value));
 }
 
 function getItemCount(items: OrderLineItem[]) {
@@ -370,6 +384,7 @@ export function OrdersAdmin() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [emailingId, setEmailingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [nearbyCounts, setNearbyCounts] = useState<NearbyOrderCounts>({
     next: 0,
@@ -542,6 +557,34 @@ export function OrdersAdmin() {
       setError(syncError instanceof Error ? syncError.message : "Error");
     } finally {
       setSyncingId(null);
+    }
+  };
+
+  const sendReceiptEmail = async (item: OrderItem) => {
+    if (!item.customer.email) {
+      setError("El pedido no tiene email cargado");
+      return;
+    }
+
+    setEmailingId(item.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/orders/${item.id}/receipt-email`, {
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(result?.error ?? "No se pudo enviar el comprobante");
+      }
+
+      await load();
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "Error");
+    } finally {
+      setEmailingId(null);
     }
   };
 
@@ -869,6 +912,33 @@ export function OrdersAdmin() {
                       Ver {formatReceiptCode(item.publicReceiptCode)}
                     </span>
                   </a>
+                  <button
+                    className={orderCompactButtonClassName}
+                    disabled={emailingId === item.id || !item.customer.email}
+                    onClick={() => void sendReceiptEmail(item)}
+                    title={
+                      item.customer.email
+                        ? `Enviar comprobante a ${item.customer.email}`
+                        : "El pedido no tiene email cargado"
+                    }
+                    type="button"
+                  >
+                    <Mail className={`h-3.5 w-3.5 ${emailingId === item.id ? "animate-pulse" : ""}`} />
+                    <span className="min-w-0 truncate">
+                      {emailingId === item.id ? "Enviando" : "Enviar comprobante"}
+                    </span>
+                  </button>
+                  {item.receiptEmailSentAt ? (
+                    <p className="truncate text-[10px] leading-4 text-zinc-500">
+                      Enviado {formatDateTime(item.receiptEmailSentAt)}
+                      {item.receiptEmailSentTo ? ` · ${item.receiptEmailSentTo}` : ""}
+                    </p>
+                  ) : null}
+                  {item.receiptEmailLastError ? (
+                    <p className="line-clamp-2 text-[10px] leading-4 text-rose-600">
+                      {item.receiptEmailLastError}
+                    </p>
+                  ) : null}
                   {canSyncMercadoPago ? (
                     <button
                       className={orderCompactButtonClassName}
