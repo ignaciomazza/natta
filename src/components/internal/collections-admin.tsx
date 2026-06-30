@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Coins } from "lucide-react";
+import { Coins, RefreshCw } from "lucide-react";
 import { MoneyInput } from "@/components/internal/money-input";
 import {
   Disclosure,
@@ -31,6 +31,10 @@ type Payment = {
   customerName: string | null;
   customerPhone: string | null;
   referenceNote: string | null;
+  externalReference: string | null;
+  providerPreferenceId: string | null;
+  providerPaymentId: string | null;
+  statusDetail: string | null;
   createdAt: string;
   order: {
     id: string;
@@ -94,6 +98,22 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatReference(value: string | null | undefined) {
+  if (!value) return null;
+  return value.length > 22 ? `${value.slice(0, 10)}...${value.slice(-7)}` : value;
+}
+
+function getMercadoPagoReference(item: Payment) {
+  if (item.providerPaymentId) return `Operación MP ${item.providerPaymentId}`;
+  if (item.providerPreferenceId) {
+    return `Preferencia ${formatReference(item.providerPreferenceId)}`;
+  }
+  if (item.externalReference) {
+    return `Referencia ${formatReference(item.externalReference)}`;
+  }
+  return "Sin identificador MP";
+}
+
 export function CollectionsAdmin() {
   const [items, setItems] = useState<Payment[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -107,6 +127,7 @@ export function CollectionsAdmin() {
   const [onlyWithOrder, setOnlyWithOrder] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ALL" | PaymentStatus>("ALL");
   const [error, setError] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const load = async () => {
     const response = await fetch("/api/collections", { cache: "no-store" });
@@ -176,6 +197,44 @@ export function CollectionsAdmin() {
     setAmountInput("");
     setReferenceNote("");
     await load();
+  };
+
+  const syncMercadoPagoPayment = async (item: Payment) => {
+    if (!item.providerPaymentId && !item.externalReference) {
+      setError("No hay identificador de Mercado Pago para sincronizar");
+      return;
+    }
+
+    setSyncingId(item.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/payments/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: item.orderId ?? undefined,
+          providerPaymentId: item.providerPaymentId ?? undefined,
+          externalReference: item.externalReference ?? undefined,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; found?: number }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "No se pudo sincronizar Mercado Pago");
+      }
+
+      if (payload?.found === 0) {
+        setError("Mercado Pago no devolvió pagos para esa referencia");
+      }
+
+      await load();
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Error");
+    } finally {
+      setSyncingId(null);
+    }
   };
 
   return (
@@ -360,6 +419,36 @@ export function CollectionsAdmin() {
                   <p className="rounded-xl bg-[color:var(--surface-soft)]/75 px-2.5 py-2 text-xs text-zinc-600 shadow-[0_10px_24px_-22px_rgba(38,35,33,0.52)]">
                     {item.referenceNote}
                   </p>
+                ) : null}
+                {item.method === "MERCADO_PAGO" ? (
+                  <div className="rounded-xl bg-white/70 px-2.5 py-2 text-xs text-zinc-600 shadow-[0_10px_24px_-22px_rgba(38,35,33,0.42)]">
+                    <p className="truncate" title={getMercadoPagoReference(item)}>
+                      {getMercadoPagoReference(item)}
+                    </p>
+                    {item.statusDetail ? (
+                      <p className="mt-1 line-clamp-2 leading-4 text-zinc-500">
+                        {item.statusDetail}
+                      </p>
+                    ) : null}
+                    {item.externalReference && !item.providerPaymentId ? (
+                      <p className="mt-1 leading-4 text-zinc-500">
+                        Esta referencia no es comprobante de pago.
+                      </p>
+                    ) : null}
+                    {item.providerPaymentId || item.externalReference ? (
+                      <button
+                        className="mt-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:var(--line)] bg-white px-3 text-[11px] font-semibold text-zinc-700 transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55"
+                        disabled={syncingId === item.id}
+                        onClick={() => void syncMercadoPagoPayment(item)}
+                        type="button"
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${syncingId === item.id ? "animate-spin" : ""}`}
+                        />
+                        {syncingId === item.id ? "Sincronizando" : "Sincronizar MP"}
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               <p className="text-lg font-semibold text-zinc-950 md:text-right">

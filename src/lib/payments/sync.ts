@@ -2,6 +2,7 @@ import type { OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   getMercadoPagoPayment,
+  searchMercadoPagoPaymentsByExternalReference,
   type MercadoPagoEnvironment,
   type MercadoPagoPaymentResponse,
   mapMercadoPagoPaymentStatus,
@@ -231,4 +232,58 @@ export async function syncMercadoPagoPaymentForOrder(
   }
 
   return applyMercadoPagoPaymentSnapshot(remotePayment);
+}
+
+export async function syncMercadoPagoPaymentsByExternalReference(
+  externalReference: string,
+  orderId?: string,
+  environment?: MercadoPagoEnvironment,
+) {
+  if (orderId) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        mercadoPagoExternalReference: true,
+        payments: {
+          select: {
+            externalReference: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new Error("ORDER_NOT_FOUND");
+    }
+
+    const expectedReferences = new Set(
+      [
+        order.mercadoPagoExternalReference,
+        ...order.payments.map((payment) => payment.externalReference),
+      ].filter((value): value is string => Boolean(value)),
+    );
+
+    if (!expectedReferences.has(externalReference)) {
+      throw new Error("PAYMENT_ORDER_MISMATCH");
+    }
+  }
+
+  const remotePayments = await searchMercadoPagoPaymentsByExternalReference(
+    externalReference,
+    environment,
+  );
+  const syncedPayments = [];
+
+  for (const remotePayment of remotePayments) {
+    const syncedPayment = await applyMercadoPagoPaymentSnapshot(remotePayment);
+    if (syncedPayment) {
+      syncedPayments.push(syncedPayment);
+    }
+  }
+
+  return {
+    found: remotePayments.length,
+    synced: syncedPayments.length,
+    payments: syncedPayments,
+  };
 }

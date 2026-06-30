@@ -37,6 +37,10 @@ export type MercadoPagoPaymentResponse = {
   };
 };
 
+type MercadoPagoPaymentSearchResponse = {
+  results?: MercadoPagoPaymentResponse[];
+};
+
 export class MercadoPagoConfigError extends Error {
   constructor(message = "Mercado Pago no esta configurado") {
     super(message);
@@ -317,6 +321,25 @@ export async function getMercadoPagoPayment(
       Authorization: `Bearer ${getAccessTokenForEnvironment(environment)}`,
     },
   });
+}
+
+export async function searchMercadoPagoPaymentsByExternalReference(
+  externalReference: string,
+  environment?: MercadoPagoEnvironment,
+) {
+  const params = new URLSearchParams({
+    external_reference: externalReference,
+  });
+  const response = await mercadoPagoRequest<MercadoPagoPaymentSearchResponse>(
+    `/v1/payments/search?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${getAccessTokenForEnvironment(environment)}`,
+      },
+    },
+  );
+
+  return response.results ?? [];
 }
 
 export function mapMercadoPagoPaymentStatus(status: string | null | undefined) {

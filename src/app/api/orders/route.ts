@@ -125,6 +125,8 @@ export async function GET(req: NextRequest) {
         amountDueNowArs: order.amountDueNowArs,
         amountPaidArs: order.amountPaidArs,
         amountBalanceArs: order.amountBalanceArs,
+        mercadoPagoExternalReference: order.mercadoPagoExternalReference,
+        mercadoPagoPreferenceId: order.mercadoPagoPreferenceId,
         customer: {
           id: order.customer.id,
           name: order.customer.name,
@@ -319,22 +321,22 @@ export async function POST(req: NextRequest) {
 
     if (error instanceof Error) {
       if (error.message === "DATE_TOO_SOON") {
-        return NextResponse.json({ error: "Fecha sin anticipacion suficiente" }, { status: 400 });
+        return NextResponse.json({ error: "La fecha no tiene la anticipación suficiente" }, { status: 400 });
       }
       if (error.message === "DATE_CLOSED") {
-        return NextResponse.json({ error: "Fecha cerrada" }, { status: 400 });
+        return NextResponse.json({ error: "No tomamos pedidos este día" }, { status: 400 });
       }
       if (error.message === "CAPACITY_EXCEEDED") {
-        return NextResponse.json({ error: "No hay cupo suficiente en esa fecha" }, { status: 409 });
+        return NextResponse.json({ error: "Esta fecha no tiene cupo suficiente para todo el pedido" }, { status: 409 });
       }
       if (error.message === "FLAVOR_CAPACITY_EXCEEDED") {
-        return NextResponse.json({ error: "No hay cupo suficiente para uno de los sabores en esa fecha" }, { status: 409 });
+        return NextResponse.json({ error: "Uno de los sabores no tiene cupo suficiente para esa fecha" }, { status: 409 });
       }
       if (error.message === "FLAVOR_SIZE_CAPACITY_EXCEEDED") {
-        return NextResponse.json({ error: "No hay cupo suficiente para uno de los tamaños en esa fecha" }, { status: 409 });
+        return NextResponse.json({ error: "Una combinación de sabor y tamaño no tiene cupo suficiente para esa fecha" }, { status: 409 });
       }
       if (error.message === "CUTOFF_REACHED") {
-        return NextResponse.json({ error: "Horario de corte alcanzado" }, { status: 400 });
+        return NextResponse.json({ error: "Ya pasó el horario de corte para esa fecha" }, { status: 400 });
       }
     }
 

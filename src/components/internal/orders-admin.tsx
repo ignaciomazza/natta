@@ -11,6 +11,7 @@ import {
   FileText,
   ListFilter,
   PackageCheck,
+  RefreshCw,
   Search,
   Store,
   Trash2,
@@ -48,12 +49,25 @@ type OrderLineItem = {
   size: string;
 };
 
+type OrderPayment = {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "REFUNDED";
+  method: "MERCADO_PAGO" | "TRANSFER" | "CASH" | "MANUAL";
+  externalReference: string | null;
+  providerPreferenceId: string | null;
+  providerPaymentId: string | null;
+  referenceNote: string | null;
+  statusDetail: string | null;
+};
+
 type OrderItem = {
   id: string;
   status: OrderStatus;
   fulfillmentMode: "PICKUP" | "DELIVERY";
   deliveryDate: string;
   publicReceiptCode: string;
+  mercadoPagoExternalReference: string | null;
+  mercadoPagoPreferenceId: string | null;
   subtotalArs: number;
   amountPaidArs: number;
   amountBalanceArs: number;
@@ -63,6 +77,7 @@ type OrderItem = {
     email?: string | null;
   };
   items: OrderLineItem[];
+  payments: OrderPayment[];
 };
 
 const statusLabel: Record<OrderStatus, string> = {
@@ -132,6 +147,74 @@ function getOrderSummary(items: OrderLineItem[]) {
 
 function formatReceiptCode(code: string) {
   return code.length > 12 ? code.slice(-8) : code;
+}
+
+function formatReference(value: string | null | undefined) {
+  if (!value) return null;
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
+}
+
+function getPrimaryMercadoPagoPayment(item: OrderItem) {
+  const mercadoPagoPayments = item.payments.filter(
+    (payment) => payment.method === "MERCADO_PAGO",
+  );
+  return (
+    mercadoPagoPayments.find((payment) => payment.status === "APPROVED") ??
+    mercadoPagoPayments.find((payment) => payment.providerPaymentId) ??
+    mercadoPagoPayments[0] ??
+    null
+  );
+}
+
+function getMercadoPagoSyncPayload(item: OrderItem) {
+  const payment = getPrimaryMercadoPagoPayment(item);
+  if (!payment) return null;
+
+  return {
+    orderId: item.id,
+    ...(payment.providerPaymentId
+      ? { providerPaymentId: payment.providerPaymentId }
+      : {}),
+    ...(payment.externalReference
+      ? { externalReference: payment.externalReference }
+      : item.mercadoPagoExternalReference
+        ? { externalReference: item.mercadoPagoExternalReference }
+        : {}),
+  };
+}
+
+function getMercadoPagoSummary(item: OrderItem) {
+  const payment = getPrimaryMercadoPagoPayment(item);
+  if (!payment) {
+    return {
+      title: "Sin cobro MP",
+      detail: null,
+    };
+  }
+
+  if (payment.providerPaymentId) {
+    return {
+      title: `Operación MP ${payment.providerPaymentId}`,
+      detail: payment.statusDetail,
+    };
+  }
+
+  if (payment.providerPreferenceId ?? item.mercadoPagoPreferenceId) {
+    return {
+      title: `Preferencia ${formatReference(payment.providerPreferenceId ?? item.mercadoPagoPreferenceId)}`,
+      detail: "Todavía no hay operación de pago guardada.",
+    };
+  }
+
+  const externalReference =
+    payment.externalReference ?? item.mercadoPagoExternalReference;
+
+  return {
+    title: externalReference
+      ? `Referencia ${formatReference(externalReference)}`
+      : "Cobro pendiente",
+    detail: "La referencia no es un comprobante de pago.",
+  };
 }
 
 function startOfDay(date: Date) {
@@ -280,6 +363,7 @@ export function OrdersAdmin() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [nearbyCounts, setNearbyCounts] = useState<NearbyOrderCounts>({
     next: 0,
     previous: 0,
@@ -416,6 +500,41 @@ export function OrdersAdmin() {
       setError(deleteError instanceof Error ? deleteError.message : "Error");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const syncMercadoPagoPayment = async (item: OrderItem) => {
+    const payload = getMercadoPagoSyncPayload(item);
+    if (!payload || (!("providerPaymentId" in payload) && !("externalReference" in payload))) {
+      setError("No hay identificador de Mercado Pago para sincronizar");
+      return;
+    }
+
+    setSyncingId(item.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/payments/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; found?: number; synced?: number }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(result?.error ?? "No se pudo sincronizar Mercado Pago");
+      }
+
+      if (result?.found === 0) {
+        setError("Mercado Pago no devolvió pagos para esa referencia");
+      }
+
+      await load();
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "Error");
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -661,7 +780,16 @@ export function OrdersAdmin() {
       ) : (
         <div className="space-y-2.5">
           {items.length ? (
-            items.map((item) => (
+            items.map((item) => {
+              const mercadoPagoSummary = getMercadoPagoSummary(item);
+              const mercadoPagoSyncPayload = getMercadoPagoSyncPayload(item);
+              const canSyncMercadoPago = Boolean(
+                mercadoPagoSyncPayload &&
+                  ("providerPaymentId" in mercadoPagoSyncPayload ||
+                    "externalReference" in mercadoPagoSyncPayload),
+              );
+
+              return (
               <article
                 className={orderCardClassName}
                 key={item.id}
@@ -700,6 +828,14 @@ export function OrdersAdmin() {
                     Pagado {formatMoney(item.amountPaidArs)} · Saldo{" "}
                     {formatMoney(item.amountBalanceArs)}
                   </p>
+                  <p className="mt-1 truncate text-[11px] text-zinc-500" title={mercadoPagoSummary.title}>
+                    {mercadoPagoSummary.title}
+                  </p>
+                  {mercadoPagoSummary.detail ? (
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-zinc-500">
+                      {mercadoPagoSummary.detail}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="min-w-0 md:w-full">
@@ -726,6 +862,19 @@ export function OrdersAdmin() {
                       Ver {formatReceiptCode(item.publicReceiptCode)}
                     </span>
                   </a>
+                  {canSyncMercadoPago ? (
+                    <button
+                      className={orderCompactButtonClassName}
+                      disabled={syncingId === item.id}
+                      onClick={() => void syncMercadoPagoPayment(item)}
+                      type="button"
+                    >
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 ${syncingId === item.id ? "animate-spin" : ""}`}
+                      />
+                      {syncingId === item.id ? "Sincronizando" : "Sync MP"}
+                    </button>
+                  ) : null}
                   {item.status === "CANCELLED" ? (
                     <button
                       className={`${orderCompactButtonClassName} text-rose-700 hover:border-rose-200 hover:text-rose-800`}
@@ -739,7 +888,8 @@ export function OrdersAdmin() {
                   ) : null}
                 </div>
               </article>
-            ))
+              );
+            })
           ) : (
             <p className="rounded-[1.6rem] bg-[color:var(--milk)]/82 px-4 py-6 text-sm text-zinc-600 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.68),0_8px_18px_-18px_rgba(82,74,70,0.42)]">
               No hay pedidos para los filtros aplicados.

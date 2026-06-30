@@ -61,6 +61,24 @@ type AvailabilityDay = {
   availableUnits: number;
   minLeadTimeDays: number;
   cutoffHour: number;
+  flavors: Array<{
+    flavorId: string;
+    flavorSlug: string;
+    flavorName: string;
+    isClosed: boolean;
+    maxUnits: number | null;
+    bookedUnits: number;
+    availableUnits: number | null;
+    sizes: Array<{
+      sizeId: string;
+      sizeSlug: string;
+      sizeName: string;
+      isClosed: boolean;
+      maxUnits: number | null;
+      bookedUnits: number;
+      availableUnits: number | null;
+    }>;
+  }>;
 };
 
 type CatalogResponse = {
@@ -246,24 +264,105 @@ const getDefaultMinDateString = (now: Date, minLeadTimeDays: number) => {
 
 const getDayBlockingReason = (day: AvailabilityDay, now: Date) => {
   if (!day.isOpen) {
-    return "Cerrado";
+    return "No tomamos pedidos este día";
   }
   if (day.availableUnits <= 0) {
-    return "Sin cupo";
+    return "Esta fecha está completa";
   }
 
   const minDate = getDefaultMinDateString(now, day.minLeadTimeDays);
   if (day.date < minDate) {
-    return "Preparación";
+    return "La fecha no tiene la anticipación suficiente";
   }
 
   const tomorrowDate = getDefaultMinDateString(now, 1);
   if (day.date === tomorrowDate && now.getHours() >= day.cutoffHour) {
-    return `Cierra ${day.cutoffHour}:00`;
+    return `Ya pasó el horario de corte de las ${day.cutoffHour}:00`;
   }
 
   return null;
 };
+
+type AvailabilityCheckItem = {
+  flavorId: string;
+  flavorName: string;
+  sizeId: string;
+  sizeName: string;
+  quantity: number;
+};
+
+function getSelectedItemsBlockingReason(
+  day: AvailabilityDay,
+  items: AvailabilityCheckItem[],
+) {
+  if (!items.length) return null;
+
+  const requestedUnits = items.reduce((sum, item) => sum + item.quantity, 0);
+  if (requestedUnits > day.availableUnits) {
+    return "Esta fecha no tiene cupo suficiente para todo el pedido";
+  }
+
+  const requestedByFlavor = new Map<string, AvailabilityCheckItem>();
+  for (const item of items) {
+    const current = requestedByFlavor.get(item.flavorId);
+    requestedByFlavor.set(item.flavorId, {
+      ...item,
+      quantity: (current?.quantity ?? 0) + item.quantity,
+    });
+  }
+
+  for (const item of requestedByFlavor.values()) {
+    const flavor = day.flavors.find((entry) => entry.flavorId === item.flavorId);
+    if (!flavor || flavor.isClosed || flavor.availableUnits === 0) {
+      return `${item.flavorName} no está disponible para esta fecha`;
+    }
+    if (flavor.availableUnits !== null && item.quantity > flavor.availableUnits) {
+      return `No hay cupo suficiente de ${item.flavorName} para esta fecha`;
+    }
+  }
+
+  const requestedByFlavorAndSize = new Map<string, AvailabilityCheckItem>();
+  for (const item of items) {
+    const key = itemKey(item.flavorId, item.sizeId);
+    const current = requestedByFlavorAndSize.get(key);
+    requestedByFlavorAndSize.set(key, {
+      ...item,
+      quantity: (current?.quantity ?? 0) + item.quantity,
+    });
+  }
+
+  for (const item of requestedByFlavorAndSize.values()) {
+    const flavor = day.flavors.find((entry) => entry.flavorId === item.flavorId);
+    const size = flavor?.sizes.find((entry) => entry.sizeId === item.sizeId);
+    if (!size || size.isClosed || size.availableUnits === 0) {
+      return `${item.flavorName} ${item.sizeName} no está disponible para esta fecha`;
+    }
+    if (size.availableUnits !== null && item.quantity > size.availableUnits) {
+      return `No hay cupo suficiente de ${item.flavorName} ${item.sizeName} para esta fecha`;
+    }
+  }
+
+  return null;
+}
+
+function getAvailabilityBlockingReason(
+  day: AvailabilityDay,
+  now: Date,
+  items: AvailabilityCheckItem[],
+) {
+  return getDayBlockingReason(day, now) ?? getSelectedItemsBlockingReason(day, items);
+}
+
+function getShortAvailabilityReason(reason: string) {
+  if (reason.includes("no está disponible")) return "No disponible";
+  if (reason.includes("No hay cupo suficiente")) return "Sin cupo";
+  if (reason.includes("no tiene cupo suficiente")) return "Sin cupo";
+  if (reason.includes("completa")) return "Completa";
+  if (reason.includes("anticipación")) return "Preparación";
+  if (reason.includes("corte")) return "Corte cerrado";
+  if (reason.includes("No tomamos")) return "Cerrado";
+  return reason;
+}
 
 function toDisplayDate(date: string) {
   const value = date.includes("T") ? date : `${date}T12:00:00`;
@@ -542,7 +641,11 @@ export function OrderAssistant() {
   const availabilityReference = new Date();
   const selectedDay = catalog?.availability.find((item) => item.date === date);
   const selectedDayBlockingReason = selectedDay
-    ? getDayBlockingReason(selectedDay, availabilityReference)
+    ? getAvailabilityBlockingReason(
+        selectedDay,
+        availabilityReference,
+        selectedItems,
+      )
     : null;
   const availabilityPageCount = Math.max(
     1,
@@ -569,9 +672,6 @@ export function OrderAssistant() {
   const hasApprovedPayment =
     paymentResult?.status === "APPROVED" ||
     Boolean(paymentSnapshot?.payments.some((payment) => payment.status === "APPROVED"));
-  const returnedFromSuccessfulPayment =
-    Boolean(createdOrderId) && returnPaymentState === "success";
-
   const summaryItems = paymentSnapshot?.order.items.length
     ? paymentSnapshot.order.items.map((item) => ({
         key: item.id,
@@ -603,7 +703,7 @@ export function OrderAssistant() {
     paymentSnapshot?.order.amountPaidArs ??
     (paymentResult?.status === "APPROVED" ? paymentResult.amountArs : 0);
   const currentView: AssistantView = createdOrderId
-    ? hasApprovedPayment || returnedFromSuccessfulPayment
+    ? hasApprovedPayment
       ? "success"
       : "payment"
     : "builder";
@@ -1359,7 +1459,11 @@ export function OrderAssistant() {
 
               <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
                 {visibleAvailability.map((day) => {
-                  const blockedReason = getDayBlockingReason(day, availabilityReference);
+                  const blockedReason = getAvailabilityBlockingReason(
+                    day,
+                    availabilityReference,
+                    selectedItems,
+                  );
                   const isDisabled = Boolean(blockedReason);
                   const parts = formatCalendarDate(day.date);
 
@@ -1387,12 +1491,20 @@ export function OrderAssistant() {
                         {parts.month}
                       </span>
                       <span className="mt-1.5 block break-words text-[0.62rem] font-medium leading-tight sm:mt-3 sm:text-xs">
-                        {blockedReason ?? getAvailablePickupCopyForDate(day.date)}
+                        {blockedReason
+                          ? getShortAvailabilityReason(blockedReason)
+                          : getAvailablePickupCopyForDate(day.date)}
                       </span>
                     </button>
                   );
                 })}
               </div>
+
+              {selectedDayBlockingReason ? (
+                <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm leading-6 text-red-700 shadow-[0_5px_14px_rgba(153,27,27,0.08)]">
+                  {selectedDayBlockingReason}
+                </p>
+              ) : null}
             </section>
           ) : null}
 
