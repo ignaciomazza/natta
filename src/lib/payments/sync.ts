@@ -7,6 +7,7 @@ import {
   type MercadoPagoPaymentResponse,
   mapMercadoPagoPaymentStatus,
 } from "@/lib/payments/mercadopago";
+import { sendOrderReceiptEmailIfNeeded } from "@/lib/email/order-receipt";
 
 type OrderPaymentSummaryInput = {
   amountDueNowArs: number;
@@ -177,6 +178,9 @@ export async function applyMercadoPagoPaymentSnapshot(
   }
 
   await recalculateOrderPaymentSummary(candidate.orderId);
+  if (effectiveStatus === "APPROVED") {
+    await sendOrderReceiptEmailIfNeeded(candidate.orderId);
+  }
 
   return updatedPayment;
 }

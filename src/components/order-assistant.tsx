@@ -500,6 +500,10 @@ function getMobileSizeWeight(size: CatalogSize | undefined) {
   return mobileSizeWeightLabels[size.slug] ?? null;
 }
 
+function isValidContactEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 export function OrderAssistant() {
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
@@ -717,7 +721,8 @@ export function OrderAssistant() {
 
   const hasContact =
     Boolean(customer.name.trim()) &&
-    Boolean(customer.phone.trim());
+    Boolean(customer.phone.trim()) &&
+    isValidContactEmail(customer.email);
   const hasDeliveryAddress =
     !isDeliveryMode(mode) || Boolean(customer.address.trim());
   const canSubmit =
@@ -1088,6 +1093,7 @@ export function OrderAssistant() {
         customer: {
           name: customer.name,
           phone: customer.phone,
+          email: customer.email,
           address: customer.address || undefined,
         },
         notes: notes || undefined,
@@ -1569,7 +1575,7 @@ export function OrderAssistant() {
                     Datos de contacto
                   </p>
                   <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
-                    Natta usa estos datos para avisarte cuando el pedido queda confirmado.
+                    Natta usa estos datos para enviarte el comprobante y coordinar el pedido.
                   </p>
                 </div>
 
@@ -1590,6 +1596,18 @@ export function OrderAssistant() {
                     onChange={(event) => updateCustomer("phone", event.target.value)}
                     placeholder="Para recibir confirmación"
                     value={customer.phone}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-3">
+                  <span className="text-sm font-medium">Email</span>
+                  <input
+                    autoComplete="email"
+                    className="h-12 w-full rounded-[1rem] bg-white/68 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_5px_14px_rgba(43,26,24,0.06)] outline-none transition focus:bg-white focus:shadow-[inset_0_0_0_1px_rgba(64,58,55,0.18),0_7px_18px_rgba(43,26,24,0.08)] sm:h-14 sm:rounded-[1.25rem]"
+                    onChange={(event) => updateCustomer("email", event.target.value)}
+                    placeholder="Para enviarte el comprobante"
+                    type="email"
+                    value={customer.email}
                   />
                 </label>
 
@@ -1909,6 +1927,7 @@ export function OrderAssistant() {
                           onPaymentResult={(result) => {
                             void handlePaymentResult(result);
                           }}
+                          payerEmail={customer.email}
                         />
                       </section>
                     )

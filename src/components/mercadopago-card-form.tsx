@@ -30,6 +30,7 @@ type PaymentResult = {
 type MercadoPagoCardFormProps = {
   checkout: CheckoutSession;
   onPaymentResult: (result: PaymentResult) => void;
+  payerEmail?: string;
 };
 
 type SelectOption = {
@@ -314,6 +315,7 @@ function CustomSelect({
 export function MercadoPagoCardForm({
   checkout,
   onPaymentResult,
+  payerEmail,
 }: MercadoPagoCardFormProps) {
   const fieldIds = useMemo(
     () => ({
@@ -345,7 +347,7 @@ export function MercadoPagoCardForm({
   const [cardholderName, setCardholderName] = useState("");
   const [identificationType, setIdentificationType] = useState("");
   const [identificationNumber, setIdentificationNumber] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => payerEmail ?? "");
 
   const [identificationOptions, setIdentificationOptions] = useState<SelectOption[]>(
     [],

@@ -168,6 +168,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+    if (order.customer.email !== email) {
+      await prisma.customer.update({
+        where: { id: order.customer.id },
+        data: { email },
+      });
+    }
 
     if (!Number.isInteger(installments) || installments < 1 || installments > 24) {
       return NextResponse.json(

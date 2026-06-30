@@ -238,6 +238,11 @@ model Order {
   mercadoPagoExternalReference String?         @unique
   mercadoPagoPreferenceId      String?
   mercadoPagoCheckoutUrl       String?
+  receiptEmailSentAt           DateTime?
+  receiptEmailSentTo           String?
+  receiptEmailResendId         String?
+  receiptEmailLastAttemptAt    DateTime?
+  receiptEmailLastError        String?
   confirmedAt                  DateTime?
   deliveredAt                  DateTime?
   cancelledAt                  DateTime?

@@ -46,6 +46,11 @@ const requiredColumns = [
   { table: "WeekdayCapacityRule", column: "isAutoCapacity" },
   { table: "DateCapacityOverride", column: "isAutoCapacity" },
   { table: "DateCapacityOverride", column: "ignoreLeadTime" },
+  { table: "Order", column: "receiptEmailSentAt" },
+  { table: "Order", column: "receiptEmailSentTo" },
+  { table: "Order", column: "receiptEmailResendId" },
+  { table: "Order", column: "receiptEmailLastAttemptAt" },
+  { table: "Order", column: "receiptEmailLastError" },
 ] as const;
 
 type TableRow = {
