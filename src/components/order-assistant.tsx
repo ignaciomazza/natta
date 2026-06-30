@@ -291,6 +291,10 @@ type AvailabilityCheckItem = {
   quantity: number;
 };
 
+function getFlavorSizeLabel(item: AvailabilityCheckItem) {
+  return `${item.sizeName} ${item.flavorName}`.trim();
+}
+
 function getSelectedItemsBlockingReason(
   day: AvailabilityDay,
   items: AvailabilityCheckItem[],
@@ -314,7 +318,7 @@ function getSelectedItemsBlockingReason(
   for (const item of requestedByFlavor.values()) {
     const flavor = day.flavors.find((entry) => entry.flavorId === item.flavorId);
     if (!flavor || flavor.isClosed || flavor.availableUnits === 0) {
-      return `${item.flavorName} no está disponible para esta fecha`;
+      return `No hay stock de ${item.flavorName} para esta fecha`;
     }
     if (flavor.availableUnits !== null && item.quantity > flavor.availableUnits) {
       return `No hay cupo suficiente de ${item.flavorName} para esta fecha`;
@@ -334,11 +338,12 @@ function getSelectedItemsBlockingReason(
   for (const item of requestedByFlavorAndSize.values()) {
     const flavor = day.flavors.find((entry) => entry.flavorId === item.flavorId);
     const size = flavor?.sizes.find((entry) => entry.sizeId === item.sizeId);
+    const flavorSizeLabel = getFlavorSizeLabel(item);
     if (!size || size.isClosed || size.availableUnits === 0) {
-      return `${item.flavorName} ${item.sizeName} no está disponible para esta fecha`;
+      return `No hay stock de ${flavorSizeLabel} para esta fecha`;
     }
     if (size.availableUnits !== null && item.quantity > size.availableUnits) {
-      return `No hay cupo suficiente de ${item.flavorName} ${item.sizeName} para esta fecha`;
+      return `No hay cupo suficiente de ${flavorSizeLabel} para esta fecha`;
     }
   }
 
@@ -354,6 +359,8 @@ function getAvailabilityBlockingReason(
 }
 
 function getShortAvailabilityReason(reason: string) {
+  const stockMatch = reason.match(/^No hay (?:stock|cupo suficiente) de (.+) para esta fecha$/);
+  if (stockMatch?.[1]) return `Sin ${stockMatch[1]}`;
   if (reason.includes("no está disponible")) return "No disponible";
   if (reason.includes("No hay cupo suficiente")) return "Sin cupo";
   if (reason.includes("no tiene cupo suficiente")) return "Sin cupo";

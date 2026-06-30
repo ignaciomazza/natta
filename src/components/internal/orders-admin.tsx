@@ -122,6 +122,8 @@ const orderControlLabelClassName =
   "mb-1 text-[10px] uppercase tracking-[0.12em] text-zinc-500";
 const orderCompactButtonClassName =
   "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--line)] bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55";
+const mercadoPagoReviewTitle =
+  "Consulta Mercado Pago y actualiza el estado si encuentra un pago aprobado. No confirma pagos manualmente.";
 
 const formatMoney = (value: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -202,7 +204,7 @@ function getMercadoPagoSummary(item: OrderItem) {
   if (payment.providerPreferenceId ?? item.mercadoPagoPreferenceId) {
     return {
       title: `Preferencia ${formatReference(payment.providerPreferenceId ?? item.mercadoPagoPreferenceId)}`,
-      detail: "Todavía no hay operación de pago guardada.",
+      detail: "Pago iniciado, todavía sin operación aprobada.",
     };
   }
 
@@ -213,8 +215,13 @@ function getMercadoPagoSummary(item: OrderItem) {
     title: externalReference
       ? `Referencia ${formatReference(externalReference)}`
       : "Cobro pendiente",
-    detail: "La referencia no es un comprobante de pago.",
+    detail: "Referencia del intento de pago; no confirma cobro.",
   };
+}
+
+function shouldShowMercadoPagoReview(item: OrderItem) {
+  const payment = getPrimaryMercadoPagoPayment(item);
+  return item.status === "PENDING" || payment?.status !== "APPROVED";
 }
 
 function startOfDay(date: Date) {
@@ -506,7 +513,7 @@ export function OrdersAdmin() {
   const syncMercadoPagoPayment = async (item: OrderItem) => {
     const payload = getMercadoPagoSyncPayload(item);
     if (!payload || (!("providerPaymentId" in payload) && !("externalReference" in payload))) {
-      setError("No hay identificador de Mercado Pago para sincronizar");
+      setError("No hay identificador de Mercado Pago para revisar");
       return;
     }
 
@@ -523,11 +530,11 @@ export function OrdersAdmin() {
         | null;
 
       if (!response.ok) {
-        throw new Error(result?.error ?? "No se pudo sincronizar Mercado Pago");
+        throw new Error(result?.error ?? "No se pudo revisar Mercado Pago");
       }
 
       if (result?.found === 0) {
-        setError("Mercado Pago no devolvió pagos para esa referencia");
+        setError("Mercado Pago no encontró pagos para esa referencia");
       }
 
       await load();
@@ -787,7 +794,7 @@ export function OrdersAdmin() {
                 mercadoPagoSyncPayload &&
                   ("providerPaymentId" in mercadoPagoSyncPayload ||
                     "externalReference" in mercadoPagoSyncPayload),
-              );
+              ) && shouldShowMercadoPagoReview(item);
 
               return (
               <article
@@ -867,12 +874,13 @@ export function OrdersAdmin() {
                       className={orderCompactButtonClassName}
                       disabled={syncingId === item.id}
                       onClick={() => void syncMercadoPagoPayment(item)}
+                      title={mercadoPagoReviewTitle}
                       type="button"
                     >
                       <RefreshCw
                         className={`h-3.5 w-3.5 ${syncingId === item.id ? "animate-spin" : ""}`}
                       />
-                      {syncingId === item.id ? "Sincronizando" : "Sync MP"}
+                      {syncingId === item.id ? "Revisando" : "Revisar pago"}
                     </button>
                   ) : null}
                   {item.status === "CANCELLED" ? (

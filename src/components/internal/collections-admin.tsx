@@ -114,6 +114,14 @@ function getMercadoPagoReference(item: Payment) {
   return "Sin identificador MP";
 }
 
+function shouldShowMercadoPagoReview(item: Payment) {
+  return Boolean(
+    item.method === "MERCADO_PAGO" &&
+      (item.providerPaymentId || item.externalReference) &&
+      (item.status !== "APPROVED" || !item.providerPaymentId),
+  );
+}
+
 export function CollectionsAdmin() {
   const [items, setItems] = useState<Payment[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -201,7 +209,7 @@ export function CollectionsAdmin() {
 
   const syncMercadoPagoPayment = async (item: Payment) => {
     if (!item.providerPaymentId && !item.externalReference) {
-      setError("No hay identificador de Mercado Pago para sincronizar");
+      setError("No hay identificador de Mercado Pago para revisar");
       return;
     }
 
@@ -222,11 +230,11 @@ export function CollectionsAdmin() {
         | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? "No se pudo sincronizar Mercado Pago");
+        throw new Error(payload?.error ?? "No se pudo revisar Mercado Pago");
       }
 
       if (payload?.found === 0) {
-        setError("Mercado Pago no devolvió pagos para esa referencia");
+        setError("Mercado Pago no encontró pagos para esa referencia");
       }
 
       await load();
@@ -432,20 +440,21 @@ export function CollectionsAdmin() {
                     ) : null}
                     {item.externalReference && !item.providerPaymentId ? (
                       <p className="mt-1 leading-4 text-zinc-500">
-                        Esta referencia no es comprobante de pago.
+                        Esta referencia no confirma un cobro.
                       </p>
                     ) : null}
-                    {item.providerPaymentId || item.externalReference ? (
+                    {shouldShowMercadoPagoReview(item) ? (
                       <button
                         className="mt-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:var(--line)] bg-white px-3 text-[11px] font-semibold text-zinc-700 transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55"
                         disabled={syncingId === item.id}
                         onClick={() => void syncMercadoPagoPayment(item)}
+                        title="Consulta Mercado Pago y actualiza el estado si encuentra un pago aprobado. No confirma pagos manualmente."
                         type="button"
                       >
                         <RefreshCw
                           className={`h-3.5 w-3.5 ${syncingId === item.id ? "animate-spin" : ""}`}
                         />
-                        {syncingId === item.id ? "Sincronizando" : "Sincronizar MP"}
+                        {syncingId === item.id ? "Revisando" : "Revisar pago"}
                       </button>
                     ) : null}
                   </div>

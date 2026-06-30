@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     logServerError("api.payments.sync.post", error);
     return NextResponse.json(
-      { error: "No se pudo sincronizar Mercado Pago" },
+      { error: "No se pudo revisar Mercado Pago" },
       { status: 500 },
     );
   }
