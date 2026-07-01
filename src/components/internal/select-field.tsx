@@ -161,7 +161,7 @@ export function SelectField({
   };
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className={`relative ${open ? "z-[90]" : "z-0"}`} ref={rootRef}>
       <button
         aria-controls={listboxId}
         aria-expanded={open}
@@ -184,7 +184,7 @@ export function SelectField({
 
       {open ? (
         <div
-          className="absolute left-0 right-0 z-50 mt-4 max-h-64 space-y-1 overflow-y-auto rounded-[1.35rem] bg-[color:var(--milk)] p-1.5 shadow-[0_22px_48px_-26px_rgba(38,35,33,0.72),0_12px_24px_-16px_rgba(82,74,70,0.5)]"
+          className="absolute left-0 right-0 z-[100] mt-4 max-h-64 space-y-1 overflow-y-auto rounded-[1.35rem] bg-[color:var(--milk)] p-1.5 shadow-[0_22px_48px_-26px_rgba(38,35,33,0.72),0_12px_24px_-16px_rgba(82,74,70,0.5)]"
           id={listboxId}
           role="listbox"
         >

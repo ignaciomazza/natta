@@ -17,6 +17,7 @@ import {
   Store,
   Trash2,
   Truck,
+  X,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -116,17 +117,22 @@ const statusSelectToneClass: Record<OrderStatus, string> = {
   CANCELLED: "border-rose-300 bg-rose-100 text-rose-800",
 };
 
+const statusIconByStatus: Record<OrderStatus, LucideIcon> = {
+  PENDING: Clock3,
+  CONFIRMED: CheckCircle2,
+  DELIVERED: PackageCheck,
+  CANCELLED: XCircle,
+};
+
 function getStatusSelectClassName(status: OrderStatus) {
-  return `!h-8 !w-full cursor-pointer !rounded-full !border !px-3 !py-0 !pr-8 text-center !text-xs !font-semibold leading-tight focus:!border-[color:var(--accent)] focus:!ring-0 ${statusSelectToneClass[status]}`;
+  return `!h-8 !w-full !min-w-[9.75rem] cursor-pointer !rounded-full !border !px-3 !py-0 !pr-8 !text-xs !font-semibold leading-tight focus:!border-[color:var(--accent)] focus:!ring-0 ${statusSelectToneClass[status]}`;
 }
 
-const statusSelectWrapperClassName = "w-full min-w-0";
+const statusSelectWrapperClassName = "w-full min-w-[9.75rem]";
 const orderCardClassName =
-  "grid gap-3 rounded-[1.6rem] bg-[color:var(--milk)]/92 p-3.5 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.72),0_8px_18px_-18px_rgba(82,74,70,0.48)] transition-shadow hover:shadow-[0_20px_44px_-30px_rgba(38,35,33,0.78),0_12px_24px_-18px_rgba(82,74,70,0.52)] md:grid-cols-[minmax(7rem,0.95fr)_minmax(11.5rem,1.25fr)_minmax(6.8rem,0.65fr)_minmax(7.75rem,0.72fr)_minmax(7.75rem,0.72fr)] md:items-center md:gap-x-3 md:gap-y-2 lg:grid-cols-[minmax(8rem,1fr)_minmax(13rem,1.35fr)_minmax(7rem,0.7fr)_minmax(8rem,0.7fr)_minmax(8rem,0.7fr)]";
-const orderControlLabelClassName =
-  "mb-1 text-[10px] uppercase tracking-[0.12em] text-zinc-500";
+  "order-card grid gap-3 rounded-[1.6rem] bg-[color:var(--milk)]/92 p-3.5 shadow-[0_16px_36px_-30px_rgba(38,35,33,0.72),0_8px_18px_-18px_rgba(82,74,70,0.48)] transition-shadow hover:shadow-[0_20px_44px_-30px_rgba(38,35,33,0.78),0_12px_24px_-18px_rgba(82,74,70,0.52)]";
 const orderCompactButtonClassName =
-  "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--line)] bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55";
+  "inline-flex h-8 min-w-0 w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--line)] bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-55";
 const mercadoPagoReviewTitle =
   "Consulta Mercado Pago y actualiza el estado si encuentra un pago aprobado. No confirma pagos manualmente.";
 
@@ -161,13 +167,20 @@ function getOrderSummary(items: OrderLineItem[]) {
     .join(" · ");
 }
 
-function formatReceiptCode(code: string) {
-  return code.length > 12 ? code.slice(-8) : code;
-}
-
 function formatReference(value: string | null | undefined) {
   if (!value) return null;
   return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
+}
+
+const mercadoPagoStatusDetailLabels: Record<string, string> = {
+  accredited: "Acreditado",
+  pending_contingency: "Pendiente de acreditación",
+  pending_review_manual: "En revisión manual",
+};
+
+function formatMercadoPagoStatusDetail(value: string | null | undefined) {
+  if (!value) return null;
+  return mercadoPagoStatusDetailLabels[value] ?? value.replaceAll("_", " ");
 }
 
 function getPrimaryMercadoPagoPayment(item: OrderItem) {
@@ -211,7 +224,7 @@ function getMercadoPagoSummary(item: OrderItem) {
   if (payment.providerPaymentId) {
     return {
       title: `Operación MP ${payment.providerPaymentId}`,
-      detail: payment.statusDetail,
+      detail: formatMercadoPagoStatusDetail(payment.statusDetail),
     };
   }
 
@@ -368,11 +381,18 @@ function OrderStatusSelect({
         }}
         value={item.status}
       >
-        {statusOptions.map((status) => (
-          <SelectOption key={status} value={status}>
-            {statusLabel[status]}
-          </SelectOption>
-        ))}
+        {statusOptions.map((status) => {
+          const Icon = statusIconByStatus[status];
+
+          return (
+            <SelectOption key={status} value={status}>
+              <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span>{statusLabel[status]}</span>
+              </span>
+            </SelectOption>
+          );
+        })}
       </SelectField>
     </div>
   );
@@ -385,6 +405,8 @@ export function OrdersAdmin() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [emailingId, setEmailingId] = useState<string | null>(null);
+  const [receiptEmailConfirmItem, setReceiptEmailConfirmItem] =
+    useState<OrderItem | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [nearbyCounts, setNearbyCounts] = useState<NearbyOrderCounts>({
     next: 0,
@@ -581,6 +603,7 @@ export function OrdersAdmin() {
       }
 
       await load();
+      setReceiptEmailConfirmItem(null);
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "Error");
     } finally {
@@ -828,7 +851,7 @@ export function OrdersAdmin() {
       {loading ? (
         <p className="text-sm text-zinc-600">Cargando pedidos...</p>
       ) : (
-        <div className="space-y-2.5">
+        <div className="order-list space-y-2.5">
           {items.length ? (
             items.map((item) => {
               const mercadoPagoSummary = getMercadoPagoSummary(item);
@@ -844,7 +867,7 @@ export function OrdersAdmin() {
                 className={orderCardClassName}
                 key={item.id}
               >
-                <div className="min-w-0">
+                <div className="order-card__customer min-w-0">
                   <p className="truncate text-sm font-semibold text-[color:var(--chocolate-deep)]">
                     {item.customer.name}
                   </p>
@@ -856,9 +879,15 @@ export function OrdersAdmin() {
                     <FulfillmentModeChip mode={item.fulfillmentMode} />
                     <Pill mini tone="info">{formatDate(item.deliveryDate)}</Pill>
                   </div>
+                  <p
+                    className="mt-1.5 truncate text-[11px] font-medium text-zinc-500"
+                    title={item.publicReceiptCode}
+                  >
+                    Comprobante {item.publicReceiptCode}
+                  </p>
                 </div>
 
-                <div className="min-w-0">
+                <div className="order-card__summary min-w-0">
                   <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                     Pedido
                   </p>
@@ -867,11 +896,8 @@ export function OrdersAdmin() {
                   </p>
                 </div>
 
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
-                    Cobro
-                  </p>
-                  <p className="mt-1 text-base font-semibold text-zinc-950 lg:text-lg">
+                <div className="order-card__payment min-w-0">
+                  <p className="text-base font-semibold text-zinc-950 lg:text-lg">
                     {formatMoney(item.subtotalArs)}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
@@ -888,34 +914,30 @@ export function OrdersAdmin() {
                   ) : null}
                 </div>
 
-                <div className="min-w-0 md:w-full">
-                  <p className={orderControlLabelClassName}>Estado</p>
-                  <OrderStatusSelect
-                    item={item}
-                    onChange={(id, status) => {
-                      void patchStatus(id, status);
-                    }}
-                  />
-                </div>
+                <div className="order-card__controls grid min-w-0 gap-1.5">
+                  <div className="order-card__status min-w-0 md:w-full">
+                    <OrderStatusSelect
+                      item={item}
+                      onChange={(id, status) => {
+                        void patchStatus(id, status);
+                      }}
+                    />
+                  </div>
 
-                <div className="grid min-w-0 gap-1.5 md:w-full">
-                  <p className={orderControlLabelClassName}>Comprobante</p>
                   <a
-                    className={orderCompactButtonClassName}
+                    className={`${orderCompactButtonClassName} order-card__receipt-action`}
                     href={`/comprobante/${item.publicReceiptCode}`}
                     rel="noreferrer"
                     target="_blank"
                     title={item.publicReceiptCode}
                   >
-                    <FileText className="h-3.5 w-3.5" />
-                    <span className="min-w-0 truncate">
-                      Ver {formatReceiptCode(item.publicReceiptCode)}
-                    </span>
+                    <FileText className="h-3.5 w-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">Ver comprobante</span>
                   </a>
                   <button
-                    className={orderCompactButtonClassName}
+                    className={`${orderCompactButtonClassName} order-card__email-action`}
                     disabled={emailingId === item.id || !item.customer.email}
-                    onClick={() => void sendReceiptEmail(item)}
+                    onClick={() => setReceiptEmailConfirmItem(item)}
                     title={
                       item.customer.email
                         ? `Enviar comprobante a ${item.customer.email}`
@@ -923,44 +945,48 @@ export function OrdersAdmin() {
                     }
                     type="button"
                   >
-                    <Mail className={`h-3.5 w-3.5 ${emailingId === item.id ? "animate-pulse" : ""}`} />
+                    <Mail className={`h-3.5 w-3.5 shrink-0 ${emailingId === item.id ? "animate-pulse" : ""}`} />
                     <span className="min-w-0 truncate">
-                      {emailingId === item.id ? "Enviando" : "Enviar comprobante"}
+                      {!item.customer.email
+                        ? "Sin email"
+                        : emailingId === item.id
+                          ? "Enviando"
+                          : "Enviar comprobante"}
                     </span>
                   </button>
                   {item.receiptEmailSentAt ? (
-                    <p className="truncate text-[10px] leading-4 text-zinc-500">
+                    <p className="order-card__email-note truncate text-[10px] leading-4 text-zinc-500">
                       Enviado {formatDateTime(item.receiptEmailSentAt)}
                       {item.receiptEmailSentTo ? ` · ${item.receiptEmailSentTo}` : ""}
                     </p>
                   ) : null}
                   {item.receiptEmailLastError ? (
-                    <p className="line-clamp-2 text-[10px] leading-4 text-rose-600">
+                    <p className="order-card__email-note line-clamp-2 text-[10px] leading-4 text-rose-600">
                       {item.receiptEmailLastError}
                     </p>
                   ) : null}
                   {canSyncMercadoPago ? (
                     <button
-                      className={orderCompactButtonClassName}
+                      className={`${orderCompactButtonClassName} order-card__secondary-action`}
                       disabled={syncingId === item.id}
                       onClick={() => void syncMercadoPagoPayment(item)}
                       title={mercadoPagoReviewTitle}
                       type="button"
                     >
                       <RefreshCw
-                        className={`h-3.5 w-3.5 ${syncingId === item.id ? "animate-spin" : ""}`}
+                        className={`h-3.5 w-3.5 shrink-0 ${syncingId === item.id ? "animate-spin" : ""}`}
                       />
                       {syncingId === item.id ? "Revisando" : "Revisar pago"}
                     </button>
                   ) : null}
                   {item.status === "CANCELLED" ? (
                     <button
-                      className={`${orderCompactButtonClassName} text-rose-700 hover:border-rose-200 hover:text-rose-800`}
+                      className={`${orderCompactButtonClassName} order-card__secondary-action text-rose-700 hover:border-rose-200 hover:text-rose-800`}
                       disabled={deletingId === item.id}
                       onClick={() => void deleteCancelledOrder(item)}
                       type="button"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5 shrink-0" />
                       {deletingId === item.id ? "Eliminando" : "Eliminar"}
                     </button>
                   ) : null}
@@ -981,6 +1007,84 @@ export function OrdersAdmin() {
       ) : null}
       {deletingId ? (
         <p className="text-xs text-zinc-500">Eliminando pedido {deletingId.slice(-6)}...</p>
+      ) : null}
+
+      {receiptEmailConfirmItem ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6">
+          <button
+            aria-label="Cerrar confirmación de envío"
+            className="absolute inset-0 bg-[#262321]/24 backdrop-blur-[3px]"
+            onClick={() => setReceiptEmailConfirmItem(null)}
+            type="button"
+          />
+          <div
+            aria-labelledby="receipt-email-confirm-title"
+            aria-modal="true"
+            className="relative z-10 w-full max-w-md rounded-[1.8rem] bg-[color:var(--milk)] p-5 shadow-[0_28px_80px_-36px_rgba(38,35,33,0.76),0_16px_36px_-20px_rgba(82,74,70,0.56)]"
+            role="dialog"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h3
+                  className="text-lg font-semibold text-[color:var(--chocolate-deep)]"
+                  id="receipt-email-confirm-title"
+                >
+                  ¿Enviar comprobante?
+                </h3>
+              </div>
+              <button
+                aria-label="Cerrar"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--line)] bg-white/70 text-zinc-600 transition hover:border-[color:var(--accent)] hover:text-[color:var(--chocolate-deep)]"
+                onClick={() => setReceiptEmailConfirmItem(null)}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm leading-6 text-zinc-600">
+              Al concretarse la venta, el comprobante ya debería haberse enviado
+              automáticamente. Usá esta opción solo si ese envío falló o si necesitás
+              reenviarlo por un motivo puntual.
+            </p>
+
+            <div className="mt-4 rounded-2xl border border-[color:var(--line)] bg-white/55 px-3 py-2.5 text-sm text-zinc-600">
+              <p className="truncate font-semibold text-[color:var(--chocolate-deep)]">
+                {receiptEmailConfirmItem.customer.name}
+              </p>
+              <p className="mt-1 truncate text-xs">
+                {receiptEmailConfirmItem.customer.email}
+              </p>
+              <p className="mt-1 truncate text-xs">
+                Comprobante {receiptEmailConfirmItem.publicReceiptCode}
+              </p>
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className={`${buttonSoftClassName} sm:min-w-[7rem]`}
+                disabled={emailingId === receiptEmailConfirmItem.id}
+                onClick={() => setReceiptEmailConfirmItem(null)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[color:var(--chocolate)] px-4 text-sm font-medium text-white transition hover:bg-[color:var(--chocolate-deep)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[12rem]"
+                disabled={emailingId === receiptEmailConfirmItem.id}
+                onClick={() => void sendReceiptEmail(receiptEmailConfirmItem)}
+                type="button"
+              >
+                <Mail
+                  className={`h-4 w-4 ${emailingId === receiptEmailConfirmItem.id ? "animate-pulse" : ""}`}
+                />
+                {emailingId === receiptEmailConfirmItem.id
+                  ? "Enviando"
+                  : "Enviar comprobante"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {customModalOpen ? (

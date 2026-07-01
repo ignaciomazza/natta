@@ -74,6 +74,100 @@ summary,
   background-size: 42px 42px;
 }
 
+.order-list {
+  container-type: inline-size;
+}
+
+.order-card {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.order-card:focus-within {
+  z-index: 20;
+}
+
+.order-card__controls,
+.order-card__customer,
+.order-card__email-action,
+.order-card__payment,
+.order-card__receipt-action,
+.order-card__status,
+.order-card__summary {
+  min-width: 0;
+}
+
+@container (min-width: 56rem) {
+  .order-card {
+    grid-template-columns:
+      minmax(10rem, 0.86fr)
+      minmax(16rem, 1.38fr)
+      minmax(10.5rem, 0.9fr);
+    gap: 1rem 1.25rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .order-card__customer {
+    grid-column: 1;
+  }
+
+  .order-card__summary {
+    grid-column: 2;
+  }
+
+  .order-card__payment {
+    grid-column: 3;
+  }
+
+  .order-card__status {
+    grid-column: auto;
+  }
+
+  .order-card__controls {
+    grid-column: 1 / 4;
+    display: grid;
+    grid-template-columns:
+      minmax(9.75rem, 0.82fr)
+      minmax(0, 1.09fr)
+      minmax(0, 1.09fr);
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .order-card__email-note,
+  .order-card__secondary-action {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (min-width: 76rem) {
+  .order-card {
+    grid-template-columns:
+      minmax(12rem, 1fr)
+      minmax(22rem, 1.5fr)
+      minmax(13rem, 0.95fr)
+      minmax(27rem, 1.75fr);
+    align-items: center;
+    gap: 1.1rem;
+    padding: 1.15rem 1.25rem;
+  }
+
+  .order-card__controls,
+  .order-card__customer,
+  .order-card__payment,
+  .order-card__summary {
+    grid-column: auto;
+  }
+
+  .order-card__controls {
+    grid-template-columns:
+      minmax(9.75rem, 0.78fr)
+      minmax(0, 1.11fr)
+      minmax(0, 1.11fr);
+  }
+}
+
 .hero-image {
   clip-path: inset(0 round 28px);
 }
