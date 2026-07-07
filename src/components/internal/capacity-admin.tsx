@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Minus, Plus, SquarePen, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock, Minus, Plus, SquarePen, X } from "lucide-react";
 import {
   Pill,
   SectionTitle,
@@ -11,6 +11,11 @@ import {
   fieldLabelClassName,
   inputClassName,
 } from "@/components/internal/ui";
+import {
+  getDefaultPickupWindowForWeekday,
+  minutesToTimeInput,
+  timeInputToMinutes,
+} from "@/lib/pickup-hours";
 
 type FlavorOption = {
   id: string;
@@ -33,6 +38,8 @@ type WeekdayRuleItem = {
   isAutoCapacity: boolean;
   minLeadTimeDays: number;
   cutoffHour: number;
+  pickupStartMinutes: number | null;
+  pickupEndMinutes: number | null;
 };
 
 type WeekdayFlavorRuleItem = {
@@ -86,6 +93,10 @@ type CapacityItem = {
   isAutoCapacity: boolean;
   minLeadTimeDays: number;
   ignoreLeadTime: boolean;
+  pickupStartMinutes: number;
+  pickupEndMinutes: number;
+  weekdayPickupStartMinutes: number;
+  weekdayPickupEndMinutes: number;
   bookedUnits: number;
   availableUnits: number;
   source: "weekday" | "override";
@@ -133,11 +144,17 @@ type ExceptionEditor = {
   maxUnits: number;
   isAutoCapacity: boolean;
   ignoreLeadTime: boolean;
+  pickupStartInput: string;
+  pickupEndInput: string;
+  weekdayPickupStartInput: string;
+  weekdayPickupEndInput: string;
   bookedUnits: number;
   availableUnits: number;
   hasOverride: boolean;
   flavors: ExceptionFlavorEditor[];
 };
+
+type PickupHoursDraft = Record<number, { start: string; end: string }>;
 
 const weekdayOptions = [
   { value: 0, label: "Domingo" },
@@ -325,6 +342,31 @@ function getWeekdayDraft(
   };
 }
 
+function buildPickupHoursDraft(rules: WeekdayRuleItem[]): PickupHoursDraft {
+  return Object.fromEntries(
+    weekdayOptions.map((option) => {
+      const rule = rules.find((item) => item.weekday === option.value);
+      const fallback = getDefaultPickupWindowForWeekday(option.value);
+      const start = rule?.pickupStartMinutes ?? fallback.pickupStartMinutes;
+      const end = rule?.pickupEndMinutes ?? fallback.pickupEndMinutes;
+
+      return [
+        option.value,
+        {
+          start: minutesToTimeInput(start),
+          end: minutesToTimeInput(end),
+        },
+      ];
+    }),
+  ) as PickupHoursDraft;
+}
+
+function formatPickupHoursDraft(draft: PickupHoursDraft, weekday: number) {
+  const entry = draft[weekday];
+  if (!entry) return "-";
+  return `${entry.start} a ${entry.end}`;
+}
+
 function formatFlavorCapacity(flavor: FlavorCapacityItem) {
   if (flavor.maxUnits === null) {
     return `${flavor.bookedUnits} reservadas`;
@@ -368,7 +410,7 @@ function formatExceptionFlavorMeta(flavor: ExceptionFlavorEditor) {
   const sizeDrafts = flavor.sizes.filter(
     (size) => size.isClosed || hasSpecificDraft(size.maxInput),
   ).length;
-  if (flavor.isClosed) return `${flavor.bookedUnits} reservadas · cerrado`;
+  if (flavor.isClosed) return `${flavor.bookedUnits} reservadas · desactivado`;
   if (hasSpecificDraft(flavor.maxInput)) {
     return `${flavor.bookedUnits} reservadas · cupo ${formatDraftUnits(flavor.maxInput)}`;
   }
@@ -382,7 +424,7 @@ function formatExceptionFlavorMeta(flavor: ExceptionFlavorEditor) {
 }
 
 function formatExceptionFlavorChip(flavor: ExceptionFlavorEditor) {
-  if (flavor.isClosed) return "cerrado";
+  if (flavor.isClosed) return "desactivado";
   if (hasSpecificDraft(flavor.maxInput)) return formatDraftUnits(flavor.maxInput);
   const sizeDrafts = flavor.sizes.filter(
     (size) => size.isClosed || hasSpecificDraft(size.maxInput),
@@ -558,6 +600,11 @@ export function CapacityAdmin() {
   const [error, setError] = useState<string | null>(null);
   const [savingWeekday, setSavingWeekday] = useState(false);
   const [savingException, setSavingException] = useState(false);
+  const [savingPickupHours, setSavingPickupHours] = useState(false);
+  const [pickupHoursModalOpen, setPickupHoursModalOpen] = useState(false);
+  const [pickupHoursDraft, setPickupHoursDraft] = useState<PickupHoursDraft>(() =>
+    buildPickupHoursDraft([]),
+  );
 
   const [weekday, setWeekday] = useState(1);
   const [weekdayOpen, setWeekdayOpen] = useState(true);
@@ -618,6 +665,7 @@ export function CapacityAdmin() {
       setWeekdayRules(payload.weekdayRules);
       setWeekdayFlavorRules(payload.weekdayFlavorRules);
       setWeekdayFlavorSizeRules(payload.weekdayFlavorSizeRules);
+      setPickupHoursDraft(buildPickupHoursDraft(payload.weekdayRules));
 
       const draft = getWeekdayDraft(
         weekday,
@@ -650,18 +698,19 @@ export function CapacityAdmin() {
   }, []);
 
   useEffect(() => {
-    if (!exceptionEditor) return;
+    if (!exceptionEditor && !pickupHoursModalOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setExceptionEditor(null);
         setExceptionFlavorPickerOpen(false);
+        setPickupHoursModalOpen(false);
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [exceptionEditor]);
+  }, [exceptionEditor, pickupHoursModalOpen]);
 
   const saveWeekday = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -745,6 +794,76 @@ export function CapacityAdmin() {
       setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
     } finally {
       setSavingWeekday(false);
+    }
+  };
+
+  const openPickupHoursModal = () => {
+    setPickupHoursDraft(buildPickupHoursDraft(weekdayRules));
+    setPickupHoursModalOpen(true);
+  };
+
+  const updatePickupHoursDraft = (
+    nextWeekday: number,
+    field: "start" | "end",
+    value: string,
+  ) => {
+    setPickupHoursDraft((prev) => ({
+      ...prev,
+      [nextWeekday]: {
+        ...prev[nextWeekday],
+        [field]: value,
+      },
+    }));
+  };
+
+  const savePickupHours = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setSavingPickupHours(true);
+
+    try {
+      const payload = weekdayOptions.map((option) => {
+        const entry = pickupHoursDraft[option.value];
+        const pickupStartMinutes = timeInputToMinutes(entry?.start ?? "");
+        const pickupEndMinutes = timeInputToMinutes(entry?.end ?? "");
+
+        if (
+          pickupStartMinutes === null ||
+          pickupEndMinutes === null ||
+          pickupEndMinutes <= pickupStartMinutes
+        ) {
+          throw new Error(`Revisá el horario de ${option.label.toLowerCase()}`);
+        }
+
+        return {
+          weekday: option.value,
+          pickupStartMinutes,
+          pickupEndMinutes,
+        };
+      });
+
+      const responses = await Promise.all(
+        payload.map((item) =>
+          fetch("/api/capacity/weekday", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          }),
+        ),
+      );
+
+      if (responses.some((item) => !item.ok)) {
+        throw new Error("No se pudieron guardar los horarios");
+      }
+
+      await load();
+      setPickupHoursModalOpen(false);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "No se pudieron guardar los horarios",
+      );
+    } finally {
+      setSavingPickupHours(false);
     }
   };
 
@@ -851,6 +970,10 @@ export function CapacityAdmin() {
       maxUnits: item.manualMaxUnits,
       isAutoCapacity: item.isAutoCapacity,
       ignoreLeadTime: item.ignoreLeadTime,
+      pickupStartInput: minutesToTimeInput(item.pickupStartMinutes),
+      pickupEndInput: minutesToTimeInput(item.pickupEndMinutes),
+      weekdayPickupStartInput: minutesToTimeInput(item.weekdayPickupStartMinutes),
+      weekdayPickupEndInput: minutesToTimeInput(item.weekdayPickupEndMinutes),
       bookedUnits: item.bookedUnits,
       availableUnits: item.availableUnits,
       hasOverride: item.hasOverride,
@@ -866,6 +989,28 @@ export function CapacityAdmin() {
     setSavingException(true);
 
     try {
+      const pickupStartMinutes = timeInputToMinutes(exceptionEditor.pickupStartInput);
+      const pickupEndMinutes = timeInputToMinutes(exceptionEditor.pickupEndInput);
+      const weekdayPickupStartMinutes = timeInputToMinutes(
+        exceptionEditor.weekdayPickupStartInput,
+      );
+      const weekdayPickupEndMinutes = timeInputToMinutes(
+        exceptionEditor.weekdayPickupEndInput,
+      );
+
+      if (
+        pickupStartMinutes === null ||
+        pickupEndMinutes === null ||
+        pickupEndMinutes <= pickupStartMinutes ||
+        weekdayPickupStartMinutes === null ||
+        weekdayPickupEndMinutes === null
+      ) {
+        throw new Error("Revisá los horarios de retiro de la fecha");
+      }
+
+      const hasPickupHoursOverride =
+        pickupStartMinutes !== weekdayPickupStartMinutes ||
+        pickupEndMinutes !== weekdayPickupEndMinutes;
       const autoMaxUnits = calculateExceptionAutoCapacity(exceptionEditor.flavors);
       const shouldSaveAutoCapacity =
         !exceptionEditor.isClosed &&
@@ -888,6 +1033,14 @@ export function CapacityAdmin() {
           ignoreLeadTime: exceptionEditor.isClosed
             ? false
             : exceptionEditor.ignoreLeadTime,
+          pickupStartMinutes:
+            !exceptionEditor.isClosed && hasPickupHoursOverride
+              ? pickupStartMinutes
+              : null,
+          pickupEndMinutes:
+            !exceptionEditor.isClosed && hasPickupHoursOverride
+              ? pickupEndMinutes
+              : null,
         }),
       });
 
@@ -1031,6 +1184,16 @@ export function CapacityAdmin() {
   return (
     <section className="space-y-7">
       <SectionTitle
+        action={
+          <button
+            className={`${buttonSoftClassName} inline-flex items-center gap-2`}
+            onClick={openPickupHoursModal}
+            type="button"
+          >
+            <Clock className="h-4 w-4" />
+            Horarios
+          </button>
+        }
         icon={CalendarDays}
         title="Cupos de producción"
       />
@@ -1378,6 +1541,135 @@ export function CapacityAdmin() {
         </section>
       </div>
 
+      {pickupHoursModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            aria-label="Cerrar horarios"
+            className="absolute inset-0 bg-[#262321]/20 backdrop-blur-[1px]"
+            onClick={() => setPickupHoursModalOpen(false)}
+            type="button"
+          />
+
+          <section
+            aria-labelledby="pickup-hours-title"
+            aria-modal="true"
+            className="relative z-10 max-h-[min(92vh,44rem)] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-[color:var(--milk)] p-5 shadow-[0_28px_70px_-36px_rgba(38,35,33,0.72),0_16px_34px_-22px_rgba(82,74,70,0.48)] sm:p-6"
+            role="dialog"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] pb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
+                  Web
+                </p>
+                <h3
+                  className="mt-1 text-xl font-semibold text-[color:var(--chocolate-deep)]"
+                  id="pickup-hours-title"
+                >
+                  Horarios de retiro
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">
+                  Se muestran en disponibilidad, resumen, estado y comprobantes.
+                </p>
+              </div>
+
+              <button
+                aria-label="Cerrar"
+                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--line)] text-zinc-600 transition hover:border-[color:var(--accent)]"
+                onClick={() => setPickupHoursModalOpen(false)}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form className="mt-5 space-y-5" onSubmit={savePickupHours}>
+              <div className="grid gap-3">
+                {weekdayOptions.map((option) => {
+                  const rule = weekdayRules.find(
+                    (item) => item.weekday === option.value,
+                  );
+                  const isOpen = rule ? rule.isOpen : option.value !== 0;
+
+                  return (
+                    <div
+                      className="grid gap-3 rounded-[1.25rem] border border-[color:var(--line)] bg-white/55 p-3 sm:grid-cols-[minmax(7rem,1fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_auto] sm:items-end"
+                      key={option.value}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                          {option.label}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <Pill mini tone={isOpen ? "success" : "danger"}>
+                            {isOpen ? "Habilitado" : "Cerrado"}
+                          </Pill>
+                          <span className="text-xs text-zinc-500">
+                            {formatPickupHoursDraft(pickupHoursDraft, option.value)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <label className={`${fieldLabelClassName} block`}>
+                        Desde
+                        <input
+                          className={inputClassName}
+                          onChange={(event) =>
+                            updatePickupHoursDraft(
+                              option.value,
+                              "start",
+                              event.target.value,
+                            )
+                          }
+                          step={900}
+                          type="time"
+                          value={pickupHoursDraft[option.value]?.start ?? ""}
+                        />
+                      </label>
+
+                      <label className={`${fieldLabelClassName} block`}>
+                        Hasta
+                        <input
+                          className={inputClassName}
+                          onChange={(event) =>
+                            updatePickupHoursDraft(
+                              option.value,
+                              "end",
+                              event.target.value,
+                            )
+                          }
+                          step={900}
+                          type="time"
+                          value={pickupHoursDraft[option.value]?.end ?? ""}
+                        />
+                      </label>
+
+                      <Clock className="hidden h-4 w-4 justify-self-end text-zinc-400 sm:block" />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--line)] pt-5">
+                <button
+                  className={buttonSoftClassName}
+                  disabled={savingPickupHours}
+                  type="submit"
+                >
+                  {savingPickupHours ? "Guardando..." : "Guardar horarios"}
+                </button>
+                <button
+                  className={buttonGhostClassName}
+                  onClick={() => setPickupHoursModalOpen(false)}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
       {exceptionEditor ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
@@ -1423,52 +1715,92 @@ export function CapacityAdmin() {
             </div>
 
             <form className="mt-5 space-y-6" onSubmit={saveException}>
-              <div className="grid gap-5 lg:grid-cols-[minmax(18rem,1fr)_20rem] lg:items-end">
-                <label className={`${fieldLabelClassName} block`}>
-                  Cupo máximo general
-                  <input
-                    className={inputClassName}
-                    disabled={exceptionEditor.isClosed || exceptionEditor.isAutoCapacity}
-                    min={0}
-                    onChange={(event) =>
-                      setExceptionEditor((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              maxUnits: Number(event.target.value),
-                            }
-                          : prev,
-                      )
-                    }
-                    type="number"
-                    value={
-                      exceptionEditor.isAutoCapacity
-                        ? exceptionAutoMaxUnits
-                        : exceptionEditor.maxUnits
-                    }
-                  />
-                </label>
+              <div className="flex justify-end">
+                <Toggle
+                  checked={exceptionEditor.isClosed}
+                  label="Cerrar fecha"
+                  onChange={(checked) =>
+                    setExceptionEditor((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            isClosed: checked,
+                            ignoreLeadTime: checked ? false : prev.ignoreLeadTime,
+                          }
+                        : prev,
+                    )
+                  }
+                />
+              </div>
 
-                <div className="text-sm text-zinc-700 lg:border-l lg:border-[color:var(--line)] lg:pl-5">
-                  <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
-                    Estado actual
-                  </p>
-                  <div className="mt-2 space-y-1.5">
-                    <p className="flex items-center justify-between">
-                      <span className="text-zinc-600">Modo</span>
-                      <strong>
-                        {exceptionEditor.isAutoCapacity ? "Auto" : "Manual"}
-                      </strong>
-                    </p>
-                    <p className="flex items-center justify-between">
-                      <span className="text-zinc-600">Reservado</span>
-                      <strong>{exceptionEditor.bookedUnits}</strong>
-                    </p>
-                    <p className="flex items-center justify-between">
-                      <span className="text-zinc-600">Disponible</span>
-                      <strong>{exceptionEditor.availableUnits}</strong>
+              <div className="rounded-[1.3rem] border border-[color:var(--line)] bg-white/55 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                      Cupo general
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(12rem,18rem)_minmax(14rem,22rem)] lg:items-end">
+                  <div>
+                    <p className={fieldLabelClassName}>Modo</p>
+                    <div className="mt-2 grid h-11 grid-cols-2 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--milk)]/90 p-1">
+                      {[
+                        { label: "Manual", value: false },
+                        { label: "Automático", value: true },
+                      ].map((option) => (
+                        <button
+                          className={`rounded-xl px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                            exceptionEditor.isAutoCapacity === option.value
+                              ? "bg-[color:var(--chocolate-deep)] text-white shadow-[0_8px_18px_rgba(43,26,24,0.14)]"
+                              : "text-zinc-600 hover:bg-white"
+                          }`}
+                          disabled={exceptionEditor.isClosed}
+                          key={option.label}
+                          onClick={() =>
+                            setExceptionEditor((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    isAutoCapacity: option.value,
+                                  }
+                                : prev,
+                            )
+                          }
+                          type="button"
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <label className={`${fieldLabelClassName} block`}>
+                    Cupo máximo general
+                    <input
+                      className={inputClassName}
+                      disabled={exceptionEditor.isClosed || exceptionEditor.isAutoCapacity}
+                      min={0}
+                      onChange={(event) =>
+                        setExceptionEditor((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                maxUnits: Number(event.target.value),
+                              }
+                            : prev,
+                        )
+                      }
+                      type="number"
+                      value={
+                        exceptionEditor.isAutoCapacity
+                          ? exceptionAutoMaxUnits
+                          : exceptionEditor.maxUnits
+                      }
+                    />
+                  </label>
+
                 </div>
               </div>
 
@@ -1477,9 +1809,6 @@ export function CapacityAdmin() {
                   <div>
                     <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
                       Preparación de 48 h
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-zinc-500">
-                      Usalo solo cuando quieran tomar pedidos para esta fecha aunque esté dentro del plazo normal.
                     </p>
                   </div>
                   <Toggle
@@ -1499,49 +1828,85 @@ export function CapacityAdmin() {
                 </div>
               </div>
 
+              <div className="rounded-[1.3rem] border border-[color:var(--line)] bg-white/55 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[color:var(--chocolate-deep)]">
+                      Horarios de retiro
+                    </p>
+                  </div>
+                  <button
+                    className={`${buttonGhostClassName} h-9 px-3 text-xs`}
+                    disabled={exceptionEditor.isClosed}
+                    onClick={() =>
+                      setExceptionEditor((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              pickupStartInput: prev.weekdayPickupStartInput,
+                              pickupEndInput: prev.weekdayPickupEndInput,
+                            }
+                          : prev,
+                      )
+                    }
+                    type="button"
+                  >
+                    Usar regla semanal
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className={`${fieldLabelClassName} block`}>
+                    Desde
+                    <input
+                      className={inputClassName}
+                      disabled={exceptionEditor.isClosed}
+                      onChange={(event) =>
+                        setExceptionEditor((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                pickupStartInput: event.target.value,
+                              }
+                            : prev,
+                        )
+                      }
+                      step={900}
+                      type="time"
+                      value={exceptionEditor.pickupStartInput}
+                    />
+                  </label>
+
+                  <label className={`${fieldLabelClassName} block`}>
+                    Hasta
+                    <input
+                      className={inputClassName}
+                      disabled={exceptionEditor.isClosed}
+                      onChange={(event) =>
+                        setExceptionEditor((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                pickupEndInput: event.target.value,
+                              }
+                            : prev,
+                        )
+                      }
+                      step={900}
+                      type="time"
+                      value={exceptionEditor.pickupEndInput}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div className="border-t border-[color:var(--line)] pt-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)] lg:items-center">
                   <div>
                     <p className="text-xs uppercase tracking-[0.12em] text-zinc-500">
                       Cupos por sabor de esta fecha
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Toggle
-                      checked={exceptionEditor.isAutoCapacity}
-                      label="Cupo auto"
-                      onChange={(checked) =>
-                        setExceptionEditor((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                isAutoCapacity: checked,
-                              }
-                            : prev,
-                        )
-                      }
-                    />
-                    {exceptionEditor.isAutoCapacity ? (
-                      <Pill mini tone="info">
-                        Auto: {exceptionAutoMaxUnits}
-                      </Pill>
-                    ) : null}
-                  </div>
-                  <Toggle
-                    checked={exceptionEditor.isClosed}
-                    label="Marcar fecha como cerrada"
-                    onChange={(checked) =>
-                      setExceptionEditor((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              isClosed: checked,
-                              ignoreLeadTime: checked ? false : prev.ignoreLeadTime,
-                            }
-                          : prev,
-                      )
-                    }
-                  />
                 </div>
 
                 {selectedExceptionFlavor ? (
@@ -1589,7 +1954,7 @@ export function CapacityAdmin() {
                         <div className="flex flex-wrap items-center gap-3">
                           <Toggle
                             checked={selectedExceptionFlavor.isClosed}
-                            label="Cerrar sabor"
+                            label="Desactivar sabor"
                             onChange={(checked) =>
                               updateExceptionFlavor(
                                 selectedExceptionFlavor.flavorId,
@@ -1658,7 +2023,7 @@ export function CapacityAdmin() {
                                 <div className="flex flex-wrap items-center gap-2">
                                   <Toggle
                                     checked={size.isClosed}
-                                    label="Cerrar"
+                                    label="Desactivar tamaño"
                                     onChange={(checked) =>
                                       updateExceptionSize(
                                         selectedExceptionFlavor.flavorId,

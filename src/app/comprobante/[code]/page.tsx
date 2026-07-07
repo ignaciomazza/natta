@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { formatDateOnly } from "@/lib/date-only";
-import { getPickupHoursForDate } from "@/lib/pickup-hours";
+import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
 import { prisma } from "@/lib/prisma";
 
 const formatMoney = (value: number) =>
@@ -209,6 +209,9 @@ export default async function ComprobantePage({
   const customerPhone = order.customer?.phone?.trim() || "Sin teléfono cargado";
   const firstPayment = order.payments[0] ?? null;
   const isPickup = order.fulfillmentMode === "PICKUP";
+  const pickupHoursLabel = isPickup
+    ? await getPickupHoursLabelForDate(order.deliveryDate)
+    : null;
 
   return (
     <>
@@ -306,7 +309,7 @@ export default async function ComprobantePage({
                           <span>Horario</span>
                         </div>
                         <p className="text-lg font-medium text-zinc-900">
-                          {getPickupHoursForDate(order.deliveryDate)}
+                          {pickupHoursLabel}
                         </p>
                       </div>
                     ) : null}

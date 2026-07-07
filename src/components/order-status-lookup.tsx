@@ -30,6 +30,7 @@ type PublicOrderStatus = {
   receiptHref: string;
   deliveryDate: string;
   fulfillmentMode: string;
+  pickupHours: string | null;
   subtotalArs: number;
   amountPaidArs: number;
   amountBalanceArs: number;
@@ -340,7 +341,7 @@ function OrderStatusResult({ order }: { order: PublicOrderStatus }) {
         {isPickup ? (
           <StatusMeta
             label="Horario"
-            value={getPickupHoursForDate(order.deliveryDate)}
+            value={order.pickupHours ?? getPickupHoursForDate(order.deliveryDate)}
           />
         ) : null}
         <StatusMeta

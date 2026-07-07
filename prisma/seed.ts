@@ -196,6 +196,9 @@ async function main() {
   }
 
   for (const weekday of [0, 1, 2, 3, 4, 5, 6]) {
+    const pickupStartMinutes = 11 * 60;
+    const pickupEndMinutes = weekday === 6 ? 14 * 60 : 18 * 60;
+
     await prisma.weekdayCapacityRule.upsert({
       where: { weekday },
       update: {
@@ -210,6 +213,8 @@ async function main() {
         maxUnits: weekday === 0 ? 0 : 20,
         minLeadTimeDays: 2,
         cutoffHour: 10,
+        pickupStartMinutes,
+        pickupEndMinutes,
       },
     });
   }

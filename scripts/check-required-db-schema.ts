@@ -44,8 +44,12 @@ const requiredUniqueIndexes = [
 
 const requiredColumns = [
   { table: "WeekdayCapacityRule", column: "isAutoCapacity" },
+  { table: "WeekdayCapacityRule", column: "pickupStartMinutes" },
+  { table: "WeekdayCapacityRule", column: "pickupEndMinutes" },
   { table: "DateCapacityOverride", column: "isAutoCapacity" },
   { table: "DateCapacityOverride", column: "ignoreLeadTime" },
+  { table: "DateCapacityOverride", column: "pickupStartMinutes" },
+  { table: "DateCapacityOverride", column: "pickupEndMinutes" },
   { table: "Order", column: "receiptEmailSentAt" },
   { table: "Order", column: "receiptEmailSentTo" },
   { table: "Order", column: "receiptEmailResendId" },

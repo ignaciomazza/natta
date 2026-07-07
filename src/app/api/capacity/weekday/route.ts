@@ -5,14 +5,27 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/tenant";
 import { logServerError } from "@/lib/server/log";
 
-const weekdaySchema = z.object({
-  weekday: z.number().int().min(0).max(6),
-  isOpen: z.boolean().optional(),
-  maxUnits: z.number().int().min(0).optional(),
-  isAutoCapacity: z.boolean().optional(),
-  minLeadTimeDays: z.number().int().min(0).max(30).optional(),
-  cutoffHour: z.number().int().min(0).max(23).optional(),
-});
+const weekdaySchema = z
+  .object({
+    weekday: z.number().int().min(0).max(6),
+    isOpen: z.boolean().optional(),
+    maxUnits: z.number().int().min(0).optional(),
+    isAutoCapacity: z.boolean().optional(),
+    minLeadTimeDays: z.number().int().min(0).max(30).optional(),
+    cutoffHour: z.number().int().min(0).max(23).optional(),
+    pickupStartMinutes: z.number().int().min(0).max(1439).optional(),
+    pickupEndMinutes: z.number().int().min(0).max(1439).optional(),
+  })
+  .refine(
+    (body) =>
+      body.pickupStartMinutes === undefined ||
+      body.pickupEndMinutes === undefined ||
+      body.pickupEndMinutes > body.pickupStartMinutes,
+    {
+      message: "El horario de cierre debe ser posterior al de inicio",
+      path: ["pickupEndMinutes"],
+    },
+  );
 
 export const runtime = "nodejs";
 
@@ -33,6 +46,12 @@ export async function PATCH(req: NextRequest) {
           ? { minLeadTimeDays: body.minLeadTimeDays }
           : {}),
         ...(body.cutoffHour !== undefined ? { cutoffHour: body.cutoffHour } : {}),
+        ...(body.pickupStartMinutes !== undefined
+          ? { pickupStartMinutes: body.pickupStartMinutes }
+          : {}),
+        ...(body.pickupEndMinutes !== undefined
+          ? { pickupEndMinutes: body.pickupEndMinutes }
+          : {}),
       },
       create: {
         weekday: body.weekday,
@@ -41,6 +60,8 @@ export async function PATCH(req: NextRequest) {
         isAutoCapacity: body.isAutoCapacity ?? false,
         minLeadTimeDays: body.minLeadTimeDays ?? 2,
         cutoffHour: body.cutoffHour ?? 10,
+        pickupStartMinutes: body.pickupStartMinutes,
+        pickupEndMinutes: body.pickupEndMinutes,
       },
     });
 

@@ -5,14 +5,27 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/tenant";
 import { logServerError } from "@/lib/server/log";
 
-const overrideSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  maxUnits: z.number().int().min(0).nullable().optional(),
-  isAutoCapacity: z.boolean().optional(),
-  isClosed: z.boolean().optional(),
-  ignoreLeadTime: z.boolean().optional(),
-  note: z.string().max(500).nullable().optional(),
-});
+const overrideSchema = z
+  .object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    maxUnits: z.number().int().min(0).nullable().optional(),
+    isAutoCapacity: z.boolean().optional(),
+    isClosed: z.boolean().optional(),
+    ignoreLeadTime: z.boolean().optional(),
+    pickupStartMinutes: z.number().int().min(0).max(1439).nullable().optional(),
+    pickupEndMinutes: z.number().int().min(0).max(1439).nullable().optional(),
+    note: z.string().max(500).nullable().optional(),
+  })
+  .refine(
+    (body) =>
+      typeof body.pickupStartMinutes !== "number" ||
+      typeof body.pickupEndMinutes !== "number" ||
+      body.pickupEndMinutes > body.pickupStartMinutes,
+    {
+      message: "El horario de cierre debe ser posterior al de inicio",
+      path: ["pickupEndMinutes"],
+    },
+  );
 
 export const runtime = "nodejs";
 
@@ -33,6 +46,12 @@ export async function PATCH(req: NextRequest) {
         ...(body.ignoreLeadTime !== undefined
           ? { ignoreLeadTime: body.ignoreLeadTime }
           : {}),
+        ...(body.pickupStartMinutes !== undefined
+          ? { pickupStartMinutes: body.pickupStartMinutes }
+          : {}),
+        ...(body.pickupEndMinutes !== undefined
+          ? { pickupEndMinutes: body.pickupEndMinutes }
+          : {}),
         ...(body.note !== undefined ? { note: body.note } : {}),
       },
       create: {
@@ -41,6 +60,8 @@ export async function PATCH(req: NextRequest) {
         isAutoCapacity: body.isAutoCapacity ?? false,
         isClosed: body.isClosed ?? false,
         ignoreLeadTime: body.ignoreLeadTime ?? false,
+        pickupStartMinutes: body.pickupStartMinutes ?? null,
+        pickupEndMinutes: body.pickupEndMinutes ?? null,
         note: body.note ?? null,
       },
     });

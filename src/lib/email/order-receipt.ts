@@ -1,7 +1,7 @@
 import type { Order, OrderStatus, Payment, PaymentMethod, PaymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl, siteConfig } from "@/lib/seo";
-import { getPickupHoursForDate } from "@/lib/pickup-hours";
+import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
 import { logServerError } from "@/lib/server/log";
 import { formatDateOnly } from "@/lib/date-only";
 
@@ -145,7 +145,7 @@ function getItemDetail(item: ReceiptOrder["items"][number]) {
   return item.flavor.description;
 }
 
-function getOrderReceiptText(order: ReceiptOrder) {
+function getOrderReceiptText(order: ReceiptOrder, pickupHoursLabel: string | null) {
   const lines = [
     "Comprobante Natta",
     "",
@@ -156,7 +156,7 @@ function getOrderReceiptText(order: ReceiptOrder) {
   ];
 
   if (order.fulfillmentMode === "PICKUP") {
-    lines.push(`Horario: ${getPickupHoursForDate(order.deliveryDate)}`);
+    lines.push(`Horario: ${pickupHoursLabel ?? ""}`);
   }
 
   lines.push("", "Detalle:");
@@ -180,7 +180,7 @@ function getOrderReceiptText(order: ReceiptOrder) {
   return lines.join("\n");
 }
 
-function buildOrderReceiptHtml(order: ReceiptOrder) {
+function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | null) {
   const logoUrl = absoluteUrl(siteConfig.logo);
   const receiptUrl = absoluteUrl(`/comprobante/${order.publicReceiptCode}`);
   const state = getReceiptState(order);
@@ -305,7 +305,7 @@ function buildOrderReceiptHtml(order: ReceiptOrder) {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:12px;border-collapse:collapse;">
                               ${row("Fecha de entrega", formatDate(order.deliveryDate), true)}
                               ${row("Modalidad", isPickup ? "Retiro" : "Envío", true)}
-                              ${isPickup ? row("Horario", getPickupHoursForDate(order.deliveryDate), true) : ""}
+                              ${isPickup ? row("Horario", pickupHoursLabel ?? "", true) : ""}
                             </table>
                           </div>
                           <div style="border-top:1px solid #d8d1cb;margin-top:22px;padding-top:20px;">
@@ -491,13 +491,17 @@ export async function sendOrderReceiptEmailIfNeeded(
   }
 
   try {
+    const pickupHoursLabel =
+      order.fulfillmentMode === "PICKUP"
+        ? await getPickupHoursLabelForDate(order.deliveryDate)
+        : null;
     const resendId = await sendViaResend({
-      html: buildOrderReceiptHtml(order),
+      html: buildOrderReceiptHtml(order, pickupHoursLabel),
       idempotencyKey: force
         ? `order-receipt-manual-${order.id}-${attemptAt.getTime()}`
         : `order-receipt-${order.id}-${order.amountPaidArs}`,
       subject: `Comprobante Natta ${order.publicReceiptCode}`,
-      text: getOrderReceiptText(order),
+      text: getOrderReceiptText(order, pickupHoursLabel),
       to: recipient,
     });
 

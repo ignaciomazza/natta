@@ -876,7 +876,7 @@ html.brand-loader-hydrated .brand-loader-shell {
   }
 
   .menu-slide-card__copy {
-    min-height: 6.15rem;
+    min-height: 7.65rem;
     padding: 0.7rem 1rem 0.55rem;
   }
 
@@ -885,7 +885,7 @@ html.brand-loader-hydrated .brand-loader-shell {
     line-height: 0.92;
   }
 
-  .menu-slide-card__copy p {
+  .menu-slide-card__description {
     margin-top: 0.4rem;
     min-height: 1.25rem;
     font-size: 0.98rem;

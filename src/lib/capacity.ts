@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getDefaultPickupWindowForWeekday } from "@/lib/pickup-hours";
 
 export type CapacityDay = {
   date: string;
@@ -12,6 +13,10 @@ export type CapacityDay = {
   minLeadTimeDays: number;
   ignoreLeadTime: boolean;
   cutoffHour: number;
+  pickupStartMinutes: number;
+  pickupEndMinutes: number;
+  weekdayPickupStartMinutes: number;
+  weekdayPickupEndMinutes: number;
   source: "weekday" | "override";
   hasOverride: boolean;
   overrideNote: string | null;
@@ -358,6 +363,15 @@ export async function getCapacityCalendar(input?: {
     const baseIsAutoCapacity = weekdayRule?.isAutoCapacity ?? false;
     const baseMaxUnits =
       typeof weekdayRule?.maxUnits === "number" ? weekdayRule.maxUnits : 20;
+    const defaultPickupWindow = getDefaultPickupWindowForWeekday(weekday);
+    const weekdayPickupStartMinutes =
+      weekdayRule?.pickupStartMinutes ?? defaultPickupWindow.pickupStartMinutes;
+    const weekdayPickupEndMinutes =
+      weekdayRule?.pickupEndMinutes ?? defaultPickupWindow.pickupEndMinutes;
+    const pickupStartMinutes =
+      override?.pickupStartMinutes ?? weekdayPickupStartMinutes;
+    const pickupEndMinutes =
+      override?.pickupEndMinutes ?? weekdayPickupEndMinutes;
 
     const isOpen =
       override?.isClosed === true
@@ -470,7 +484,9 @@ export async function getCapacityCalendar(input?: {
       (isOpen !== baseIsOpen ||
         manualMaxUnits !== baseMaxUnits ||
         usesAutoCapacity !== baseIsAutoCapacity ||
-        ignoreLeadTime);
+        ignoreLeadTime ||
+        pickupStartMinutes !== weekdayPickupStartMinutes ||
+        pickupEndMinutes !== weekdayPickupEndMinutes);
 
     const availableUnits = isOpen ? Math.max(0, maxUnits - bookedUnits) : 0;
 
@@ -486,6 +502,10 @@ export async function getCapacityCalendar(input?: {
       minLeadTimeDays: ignoreLeadTime ? 0 : (weekdayRule?.minLeadTimeDays ?? 2),
       ignoreLeadTime,
       cutoffHour: weekdayRule?.cutoffHour ?? 10,
+      pickupStartMinutes,
+      pickupEndMinutes,
+      weekdayPickupStartMinutes,
+      weekdayPickupEndMinutes,
       source: hasMeaningfulOverride ? "override" : "weekday",
       hasOverride: hasMeaningfulOverride,
       overrideNote: hasMeaningfulOverride ? (override?.note ?? null) : null,

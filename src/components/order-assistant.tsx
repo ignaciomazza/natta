@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { MercadoPagoCardForm } from "@/components/mercadopago-card-form";
+import { getFlavorNotice } from "@/lib/flavor-notices";
 import {
   getAvailablePickupCopyForDate,
   getPickupHoursForDate,
@@ -61,6 +62,8 @@ type AvailabilityDay = {
   availableUnits: number;
   minLeadTimeDays: number;
   cutoffHour: number;
+  pickupStartMinutes: number;
+  pickupEndMinutes: number;
   flavors: Array<{
     flavorId: string;
     flavorSlug: string;
@@ -85,6 +88,7 @@ type CatalogResponse = {
   flavors: CatalogFlavor[];
   sizes: CatalogSize[];
   availability: AvailabilityDay[];
+  pickupHoursSummary?: string;
 };
 
 type CheckoutSession = {
@@ -699,7 +703,11 @@ export function OrderAssistant() {
 
   const summaryDate = paymentSnapshot?.order.deliveryDate ?? date;
   const summaryMode = paymentSnapshot?.order.fulfillmentMode ?? mode;
-  const summaryPickupHours = getPickupHoursForDate(summaryDate);
+  const summaryDateOnly = summaryDate.split("T")[0] ?? summaryDate;
+  const summaryDay = catalog?.availability.find(
+    (item) => item.date === summaryDateOnly,
+  );
+  const summaryPickupHours = getPickupHoursForDate(summaryDate, summaryDay);
   const summaryTotalArs = paymentSnapshot?.order.subtotalArs ?? totalArs;
   const summaryBalanceArs = paymentSnapshot?.order.amountBalanceArs ?? balanceArs;
   const snapshotAmountRequiredArs = paymentSnapshot
@@ -789,12 +797,13 @@ export function OrderAssistant() {
             label: "Pedido asistido",
             notes: [
               "Podés combinar sabores y tamaños en un mismo pedido.",
-              PICKUP_HOURS_SUMMARY,
+              catalog?.pickupHoursSummary ?? PICKUP_HOURS_SUMMARY,
             ],
             title: "Armá tu pedido.",
           };
 
   const modalPhoto = photoFlavor ? getFlavorPhoto(photoFlavor) : null;
+  const modalFlavorNotice = photoFlavor ? getFlavorNotice(photoFlavor.slug) : null;
 
   function updateQuantity(flavorId: string, sizeId: string, delta: number) {
     const key = itemKey(flavorId, sizeId);
@@ -1350,6 +1359,11 @@ export function OrderAssistant() {
                           <p className="mt-1 min-w-0 text-xs leading-5 text-[var(--chocolate)]/70 sm:text-sm sm:leading-6 lg:max-w-[12rem]">
                             {flavor.description}
                           </p>
+                          {getFlavorNotice(flavor.slug) ? (
+                            <p className="mt-1.5 max-w-[13rem] text-[0.62rem] font-semibold uppercase leading-4 tracking-[0.08em] text-[var(--sage)] sm:text-[0.68rem]">
+                              {getFlavorNotice(flavor.slug)}
+                            </p>
+                          ) : null}
                         </div>
                         <button
                           aria-label={`Ver foto de ${flavor.name}`}
@@ -1436,7 +1450,7 @@ export function OrderAssistant() {
                     Disponibilidad
                   </p>
                   <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
-                    Las primeras 48 h quedan como preparación. Retiros de lunes a viernes de 11 a 18 h y sábados de 11 a 14 h. Domingos cerrados.
+                    Las primeras 48 h quedan como preparación. {catalog.pickupHoursSummary ?? PICKUP_HOURS_SUMMARY}
                   </p>
                 </div>
 
@@ -1506,7 +1520,7 @@ export function OrderAssistant() {
                       <span className="mt-1.5 block break-words text-[0.62rem] font-medium leading-tight sm:mt-3 sm:text-xs">
                         {blockedReason
                           ? getShortAvailabilityReason(blockedReason)
-                          : getAvailablePickupCopyForDate(day.date)}
+                          : getAvailablePickupCopyForDate(day.date, day)}
                       </span>
                     </button>
                   );
@@ -2241,6 +2255,11 @@ export function OrderAssistant() {
                 <p className="mt-3 text-sm leading-6 text-[var(--chocolate)]/72 sm:text-base sm:leading-7">
                   {photoFlavor.description}
                 </p>
+                {modalFlavorNotice ? (
+                  <p className="mt-3 text-[0.68rem] font-semibold uppercase leading-5 tracking-[0.1em] text-[var(--sage)]">
+                    {modalFlavorNotice}
+                  </p>
+                ) : null}
               </div>
             </div>
           </article>

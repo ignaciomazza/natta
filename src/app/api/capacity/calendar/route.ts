@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
           isAutoCapacity: true,
           minLeadTimeDays: true,
           cutoffHour: true,
+          pickupStartMinutes: true,
+          pickupEndMinutes: true,
         },
       }),
       withMissingCapacityTableFallback(

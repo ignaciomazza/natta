@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getFlavorNotice } from "@/lib/flavor-notices";
 
 type SizeId = "latta" | "chica" | "grande";
 
@@ -361,6 +362,7 @@ function MenuSlideCard({
   onSelect: () => void;
 }) {
   const photo = productPhotos[flavor.slug] ?? productPhotos.natta;
+  const notice = getFlavorNotice(flavor.slug);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (isActive || (event.key !== "Enter" && event.key !== " ")) return;
@@ -381,13 +383,18 @@ function MenuSlideCard({
       role={isActive ? undefined : "button"}
       tabIndex={isActive ? -1 : 0}
     >
-      <div className="menu-slide-card__copy px-3 py-1 md:px-4 md:py-1.5">
+      <div className="menu-slide-card__copy min-h-[6.3rem] px-3 py-1 md:px-4 md:py-1.5">
         <h3 className="font-display text-5xl leading-none text-[var(--chocolate-deep)] md:text-6xl">
           {flavor.name}
         </h3>
-        <p className="mb-1 mt-0.5 min-h-5 text-base leading-5 text-[var(--chocolate)]/72">
+        <p className="menu-slide-card__description mb-1 mt-0.5 min-h-5 text-base leading-5 text-[var(--chocolate)]/72">
           {flavor.description}
         </p>
+        {notice ? (
+          <p className="mt-1.5 text-[0.68rem] font-medium uppercase leading-4 tracking-[0.08em] text-[var(--sage)]">
+            {notice}
+          </p>
+        ) : null}
       </div>
 
       <div className="menu-slide-card__media relative aspect-[9/10] overflow-hidden rounded-[20px] bg-[var(--cream)]">

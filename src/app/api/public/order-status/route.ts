@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getDateOnlyString } from "@/lib/date-only";
 import { getDateRange } from "@/lib/capacity";
+import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
 import { logServerError } from "@/lib/server/log";
 
 const lookupSchema = z.discriminatedUnion("mode", [
@@ -180,8 +181,12 @@ function getPaymentStatusLabel(status: string) {
   return "En revisión";
 }
 
-function serializeOrder(order: PublicOrder) {
+async function serializeOrder(order: PublicOrder) {
   const status = getStatusCopy(order);
+  const pickupHours =
+    order.fulfillmentMode === "PICKUP"
+      ? await getPickupHoursLabelForDate(order.deliveryDate)
+      : null;
 
   return {
     code: order.publicReceiptCode,
@@ -193,6 +198,7 @@ function serializeOrder(order: PublicOrder) {
     deliveryDate: getDateOnlyString(order.deliveryDate),
     fulfillmentMode:
       order.fulfillmentMode === "PICKUP" ? "Retiro" : "Envío",
+    pickupHours,
     subtotalArs: order.subtotalArs,
     amountPaidArs: order.amountPaidArs,
     amountBalanceArs: order.amountBalanceArs,
@@ -295,7 +301,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return NextResponse.json({ order: serializeOrder(order) });
+      return NextResponse.json({ order: await serializeOrder(order) });
     }
 
     const result = await findOrderByRecovery(body);
@@ -307,7 +313,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ order: serializeOrder(result.order) });
+    return NextResponse.json({ order: await serializeOrder(result.order) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
