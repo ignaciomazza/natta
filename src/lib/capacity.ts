@@ -635,7 +635,11 @@ export async function validateCapacityForOrder(input: {
 
   const now = new Date();
   const tomorrow = getDefaultMinDate(new Date(), 1);
-  if (date === toDateOnlyString(tomorrow) && getBusinessHour(now) >= (rule?.cutoffHour ?? 10)) {
+  if (
+    !ignoreLeadTime &&
+    date === toDateOnlyString(tomorrow) &&
+    getBusinessHour(now) >= (rule?.cutoffHour ?? 10)
+  ) {
     throw new Error("CUTOFF_REACHED");
   }
 

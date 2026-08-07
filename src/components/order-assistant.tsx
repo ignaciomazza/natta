@@ -280,7 +280,11 @@ const getDayBlockingReason = (day: AvailabilityDay, now: Date) => {
   }
 
   const tomorrowDate = getDefaultMinDateString(now, 1);
-  if (day.date === tomorrowDate && now.getHours() >= day.cutoffHour) {
+  if (
+    day.minLeadTimeDays > 0 &&
+    day.date === tomorrowDate &&
+    now.getHours() >= day.cutoffHour
+  ) {
     return `Ya pasó el horario de corte de las ${day.cutoffHour}:00`;
   }
 
