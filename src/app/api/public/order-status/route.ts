@@ -7,6 +7,7 @@ import { getDateOnlyString } from "@/lib/date-only";
 import { getDateRange } from "@/lib/capacity";
 import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
 import { logServerError } from "@/lib/server/log";
+import { getBranchByCode } from "@/lib/branches";
 
 const lookupSchema = z.discriminatedUnion("mode", [
   z.object({
@@ -25,6 +26,7 @@ export const runtime = "nodejs";
 
 const orderSelect = {
   id: true,
+  branchCode: true,
   status: true,
   fulfillmentMode: true,
   deliveryDate: true,
@@ -185,11 +187,12 @@ async function serializeOrder(order: PublicOrder) {
   const status = getStatusCopy(order);
   const pickupHours =
     order.fulfillmentMode === "PICKUP"
-      ? await getPickupHoursLabelForDate(order.deliveryDate)
+      ? await getPickupHoursLabelForDate(order.deliveryDate, order.branchCode)
       : null;
 
   return {
     code: order.publicReceiptCode,
+    branch: getBranchByCode(order.branchCode),
     status: order.status,
     statusLabel: status.label,
     statusTone: status.tone,

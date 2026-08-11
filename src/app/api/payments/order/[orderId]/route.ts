@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getDateOnlyString } from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
 import { syncMercadoPagoPaymentForOrder } from "@/lib/payments/sync";
+import { getBranchByCode } from "@/lib/branches";
 
 export const runtime = "nodejs";
 
@@ -113,6 +114,7 @@ export async function GET(
   return NextResponse.json({
     order: {
       id: order.id,
+      branch: getBranchByCode(order.branchCode),
       status: order.status,
       amountDueNowArs: order.amountDueNowArs,
       amountPaidArs: order.amountPaidArs,

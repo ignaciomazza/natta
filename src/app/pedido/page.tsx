@@ -65,7 +65,7 @@ export default function PedidoPage() {
         </nav>
       </header>
 
-      <section className="section-pad noise overflow-hidden bg-[var(--cream-soft)] pb-10 pt-[5.5rem] md:pb-14 md:pt-28">
+      <section className="section-pad noise overflow-hidden bg-[var(--cream-soft)] pb-8 pt-[5.5rem] md:pb-10 md:pt-24">
         <div className="content-shell min-w-0" data-reveal="subtle">
           <BrandLoaderLink
             className="motion-link inline-flex items-center gap-2 text-sm font-medium text-[var(--sage)] transition hover:text-[var(--chocolate)]"
@@ -75,19 +75,19 @@ export default function PedidoPage() {
             Volver
           </BrandLoaderLink>
 
-          <div className="mt-7 max-w-[calc(100vw-2rem)] md:mt-9 md:max-w-4xl">
-            <h1 className="font-display text-[clamp(3.7rem,15vw,9rem)] leading-[0.84] tracking-[-0.06em] text-[var(--chocolate-deep)]">
+          <div className="mt-7 max-w-[calc(100vw-2rem)] md:mt-6 md:max-w-4xl">
+            <h1 className="font-display text-[clamp(3.7rem,12vw,6.5rem)] leading-[0.84] tracking-[-0.06em] text-[var(--chocolate-deep)]">
               pedido
             </h1>
-            <p className="mt-5 max-w-2xl break-words text-sm leading-6 text-[var(--chocolate)]/80 md:mt-7 md:text-2xl md:leading-10">
-              Elegí sabores, cantidades, fecha y modalidad. El pago se hace
-              desde la web y Natta te escribe para confirmar el pedido.
+            <p className="mt-4 max-w-2xl break-words text-[0.8rem] leading-5 text-[var(--chocolate)]/80 sm:mt-5 sm:text-sm sm:leading-6 md:mt-4 md:text-xl md:leading-8">
+              Elegí sucursal, sabores, cantidades, fecha y modalidad. El pago
+              se hace desde la web y Natta te escribe para confirmar el pedido.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="section-pad overflow-hidden bg-[var(--cream)] py-10 md:py-[4.5rem] lg:py-16" id="armar">
+      <section className="section-pad overflow-hidden bg-[var(--cream)] py-8 md:py-10 lg:py-12" id="armar">
         <div className="content-shell min-w-0">
           <OrderAssistant />
         </div>

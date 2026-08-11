@@ -1,9 +1,11 @@
+import { BranchCode } from "@prisma/client";
 import { getDateOnlyString, getDateOnlyWeekday } from "@/lib/date-only";
 import { getPickupHoursForDate, getPickupHoursSummaryFromRules } from "@/lib/pickup-hours";
 import { prisma } from "@/lib/prisma";
 
 export async function getPickupHoursWindowForDate(
   value: string | Date | null | undefined,
+  branchCode: BranchCode = BranchCode.DEVOTO,
 ) {
   const weekday = getDateOnlyWeekday(value);
   if (weekday === null) return null;
@@ -11,7 +13,9 @@ export async function getPickupHoursWindowForDate(
 
   const [weekdayRule, dateOverride] = await Promise.all([
     prisma.weekdayCapacityRule.findUnique({
-      where: { weekday },
+      where: {
+        branchCode_weekday: { branchCode, weekday },
+      },
       select: {
         pickupStartMinutes: true,
         pickupEndMinutes: true,
@@ -19,7 +23,12 @@ export async function getPickupHoursWindowForDate(
     }),
     dateOnly
       ? prisma.dateCapacityOverride.findUnique({
-          where: { date: new Date(`${dateOnly}T12:00:00`) },
+          where: {
+            branchCode_date: {
+              branchCode,
+              date: new Date(`${dateOnly}T12:00:00`),
+            },
+          },
           select: {
             pickupStartMinutes: true,
             pickupEndMinutes: true,
@@ -38,13 +47,17 @@ export async function getPickupHoursWindowForDate(
 
 export async function getPickupHoursLabelForDate(
   value: string | Date | null | undefined,
+  branchCode: BranchCode = BranchCode.DEVOTO,
 ) {
-  const window = await getPickupHoursWindowForDate(value);
+  const window = await getPickupHoursWindowForDate(value, branchCode);
   return getPickupHoursForDate(value, window);
 }
 
-export async function getPickupHoursSummary() {
+export async function getPickupHoursSummary(
+  branchCode: BranchCode = BranchCode.DEVOTO,
+) {
   const rules = await prisma.weekdayCapacityRule.findMany({
+    where: { branchCode },
     orderBy: { weekday: "asc" },
     select: {
       weekday: true,

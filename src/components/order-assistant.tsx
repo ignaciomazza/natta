@@ -18,6 +18,7 @@ import {
   ReceiptText,
   RefreshCw,
   ShoppingBag,
+  Store,
   Truck,
   UserRound,
   X,
@@ -29,6 +30,12 @@ import {
   getPickupHoursForDate,
   PICKUP_HOURS_SUMMARY,
 } from "@/lib/pickup-hours";
+import {
+  branches,
+  defaultBranch,
+  getBranchBySlug,
+  type Branch,
+} from "@/lib/branches";
 
 type CatalogSize = {
   id: string;
@@ -85,6 +92,8 @@ type AvailabilityDay = {
 };
 
 type CatalogResponse = {
+  branch: Branch;
+  branches: Branch[];
   flavors: CatalogFlavor[];
   sizes: CatalogSize[];
   availability: AvailabilityDay[];
@@ -105,6 +114,7 @@ type CheckoutSession = {
 type OrderPaymentsSnapshot = {
   order: {
     id: string;
+    branch: Branch;
     status: string;
     amountDueNowArs: number;
     amountPaidArs: number;
@@ -428,8 +438,11 @@ function isDeliveryMode(mode: string | null | undefined) {
   return mode === "delivery" || mode === "DELIVERY";
 }
 
-function getFulfillmentLabel(mode: string | null | undefined) {
-  return isDeliveryMode(mode) ? "Uber" : "Retiro Devoto";
+function getFulfillmentLabel(
+  mode: string | null | undefined,
+  branch: Branch,
+) {
+  return isDeliveryMode(mode) ? "Uber" : `Retiro en ${branch.name}`;
 }
 
 function getDueCopy(
@@ -513,8 +526,10 @@ function isValidContactEmail(value: string) {
 }
 
 export function OrderAssistant() {
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [urlStateReady, setUrlStateReady] = useState(false);
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
-  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [step, setStep] = useState<StepIndex>(0);
   const [quantities, setQuantities] = useState<QuantityMap>({});
@@ -533,41 +548,57 @@ export function OrderAssistant() {
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [loadingPaymentView, setLoadingPaymentView] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submittedCode, setSubmittedCode] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("code");
-  });
-  const [createdOrderId, setCreatedOrderId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("order");
-  });
+  const [submittedCode, setSubmittedCode] = useState<string | null>(null);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [checkoutSession, setCheckoutSession] = useState<CheckoutSession | null>(null);
   const [paymentSnapshot, setPaymentSnapshot] = useState<OrderPaymentsSnapshot | null>(null);
   const [paymentResult, setPaymentResult] = useState<ProcessPaymentResponse["payment"] | null>(
     null,
   );
-  const [returnPaymentState, setReturnPaymentState] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("payment");
-  });
-  const [returnPaymentId, setReturnPaymentId] = useState<string | null>(() =>
-    getMercadoPagoReturnPaymentId(),
-  );
+  const [returnPaymentState, setReturnPaymentState] = useState<string | null>(null);
+  const [returnPaymentId, setReturnPaymentId] = useState<string | null>(null);
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("wallet");
   const [photoFlavor, setPhotoFlavor] = useState<CatalogFlavor | null>(null);
   const [datePage, setDatePage] = useState(0);
 
   useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const orderId = searchParams.get("order");
+      const initialBranch =
+        getBranchBySlug(searchParams.get("sucursal")) ??
+        (orderId ? defaultBranch : null);
+
+      setSelectedBranch(initialBranch);
+      setLoadingCatalog(Boolean(initialBranch));
+      setSubmittedCode(searchParams.get("code"));
+      setCreatedOrderId(orderId);
+      setReturnPaymentState(searchParams.get("payment"));
+      setReturnPaymentId(getMercadoPagoReturnPaymentId());
+      setUrlStateReady(true);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedBranch) return;
+
+    let cancelled = false;
     void (async () => {
       setLoadingCatalog(true);
       setCatalogError(null);
       try {
-        const response = await fetch("/api/catalog", { cache: "no-store" });
+        const response = await fetch(
+          `/api/catalog?branch=${selectedBranch.slug}`,
+          { cache: "no-store" },
+        );
         if (!response.ok) {
           throw new Error("No se pudo cargar el catálogo");
         }
 
         const payload = (await response.json()) as CatalogResponse;
+        if (cancelled) return;
         setCatalog(payload);
 
         const now = new Date();
@@ -578,12 +609,17 @@ export function OrderAssistant() {
         setDate(firstAvailable?.date ?? "");
         setDatePage(firstAvailableIndex >= 0 ? Math.floor(firstAvailableIndex / DATE_PAGE_SIZE) : 0);
       } catch (error) {
+        if (cancelled) return;
         setCatalogError(error instanceof Error ? error.message : "No se pudo cargar el catálogo");
       } finally {
-        setLoadingCatalog(false);
+        if (!cancelled) setLoadingCatalog(false);
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBranch]);
 
   useEffect(() => {
     if (!photoFlavor) return;
@@ -707,6 +743,8 @@ export function OrderAssistant() {
 
   const summaryDate = paymentSnapshot?.order.deliveryDate ?? date;
   const summaryMode = paymentSnapshot?.order.fulfillmentMode ?? mode;
+  const activeBranch = selectedBranch ?? defaultBranch;
+  const summaryBranch = paymentSnapshot?.order.branch ?? activeBranch;
   const summaryDateOnly = summaryDate.split("T")[0] ?? summaryDate;
   const summaryDay = catalog?.availability.find(
     (item) => item.date === summaryDateOnly,
@@ -827,6 +865,25 @@ export function OrderAssistant() {
     }));
   }
 
+  function chooseBranch(branch: Branch) {
+    setSelectedBranch(branch);
+    setCatalog(null);
+    setLoadingCatalog(true);
+    setCatalogError(null);
+    setQuantities({});
+    setDate("");
+    setDatePage(0);
+    setStep(0);
+    setMode("pickup");
+    setPaymentAmountChoice("deposit");
+    setSubmitError(null);
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("sucursal", branch.slug);
+    window.history.replaceState({}, "", nextUrl);
+    scrollToBuilderStart();
+  }
+
   function scrollPageToTop(behavior: ScrollBehavior = "smooth") {
     const scroll = (nextBehavior: ScrollBehavior) => {
       window.scrollTo({ left: 0, top: 0, behavior: nextBehavior });
@@ -842,13 +899,27 @@ export function OrderAssistant() {
     });
   }
 
+  function scrollToBuilderStart() {
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth";
+
+    requestAnimationFrame(() => {
+      document
+        .getElementById("pedido-asistido")
+        ?.scrollIntoView({ behavior, block: "start" });
+    });
+  }
+
   function goToNextStep() {
     if (!canAdvance) return;
     setStep((current) => Math.min(current + 1, 3) as StepIndex);
+    scrollToBuilderStart();
   }
 
   function goToPreviousStep() {
     setStep((current) => Math.max(current - 1, 0) as StepIndex);
+    scrollToBuilderStart();
   }
 
   const getCurrentReceiptCode = useCallback(
@@ -926,6 +997,7 @@ export function OrderAssistant() {
     }
 
     setPaymentSnapshot(payload);
+    setSelectedBranch(payload.order.branch);
     setSubmittedCode(payload.order.publicReceiptCode);
     const deliveryDate = payload.order.deliveryDate.split("T")[0] ?? payload.order.deliveryDate;
     setDate(deliveryDate);
@@ -1079,7 +1151,7 @@ export function OrderAssistant() {
   }
 
   async function createOrderAndPreparePayment() {
-    if (!catalog || !canSubmit) return;
+    if (!catalog || !selectedBranch || !canSubmit) return;
 
     if (selectedDayBlockingReason) {
       setSubmitError(`La fecha elegida no está disponible: ${selectedDayBlockingReason}.`);
@@ -1100,6 +1172,7 @@ export function OrderAssistant() {
 
     try {
       const orderPayload = {
+        branch: selectedBranch.slug,
         deliveryDate: date,
         fulfillmentMode: mode,
         paymentOption: resolvedPaymentAmountChoice,
@@ -1271,9 +1344,104 @@ export function OrderAssistant() {
     );
   }
 
+  if (!urlStateReady) {
+    return (
+      <div
+        className="scroll-mt-20 rounded-3xl border border-white/70 bg-[var(--milk)] p-8 text-[var(--chocolate)] image-shadow md:scroll-mt-24"
+        id="pedido-asistido"
+      >
+        <p className="flex items-center gap-2 text-sm text-[var(--sage)]">
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+          Cargando pedido...
+        </p>
+      </div>
+    );
+  }
+
+  if (!selectedBranch && !createdOrderId) {
+    return (
+      <section
+        aria-labelledby="branch-selector-title"
+        className="mx-auto w-full max-w-[74rem] scroll-mt-20 overflow-hidden rounded-[24px] bg-[var(--milk)] text-[var(--chocolate)] image-shadow md:scroll-mt-24"
+        data-reveal="subtle"
+        id="pedido-asistido"
+      >
+        <div className="border-b border-[var(--line)] px-5 py-5 sm:px-8 sm:py-6 lg:px-8">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--sage)] sm:text-sm">
+            <Store className="h-4 w-4" />
+            Antes de empezar
+          </p>
+          <h2
+            className="mt-2 max-w-3xl font-display text-[2.05rem] leading-[0.94] tracking-[-0.045em] text-[var(--chocolate-deep)] sm:text-[clamp(2.6rem,5vw,4.15rem)]"
+            id="branch-selector-title"
+          >
+            ¿Dónde querés hacer tu pedido?
+          </h2>
+          <p className="mt-3 hidden max-w-2xl text-sm leading-6 text-[var(--chocolate)]/72 sm:block sm:text-base">
+            Cada sucursal tiene su propio menú, fechas y cupos disponibles.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 border-b border-[var(--line)] bg-[var(--cream-soft)]/72 px-5 py-3.5 sm:px-8 sm:py-4">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--sage)] text-[var(--milk)]">
+            <Clock className="h-4 w-4" />
+          </span>
+          <p className="text-sm font-semibold leading-5 text-[var(--chocolate-deep)]">
+            Pedidos con 48 h de anticipación.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2">
+          {branches.map((branch, index) => (
+            <button
+              className={`group relative flex min-h-[13rem] flex-col justify-between overflow-hidden px-5 py-6 text-left transition duration-300 sm:min-h-[14rem] sm:px-7 sm:py-7 lg:px-8 ${
+                index === 0
+                  ? "border-b border-[var(--line)] md:border-b-0 md:border-r"
+                  : ""
+              } hover:bg-[var(--cream)] focus-visible:bg-[var(--cream)] focus-visible:outline-none`}
+              key={branch.slug}
+              onClick={() => chooseBranch(branch)}
+              type="button"
+            >
+              <span className="flex items-start justify-between gap-5">
+                <span>
+                  <span className="hidden text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)] sm:block">
+                    Sucursal
+                  </span>
+                  <span className="block font-display text-4xl leading-none tracking-[-0.035em] text-[var(--chocolate-deep)] sm:mt-1.5 sm:text-5xl">
+                    {branch.name}
+                  </span>
+                </span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--chocolate-deep)] text-[var(--milk)] transition duration-300 group-hover:translate-x-1 group-hover:bg-[var(--sage)]">
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              </span>
+
+              <span className="mt-8 block sm:mt-9">
+                <span className="flex items-center gap-2 text-sm font-semibold text-[var(--chocolate-deep)]">
+                  <MapPin className="h-4 w-4 text-[var(--sage)]" />
+                  {branch.area}
+                </span>
+                <span className="mt-2 block max-w-md text-sm leading-6 text-[var(--chocolate)]/68">
+                  {branch.addressLine}
+                </span>
+                <span className="mt-3 inline-block border-t border-[var(--line)] pt-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--sage)]">
+                  {branch.catalogNote}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   if (loadingCatalog) {
     return (
-      <div className="rounded-3xl border border-white/70 bg-[var(--milk)] p-8 text-[var(--chocolate)] image-shadow">
+      <div
+        className="scroll-mt-20 rounded-3xl border border-white/70 bg-[var(--milk)] p-8 text-[var(--chocolate)] image-shadow md:scroll-mt-24"
+        id="pedido-asistido"
+      >
         <p className="flex items-center gap-2 text-sm text-[var(--sage)]">
           <LoaderCircle className="h-4 w-4 animate-spin" />
           Cargando sabores y fechas...
@@ -1284,7 +1452,10 @@ export function OrderAssistant() {
 
   if (catalogError || !catalog) {
     return (
-      <div className="rounded-3xl border border-white/70 bg-[var(--milk)] p-8 text-[var(--chocolate)] image-shadow">
+      <div
+        className="scroll-mt-20 rounded-3xl border border-white/70 bg-[var(--milk)] p-8 text-[var(--chocolate)] image-shadow md:scroll-mt-24"
+        id="pedido-asistido"
+      >
         <p className="text-sm text-red-600">{catalogError ?? "No se pudo cargar el catálogo"}</p>
       </div>
     );
@@ -1330,11 +1501,27 @@ export function OrderAssistant() {
 
       {currentView === "builder" ? (
         <form
-          className="w-full min-w-0 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow lg:max-w-[70rem] lg:p-8 xl:max-w-[74rem]"
+          className="w-full min-w-0 scroll-mt-20 overflow-visible p-0 text-[var(--chocolate)] sm:rounded-[24px] sm:bg-[var(--milk)] sm:p-6 sm:image-shadow md:scroll-mt-24 lg:max-w-[70rem] lg:p-8 xl:max-w-[74rem]"
           data-testid="order-assistant"
           id="pedido-asistido"
           onSubmit={handleBuilderSubmit}
         >
+          <div className="mb-4 border-b border-[var(--line)] pb-4 sm:mb-6 sm:pb-5">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--cream)] text-[var(--sage)] shadow-[0_5px_14px_rgba(43,26,24,0.06)]">
+                <MapPin className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--sage)]">
+                  Pedido en {activeBranch.name}
+                </p>
+                <p className="mt-1 truncate text-sm text-[var(--chocolate)]/68">
+                  {activeBranch.addressLine}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {renderStepHeader(step, true)}
 
           {step === 0 ? (
@@ -1547,7 +1734,7 @@ export function OrderAssistant() {
                   Entrega
                 </p>
                 <p className="mt-1.5 hidden text-sm leading-6 text-[var(--chocolate)]/68 md:block">
-                  Elegí si retirás por Devoto o si coordinamos envío por Uber.
+                  Elegí si retirás por {activeBranch.name} o si coordinamos envío por Uber.
                 </p>
               </div>
 
@@ -1563,8 +1750,11 @@ export function OrderAssistant() {
                   type="button"
                 >
                   <MapPin className="mb-2 h-4 w-4 sm:mb-3 sm:h-5 sm:w-5" />
-                  <span className="block font-semibold">Retiro Devoto</span>
-                  <span className="mt-1 block text-sm opacity-80">50% o total desde la web</span>
+                  <span className="block font-semibold">Retiro en {activeBranch.name}</span>
+                  <span className="mt-1 block text-sm opacity-80">
+                    {activeBranch.addressLine}
+                  </span>
+                  <span className="mt-1 block text-sm opacity-70">50% o total desde la web</span>
                 </button>
                 <button
                   className={`order-card rounded-[1rem] p-3 text-left transition sm:rounded-[1.35rem] sm:p-4 ${
@@ -1677,6 +1867,12 @@ export function OrderAssistant() {
 
                 <div className="mt-4 space-y-2 p-3 text-sm sm:mt-5 sm:space-y-3 sm:p-4">
                   <div className="flex justify-between gap-4">
+                    <span>Sucursal</span>
+                    <strong className="text-right font-medium">
+                      {summaryBranch.name}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between gap-4">
                     <span>Fecha</span>
                     <strong className="text-right font-medium">
                       {summaryDate ? formatLongDate(summaryDate) : "Sin definir"}
@@ -1685,7 +1881,7 @@ export function OrderAssistant() {
                   <div className="flex justify-between gap-4">
                     <span>Modalidad</span>
                     <strong className="text-right font-medium">
-                      {getFulfillmentLabel(summaryMode)}
+                      {getFulfillmentLabel(summaryMode, summaryBranch)}
                     </strong>
                   </div>
                   {!isDeliveryMode(summaryMode) ? (
@@ -2045,6 +2241,12 @@ export function OrderAssistant() {
 
                   <div className="mt-4 space-y-2 p-3 text-sm sm:space-y-3 sm:p-4">
                     <div className="flex justify-between gap-4">
+                      <span>Sucursal</span>
+                      <strong className="text-right font-medium">
+                        {summaryBranch.name}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between gap-4">
                       <span>Fecha</span>
                       <strong className="text-right font-medium">
                         {summaryDate ? formatLongDate(summaryDate) : "Sin definir"}
@@ -2053,7 +2255,7 @@ export function OrderAssistant() {
                     <div className="flex justify-between gap-4">
                       <span>Modalidad</span>
                       <strong className="text-right font-medium">
-                        {getFulfillmentLabel(summaryMode)}
+                        {getFulfillmentLabel(summaryMode, summaryBranch)}
                       </strong>
                     </div>
                     {!isDeliveryMode(summaryMode) ? (
@@ -2160,6 +2362,12 @@ export function OrderAssistant() {
 
               <div className="mt-4 space-y-2 rounded-2xl bg-white/44 p-3 text-sm shadow-[0_4px_12px_rgba(43,26,24,0.045)] sm:space-y-3 sm:p-4">
                 <div className="flex justify-between gap-4">
+                  <span>Sucursal</span>
+                  <strong className="text-right font-medium">
+                    {summaryBranch.name}
+                  </strong>
+                </div>
+                <div className="flex justify-between gap-4">
                   <span>Fecha</span>
                   <strong className="text-right font-medium">
                     {summaryDate ? formatLongDate(summaryDate) : "Sin definir"}
@@ -2168,7 +2376,7 @@ export function OrderAssistant() {
                 <div className="flex justify-between gap-4">
                   <span>Modalidad</span>
                   <strong className="text-right font-medium">
-                    {getFulfillmentLabel(summaryMode)}
+                    {getFulfillmentLabel(summaryMode, summaryBranch)}
                   </strong>
                 </div>
                 {!isDeliveryMode(summaryMode) ? (

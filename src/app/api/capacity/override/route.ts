@@ -7,6 +7,7 @@ import { logServerError } from "@/lib/server/log";
 
 const overrideSchema = z
   .object({
+    branchCode: z.enum(["DEVOTO", "NORDELTA"]),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     maxUnits: z.number().int().min(0).nullable().optional(),
     isAutoCapacity: z.boolean().optional(),
@@ -36,7 +37,12 @@ export async function PATCH(req: NextRequest) {
     const date = new Date(`${body.date}T12:00:00`);
 
     const override = await prisma.dateCapacityOverride.upsert({
-      where: { date },
+      where: {
+        branchCode_date: {
+          branchCode: body.branchCode,
+          date,
+        },
+      },
       update: {
         ...(body.maxUnits !== undefined ? { maxUnits: body.maxUnits } : {}),
         ...(body.isAutoCapacity !== undefined
@@ -55,6 +61,7 @@ export async function PATCH(req: NextRequest) {
         ...(body.note !== undefined ? { note: body.note } : {}),
       },
       create: {
+        branchCode: body.branchCode,
         date,
         maxUnits: body.maxUnits ?? null,
         isAutoCapacity: body.isAutoCapacity ?? false,

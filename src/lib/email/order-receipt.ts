@@ -4,6 +4,7 @@ import { absoluteUrl, siteConfig } from "@/lib/seo";
 import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
 import { logServerError } from "@/lib/server/log";
 import { formatDateOnly } from "@/lib/date-only";
+import { getBranchByCode } from "@/lib/branches";
 
 type ReceiptOrder = Order & {
   customer: {
@@ -146,16 +147,19 @@ function getItemDetail(item: ReceiptOrder["items"][number]) {
 }
 
 function getOrderReceiptText(order: ReceiptOrder, pickupHoursLabel: string | null) {
+  const branch = getBranchByCode(order.branchCode);
   const lines = [
     "Comprobante Natta",
     "",
     `Código: ${order.publicReceiptCode}`,
     `Estado: ${getReceiptState(order)}`,
     `Fecha de entrega: ${formatDate(order.deliveryDate)}`,
+    `Sucursal: ${branch.name}`,
     `Modalidad: ${order.fulfillmentMode === "PICKUP" ? "Retiro" : "Envío"}`,
   ];
 
   if (order.fulfillmentMode === "PICKUP") {
+    lines.push(`Dirección de retiro: ${branch.fullAddress}`);
     lines.push(`Horario: ${pickupHoursLabel ?? ""}`);
   }
 
@@ -181,6 +185,7 @@ function getOrderReceiptText(order: ReceiptOrder, pickupHoursLabel: string | nul
 }
 
 function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | null) {
+  const branch = getBranchByCode(order.branchCode);
   const logoUrl = absoluteUrl(siteConfig.logo);
   const receiptUrl = absoluteUrl(`/comprobante/${order.publicReceiptCode}`);
   const state = getReceiptState(order);
@@ -304,7 +309,9 @@ function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | n
                             <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:#8e8179;">Datos del pedido</div>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:12px;border-collapse:collapse;">
                               ${row("Fecha de entrega", formatDate(order.deliveryDate), true)}
+                              ${row("Sucursal", branch.name, true)}
                               ${row("Modalidad", isPickup ? "Retiro" : "Envío", true)}
+                              ${isPickup ? row("Dirección de retiro", branch.fullAddress, true) : ""}
                               ${isPickup ? row("Horario", pickupHoursLabel ?? "", true) : ""}
                             </table>
                           </div>
@@ -352,7 +359,7 @@ function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | n
             </td>
           </tr>
           <tr>
-            <td style="padding:18px 8px 0 8px;text-align:center;font-size:12px;line-height:20px;color:#8e8179;">Natta Vascas · Pedido por encargo · Villa Devoto</td>
+            <td style="padding:18px 8px 0 8px;text-align:center;font-size:12px;line-height:20px;color:#8e8179;">Natta Vascas · Pedido por encargo · Devoto y Nordelta</td>
           </tr>
         </table>
       </td>
@@ -493,7 +500,7 @@ export async function sendOrderReceiptEmailIfNeeded(
   try {
     const pickupHoursLabel =
       order.fulfillmentMode === "PICKUP"
-        ? await getPickupHoursLabelForDate(order.deliveryDate)
+        ? await getPickupHoursLabelForDate(order.deliveryDate, order.branchCode)
         : null;
     const resendId = await sendViaResend({
       html: buildOrderReceiptHtml(order, pickupHoursLabel),

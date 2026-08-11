@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { FulfillmentMode, PaymentMethod } from "@prisma/client";
+import { BranchCode, FulfillmentMode, PaymentMethod } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/tenant";
@@ -15,9 +15,11 @@ import {
 import { getDateOnlyString } from "@/lib/date-only";
 import { getDateAtNoon, getDateRange, validateCapacityForOrder } from "@/lib/capacity";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
-import { isCatalogPairAvailable } from "@/lib/catalog-db";
+import { isCatalogPairAvailableAtBranch } from "@/lib/catalog-db";
+import { getBranchByCode, getBranchBySlug } from "@/lib/branches";
 
 const orderCreateSchema = z.object({
+  branch: z.enum(["devoto", "nordelta"]),
   customer: z.object({
     name: z.string().min(2).max(90),
     phone: z.string().min(6).max(40),
@@ -60,10 +62,17 @@ export async function GET(req: NextRequest) {
     const q = req.nextUrl.searchParams.get("q")?.trim();
     const status = req.nextUrl.searchParams.get("status")?.trim();
     const mode = req.nextUrl.searchParams.get("mode")?.trim();
+    const branch = req.nextUrl.searchParams.get("branch")?.trim();
+    const branchFilter = branch ? getBranchBySlug(branch) : null;
     const from = req.nextUrl.searchParams.get("from")?.trim();
     const to = req.nextUrl.searchParams.get("to")?.trim();
 
+    if (branch && !branchFilter) {
+      return NextResponse.json({ error: "Sucursal inválida" }, { status: 400 });
+    }
+
     const where: Record<string, unknown> = {
+      ...(branchFilter ? { branchCode: branchFilter.code } : {}),
       ...(status
         ? {
             status: status.toUpperCase() as "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED",
@@ -117,6 +126,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       items: orders.map((order) => ({
         id: order.id,
+        branch: getBranchByCode(order.branchCode),
         status: order.status,
         fulfillmentMode: order.fulfillmentMode,
         deliveryDate: getDateOnlyString(order.deliveryDate),
@@ -160,6 +170,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = orderCreateSchema.parse(await req.json());
+    const branch = getBranchBySlug(body.branch);
+    if (!branch) {
+      return NextResponse.json({ error: "Sucursal inválida" }, { status: 400 });
+    }
+    const branchCode = BranchCode[branch.code];
 
     const mode = mapFulfillmentMode(body.fulfillmentMode);
     const paymentOption = resolveOrderPaymentOption(mode, body.paymentOption);
@@ -198,7 +213,11 @@ export async function POST(req: NextRequest) {
         !price ||
         !price.flavor.isActive ||
         !price.size.isActive ||
-        !isCatalogPairAvailable(price.flavor.slug, price.size.slug)
+        !isCatalogPairAvailableAtBranch(
+          branch,
+          price.flavor.slug,
+          price.size.slug,
+        )
       ) {
         return NextResponse.json({ error: "Producto no disponible" }, { status: 400 });
       }
@@ -216,6 +235,7 @@ export async function POST(req: NextRequest) {
 
     const requestedUnits = orderItems.reduce((sum, item) => sum + item.quantity, 0);
     await validateCapacityForOrder({
+      branchCode,
       deliveryDate: body.deliveryDate,
       requestedUnits,
       requestedFlavorUnits: orderItems.map((item) => ({
@@ -261,6 +281,7 @@ export async function POST(req: NextRequest) {
     const order = await prisma.order.create({
       data: {
         customerId: customer.id,
+        branchCode,
         fulfillmentMode: mode,
         deliveryDate: getDateAtNoon(body.deliveryDate),
         deliveryAddress: body.fulfillmentMode === "delivery" ? body.customer.address?.trim() || null : null,

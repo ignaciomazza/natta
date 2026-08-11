@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { BranchCode } from "@prisma/client";
 import {
   getCapacityCalendar,
   withMissingCapacityTableFallback,
@@ -7,6 +8,7 @@ import {
 import { requireAuth } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/prisma";
 import { logServerError } from "@/lib/server/log";
+import { branches, defaultBranch, getBranchBySlug } from "@/lib/branches";
 
 export const runtime = "nodejs";
 
@@ -16,6 +18,16 @@ export async function GET(req: NextRequest) {
     const from = req.nextUrl.searchParams.get("from") ?? undefined;
     const daysParam = req.nextUrl.searchParams.get("days");
     const days = daysParam ? Number(daysParam) : undefined;
+    const requestedBranch = req.nextUrl.searchParams.get("branch");
+    const branch = requestedBranch
+      ? getBranchBySlug(requestedBranch)
+      : defaultBranch;
+
+    if (!branch) {
+      return NextResponse.json({ error: "Sucursal inválida" }, { status: 400 });
+    }
+
+    const branchCode = BranchCode[branch.code];
 
     const [
       calendar,
@@ -25,8 +37,9 @@ export async function GET(req: NextRequest) {
       flavors,
       prices,
     ] = await Promise.all([
-      getCapacityCalendar({ from, days }),
+      getCapacityCalendar({ from, days, branchCode }),
       prisma.weekdayCapacityRule.findMany({
+        where: { branchCode },
         orderBy: { weekday: "asc" },
         select: {
           weekday: true,
@@ -41,6 +54,7 @@ export async function GET(req: NextRequest) {
       }),
       withMissingCapacityTableFallback(
         () => prisma.weekdayFlavorCapacityRule.findMany({
+          where: { branchCode },
           orderBy: [{ weekday: "asc" }, { flavor: { name: "asc" } }],
           select: {
             weekday: true,
@@ -52,6 +66,7 @@ export async function GET(req: NextRequest) {
       ),
       withMissingCapacityTableFallback(
         () => prisma.weekdayFlavorSizeCapacityRule.findMany({
+          where: { branchCode },
           orderBy: [
             { weekday: "asc" },
             { flavor: { name: "asc" } },
@@ -78,7 +93,10 @@ export async function GET(req: NextRequest) {
       prisma.price.findMany({
         where: {
           flavor: { isActive: true },
-          size: { isActive: true },
+          size: {
+            isActive: true,
+            slug: { in: [...branch.allowedSizeSlugs] },
+          },
         },
         select: {
           flavorId: true,
@@ -112,6 +130,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       items: calendar,
+      branch,
+      branches,
       flavors: flavors.map((flavor) => ({
         ...flavor,
         sizes: sizesByFlavor.get(flavor.id) ?? [],

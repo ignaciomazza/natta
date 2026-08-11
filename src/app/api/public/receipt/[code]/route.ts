@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDateOnlyString } from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
+import { getBranchByCode } from "@/lib/branches";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,7 @@ export async function GET(
   return NextResponse.json({
     order: {
       id: order.id,
+      branch: getBranchByCode(order.branchCode),
       code: order.publicReceiptCode,
       status: order.status,
       deliveryDate: getDateOnlyString(order.deliveryDate),

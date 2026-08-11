@@ -32,6 +32,7 @@ import {
 } from "@/components/internal/ui";
 import { SelectField, SelectOption } from "@/components/internal/select-field";
 import { formatDateOnly } from "@/lib/date-only";
+import { branches, type Branch, type BranchSlug } from "@/lib/branches";
 
 type OrderStatus = "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
 type PeriodUnit = "day" | "week" | "month";
@@ -64,6 +65,7 @@ type OrderPayment = {
 
 type OrderItem = {
   id: string;
+  branch: Branch;
   status: OrderStatus;
   fulfillmentMode: "PICKUP" | "DELIVERY";
   deliveryDate: string;
@@ -415,6 +417,7 @@ export function OrdersAdmin() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("CONFIRMED");
   const [modeFilter, setModeFilter] = useState<"ALL" | "pickup" | "delivery">("ALL");
+  const [branchFilter, setBranchFilter] = useState<"ALL" | BranchSlug>("ALL");
   const [dateMode, setDateMode] = useState<PeriodMode>("week");
   const [periodUnit, setPeriodUnit] = useState<PeriodUnit>("week");
   const [periodAnchor, setPeriodAnchor] = useState(() => startOfPeriod(new Date(), "week"));
@@ -429,6 +432,7 @@ export function OrdersAdmin() {
       query: string;
       status: "ALL" | OrderStatus;
       mode: "ALL" | "pickup" | "delivery";
+      branch: "ALL" | BranchSlug;
       dateMode: PeriodMode;
       periodUnit: PeriodUnit;
       periodAnchor: Date;
@@ -441,6 +445,7 @@ export function OrdersAdmin() {
       const nextQuery = overrides.query ?? query;
       const nextStatus = overrides.status ?? statusFilter;
       const nextMode = overrides.mode ?? modeFilter;
+      const nextBranch = overrides.branch ?? branchFilter;
       const nextDateMode = overrides.dateMode ?? dateMode;
       const nextPeriodUnit = overrides.periodUnit ?? periodUnit;
       const nextPeriodAnchor = overrides.periodAnchor ?? periodAnchor;
@@ -457,6 +462,7 @@ export function OrdersAdmin() {
       if (nextQuery.trim()) baseParams.set("q", nextQuery.trim());
       if (nextStatus !== "ALL") baseParams.set("status", nextStatus.toLowerCase());
       if (nextMode !== "ALL") baseParams.set("mode", nextMode);
+      if (nextBranch !== "ALL") baseParams.set("branch", nextBranch);
       const fetchRange = async (from: Date, to: Date) => {
         const params = new URLSearchParams(baseParams);
         params.set("from", formatDateParam(from));
@@ -725,7 +731,7 @@ export function OrdersAdmin() {
         title="Filtros de pedidos"
         variant="dashed"
       >
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1.45fr)_minmax(12rem,0.7fr)_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.45fr)_minmax(10rem,0.65fr)_minmax(10rem,0.65fr)_auto] md:items-end">
           <label className={fieldLabelClassName}>
             Buscar
             <div className="relative">
@@ -748,6 +754,21 @@ export function OrdersAdmin() {
               <SelectOption value="ALL">Todos</SelectOption>
               <SelectOption value="pickup">Retiro</SelectOption>
               <SelectOption value="delivery">Envío</SelectOption>
+            </SelectField>
+          </label>
+
+          <label className={fieldLabelClassName}>
+            Sucursal
+            <SelectField
+              onChange={(value) => setBranchFilter(value as "ALL" | BranchSlug)}
+              value={branchFilter}
+            >
+              <SelectOption value="ALL">Todas</SelectOption>
+              {branches.map((branch) => (
+                <SelectOption key={branch.slug} value={branch.slug}>
+                  {branch.name}
+                </SelectOption>
+              ))}
             </SelectField>
           </label>
 
@@ -877,6 +898,7 @@ export function OrdersAdmin() {
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <FulfillmentModeChip mode={item.fulfillmentMode} />
+                    <Pill mini>{item.branch.name}</Pill>
                     <Pill mini tone="info">{formatDate(item.deliveryDate)}</Pill>
                   </div>
                   <p

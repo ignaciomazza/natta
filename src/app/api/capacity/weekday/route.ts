@@ -7,6 +7,7 @@ import { logServerError } from "@/lib/server/log";
 
 const weekdaySchema = z
   .object({
+    branchCode: z.enum(["DEVOTO", "NORDELTA"]),
     weekday: z.number().int().min(0).max(6),
     isOpen: z.boolean().optional(),
     maxUnits: z.number().int().min(0).optional(),
@@ -35,7 +36,12 @@ export async function PATCH(req: NextRequest) {
     const body = weekdaySchema.parse(await req.json());
 
     const rule = await prisma.weekdayCapacityRule.upsert({
-      where: { weekday: body.weekday },
+      where: {
+        branchCode_weekday: {
+          branchCode: body.branchCode,
+          weekday: body.weekday,
+        },
+      },
       update: {
         ...(body.isOpen !== undefined ? { isOpen: body.isOpen } : {}),
         ...(body.maxUnits !== undefined ? { maxUnits: body.maxUnits } : {}),
@@ -54,6 +60,7 @@ export async function PATCH(req: NextRequest) {
           : {}),
       },
       create: {
+        branchCode: body.branchCode,
         weekday: body.weekday,
         isOpen: body.isOpen ?? body.weekday !== 0,
         maxUnits: body.maxUnits ?? 20,

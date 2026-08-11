@@ -228,7 +228,7 @@ export default async function Home() {
                 Elegís, reservás y coordinamos.
               </h2>
               <p className="mt-4 max-w-lg text-base leading-7 text-[var(--chocolate)]/72 md:mt-6 md:text-lg md:leading-8">
-                48 h de anticipación · Villa Devoto · envío por Uber.
+                48 h de anticipación · Devoto o Nordelta · envío por Uber.
               </p>
             </div>
             <div className="grid gap-5 sm:grid-cols-3 md:gap-7" data-stagger>
@@ -243,7 +243,7 @@ export default async function Home() {
                   Elegís
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
-                  Tamaño, sabor y fecha.
+                  Sucursal, tamaño, sabor y fecha.
                 </p>
               </div>
               <div
@@ -271,7 +271,7 @@ export default async function Home() {
                   Retirás
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--chocolate)]/72 md:mt-3 md:text-base md:leading-7">
-                  Por Devoto o con envío por Uber previamente coordinado.
+                  Por la sucursal elegida o con envío por Uber previamente coordinado.
                 </p>
               </div>
             </div>

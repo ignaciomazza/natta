@@ -18,11 +18,13 @@ import {
 import { useState, type FormEvent } from "react";
 import { formatDateOnly } from "@/lib/date-only";
 import { getPickupHoursForDate } from "@/lib/pickup-hours";
+import type { Branch } from "@/lib/branches";
 
 type LookupMode = "code" | "recovery";
 
 type PublicOrderStatus = {
   code: string;
+  branch: Branch;
   status: string;
   statusLabel: string;
   statusTone: "pending" | "confirmed" | "delivered" | "cancelled";
@@ -329,7 +331,11 @@ function OrderStatusResult({ order }: { order: PublicOrderStatus }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-5">
+        <StatusMeta
+          label="Sucursal"
+          value={order.branch.name}
+        />
         <StatusMeta
           label="Entrega"
           value={formatDate(order.deliveryDate)}

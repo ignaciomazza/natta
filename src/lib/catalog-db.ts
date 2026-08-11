@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
+import {
+  defaultBranch,
+  isSizeAvailableAtBranch,
+  type Branch,
+} from "@/lib/branches";
 
 export const sizeSlugToId = {
   latta: "latta",
@@ -13,6 +18,17 @@ const unavailableCatalogPairs = new Set(["brulee::chica", "brulee::grande"]);
 
 export function isCatalogPairAvailable(flavorSlug: string, sizeSlug: string) {
   return !unavailableCatalogPairs.has(`${flavorSlug}::${sizeSlug}`);
+}
+
+export function isCatalogPairAvailableAtBranch(
+  branch: Branch,
+  flavorSlug: string,
+  sizeSlug: string,
+) {
+  return (
+    isSizeAvailableAtBranch(branch, sizeSlug) &&
+    isCatalogPairAvailable(flavorSlug, sizeSlug)
+  );
 }
 
 const flavorDescriptionOverrides: Partial<Record<string, string>> = {
@@ -59,7 +75,7 @@ const sizeContentOverrides: Partial<
   },
 };
 
-export async function getActiveCatalog() {
+export async function getActiveCatalog(branch: Branch = defaultBranch) {
   const [flavors, sizes, prices] = await Promise.all([
     prisma.flavor.findMany({
       where: { isActive: true },
@@ -72,7 +88,10 @@ export async function getActiveCatalog() {
       },
     }),
     prisma.size.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        slug: { in: [...branch.allowedSizeSlugs] },
+      },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -85,6 +104,13 @@ export async function getActiveCatalog() {
       },
     }),
     prisma.price.findMany({
+      where: {
+        size: {
+          isActive: true,
+          slug: { in: [...branch.allowedSizeSlugs] },
+        },
+        flavor: { isActive: true },
+      },
       select: {
         id: true,
         flavorId: true,
@@ -117,7 +143,7 @@ export async function getActiveCatalog() {
         .map((price) => {
           const size = sizeMap.get(price.sizeId);
           if (!size) return null;
-          if (!isCatalogPairAvailable(flavor.slug, size.slug)) {
+          if (!isCatalogPairAvailableAtBranch(branch, flavor.slug, size.slug)) {
             return null;
           }
           return {

@@ -1,5 +1,7 @@
+import { BranchCode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDefaultPickupWindowForWeekday } from "@/lib/pickup-hours";
+import { getBranchByCode } from "@/lib/branches";
 
 export type CapacityDay = {
   date: string;
@@ -200,7 +202,10 @@ export function getWeekdayFromDateString(date: string) {
 export async function getCapacityCalendar(input?: {
   from?: string;
   days?: number;
+  branchCode?: BranchCode;
 }) {
+  const branchCode = input?.branchCode ?? BranchCode.DEVOTO;
+  const branch = getBranchByCode(branchCode);
   const fromDate = input?.from ?? toDateOnlyString(getDefaultMinDate(new Date(), 0));
   const days = Math.max(1, Math.min(input?.days ?? 30, 120));
 
@@ -220,31 +225,36 @@ export async function getCapacityCalendar(input?: {
     activePrices,
     orderItems,
   ] = await Promise.all([
-    prisma.weekdayCapacityRule.findMany(),
+    prisma.weekdayCapacityRule.findMany({ where: { branchCode } }),
     prisma.dateCapacityOverride.findMany({
       where: {
+        branchCode,
         date: dateRange,
       },
     }),
     withMissingCapacityTableFallback(
-      () => prisma.weekdayFlavorCapacityRule.findMany(),
+      () => prisma.weekdayFlavorCapacityRule.findMany({ where: { branchCode } }),
       [],
     ),
     withMissingCapacityTableFallback(
       () => prisma.dateFlavorCapacityOverride.findMany({
         where: {
+          branchCode,
           date: dateRange,
         },
       }),
       [],
     ),
     withMissingCapacityTableFallback(
-      () => prisma.weekdayFlavorSizeCapacityRule.findMany(),
+      () => prisma.weekdayFlavorSizeCapacityRule.findMany({
+        where: { branchCode },
+      }),
       [],
     ),
     withMissingCapacityTableFallback(
       () => prisma.dateFlavorSizeCapacityOverride.findMany({
         where: {
+          branchCode,
           date: dateRange,
         },
       }),
@@ -262,7 +272,10 @@ export async function getCapacityCalendar(input?: {
     prisma.price.findMany({
       where: {
         flavor: { isActive: true },
-        size: { isActive: true },
+        size: {
+          isActive: true,
+          slug: { in: [...branch.allowedSizeSlugs] },
+        },
       },
       select: {
         flavorId: true,
@@ -279,6 +292,7 @@ export async function getCapacityCalendar(input?: {
     prisma.orderItem.findMany({
       where: {
         order: {
+          branchCode,
           status: {
             not: "CANCELLED",
           },
@@ -517,6 +531,7 @@ export async function getCapacityCalendar(input?: {
 }
 
 export async function validateCapacityForOrder(input: {
+  branchCode: BranchCode;
   deliveryDate: string;
   requestedUnits: number;
   requestedFlavorUnits?: Array<{
@@ -529,6 +544,7 @@ export async function validateCapacityForOrder(input: {
     quantity: number;
   }>;
 }) {
+  const branch = getBranchByCode(input.branchCode);
   const date = input.deliveryDate;
   const weekday = getWeekdayFromDateString(date);
   const dateAtNoon = getDateAtNoon(date);
@@ -567,16 +583,25 @@ export async function validateCapacityForOrder(input: {
     activePrices,
   ] = await Promise.all([
     prisma.weekdayCapacityRule.findUnique({
-      where: { weekday },
+      where: {
+        branchCode_weekday: {
+          branchCode: input.branchCode,
+          weekday,
+        },
+      },
     }),
     prisma.dateCapacityOverride.findUnique({
       where: {
-        date: dateAtNoon,
+        branchCode_date: {
+          branchCode: input.branchCode,
+          date: dateAtNoon,
+        },
       },
     }),
     prisma.orderItem.findMany({
       where: {
         order: {
+          branchCode: input.branchCode,
           status: {
             not: "CANCELLED",
           },
@@ -591,32 +616,35 @@ export async function validateCapacityForOrder(input: {
     }),
     withMissingCapacityTableFallback(
       () => prisma.weekdayFlavorCapacityRule.findMany({
-        where: { weekday },
+        where: { branchCode: input.branchCode, weekday },
       }),
       [],
     ),
     withMissingCapacityTableFallback(
       () => prisma.dateFlavorCapacityOverride.findMany({
-        where: { date: dateAtNoon },
+        where: { branchCode: input.branchCode, date: dateAtNoon },
       }),
       [],
     ),
     withMissingCapacityTableFallback(
       () => prisma.weekdayFlavorSizeCapacityRule.findMany({
-        where: { weekday },
+        where: { branchCode: input.branchCode, weekday },
       }),
       [],
     ),
     withMissingCapacityTableFallback(
       () => prisma.dateFlavorSizeCapacityOverride.findMany({
-        where: { date: dateAtNoon },
+        where: { branchCode: input.branchCode, date: dateAtNoon },
       }),
       [],
     ),
     prisma.price.findMany({
       where: {
         flavor: { isActive: true },
-        size: { isActive: true },
+        size: {
+          isActive: true,
+          slug: { in: [...branch.allowedSizeSlugs] },
+        },
       },
       select: {
         flavorId: true,

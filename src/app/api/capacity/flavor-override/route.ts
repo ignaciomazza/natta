@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { logServerError } from "@/lib/server/log";
 
 const flavorOverrideSchema = z.object({
+  branchCode: z.enum(["DEVOTO", "NORDELTA"]),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   flavorId: z.string().min(1),
   maxUnits: z.number().int().min(0).nullable().optional(),
@@ -26,6 +27,7 @@ export async function PATCH(req: NextRequest) {
     if (body.clear) {
       await prisma.dateFlavorCapacityOverride.deleteMany({
         where: {
+          branchCode: body.branchCode,
           date,
           flavorId: body.flavorId,
         },
@@ -35,7 +37,8 @@ export async function PATCH(req: NextRequest) {
 
     const override = await prisma.dateFlavorCapacityOverride.upsert({
       where: {
-        date_flavorId: {
+        branchCode_date_flavorId: {
+          branchCode: body.branchCode,
           date,
           flavorId: body.flavorId,
         },
@@ -46,6 +49,7 @@ export async function PATCH(req: NextRequest) {
         ...(body.note !== undefined ? { note: body.note } : {}),
       },
       create: {
+        branchCode: body.branchCode,
         date,
         flavorId: body.flavorId,
         maxUnits: body.maxUnits ?? null,

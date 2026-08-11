@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { BranchCode, PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
 
 const prisma = new PrismaClient();
@@ -195,28 +195,36 @@ async function main() {
     });
   }
 
-  for (const weekday of [0, 1, 2, 3, 4, 5, 6]) {
-    const pickupStartMinutes = 11 * 60;
-    const pickupEndMinutes = weekday === 6 ? 14 * 60 : 18 * 60;
+  for (const branchCode of [BranchCode.DEVOTO, BranchCode.NORDELTA]) {
+    for (const weekday of [0, 1, 2, 3, 4, 5, 6]) {
+      const pickupStartMinutes = 11 * 60;
+      const pickupEndMinutes = weekday === 6 ? 14 * 60 : 18 * 60;
 
-    await prisma.weekdayCapacityRule.upsert({
-      where: { weekday },
-      update: {
-        isOpen: weekday !== 0,
-        maxUnits: weekday === 0 ? 0 : 20,
-        minLeadTimeDays: 2,
-        cutoffHour: 10,
-      },
-      create: {
-        weekday,
-        isOpen: weekday !== 0,
-        maxUnits: weekday === 0 ? 0 : 20,
-        minLeadTimeDays: 2,
-        cutoffHour: 10,
-        pickupStartMinutes,
-        pickupEndMinutes,
-      },
-    });
+      await prisma.weekdayCapacityRule.upsert({
+        where: {
+          branchCode_weekday: {
+            branchCode,
+            weekday,
+          },
+        },
+        update: {
+          isOpen: weekday !== 0,
+          maxUnits: weekday === 0 ? 0 : 20,
+          minLeadTimeDays: 2,
+          cutoffHour: 10,
+        },
+        create: {
+          branchCode,
+          weekday,
+          isOpen: weekday !== 0,
+          maxUnits: weekday === 0 ? 0 : 20,
+          minLeadTimeDays: 2,
+          cutoffHour: 10,
+          pickupStartMinutes,
+          pickupEndMinutes,
+        },
+      });
+    }
   }
 
   const adminEmail = "admin@natta.local";

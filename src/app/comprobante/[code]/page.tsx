@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Clock,
   CreditCard,
+  MapPin,
   Package,
   Phone,
   ReceiptText,
@@ -15,6 +16,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { formatDateOnly } from "@/lib/date-only";
 import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
 import { prisma } from "@/lib/prisma";
+import { getBranchByCode } from "@/lib/branches";
 
 const formatMoney = (value: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -209,8 +211,9 @@ export default async function ComprobantePage({
   const customerPhone = order.customer?.phone?.trim() || "Sin teléfono cargado";
   const firstPayment = order.payments[0] ?? null;
   const isPickup = order.fulfillmentMode === "PICKUP";
+  const branch = getBranchByCode(order.branchCode);
   const pickupHoursLabel = isPickup
-    ? await getPickupHoursLabelForDate(order.deliveryDate)
+    ? await getPickupHoursLabelForDate(order.deliveryDate, order.branchCode)
     : null;
 
   return (
@@ -282,6 +285,21 @@ export default async function ComprobantePage({
                   </div>
 
                   <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-zinc-500">
+                        <MapPin className="h-4 w-4" strokeWidth={1.9} />
+                        <span>Sucursal</span>
+                      </div>
+                      <p className="text-lg font-medium text-zinc-900">
+                        {branch.name}
+                      </p>
+                      {isPickup ? (
+                        <p className="text-sm leading-6 text-zinc-600">
+                          {branch.addressLine}
+                        </p>
+                      ) : null}
+                    </div>
+
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-zinc-500">
                         <CalendarDays className="h-4 w-4" strokeWidth={1.9} />

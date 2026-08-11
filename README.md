@@ -98,6 +98,16 @@ El flujo de pedido asistido genera un mensaje con tamaño, sabor, cantidad, fech
 - Módulos: pedidos, cupos, clientes, compras, gastos y cobros
 - Comprobante público por código: `/comprobante/{codigo}`
 
+## Sucursales
+
+- Devoto: Av. Francisco Beiró 5015, timbre 302, Villa Devoto, CABA.
+- Nordelta: Boulevard de Todos los Santos 4380, Vila Marina 1, Dique Luján,
+  Tigre, Buenos Aires.
+- El catálogo, los cupos y los pedidos se separan por sucursal. Nordelta ofrece
+  inicialmente sólo Lattas.
+- El contrato de transición a Cobots Gestión y el orden seguro de despliegue
+  están en `docs/branches-and-cobots.md`.
+
 ## Assets
 
 Los PNG de `public/images` son placeholders generados para validar composición visual. Reemplazarlos por fotos reales de Natta cuando Cami comparta el material.

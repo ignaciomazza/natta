@@ -7,9 +7,9 @@ export const siteConfig = {
   url: "https://www.nattavascas.com",
   locale: "es_AR",
   language: "es-AR",
-  title: "Natta Vascas | Tartas vascas de queso en Villa Devoto",
+  title: "Natta Vascas | Tartas vascas de queso en Devoto y Nordelta",
   description:
-    "Tartas vascas de queso hechas por encargo en Villa Devoto. Menu corto, textura cremosa y pedidos con anticipacion.",
+    "Tartas vascas de queso hechas por encargo en Devoto y Nordelta. Menu corto, textura cremosa y pedidos con anticipacion.",
   orderDescription:
     "Arma tu pedido de tartas vascas Natta con sabores, fecha, modalidad y pago online.",
   statusDescription:
@@ -24,7 +24,7 @@ export const siteConfig = {
   whatsapp: "https://wa.me/5491173588459",
   phoneDisplay: "+54 9 11 7358-8459",
   phone: "+5491173588459",
-  location: "Villa Devoto, Buenos Aires",
+  location: "Devoto y Nordelta, Buenos Aires",
   maps:
     "https://www.google.com/maps/search/?api=1&query=Villa%20Devoto%2C%20Buenos%20Aires%2C%20Argentina",
 };
@@ -37,7 +37,7 @@ export const sharedOpenGraph: NonNullable<Metadata["openGraph"]> = {
   siteName: siteConfig.name,
   title: siteConfig.name,
   description:
-    "Tartas vascas de queso, lattas y pedidos por encargo en Villa Devoto.",
+    "Tartas vascas de queso, lattas y pedidos por encargo en Devoto y Nordelta.",
   url: siteConfig.url,
   images: [
     {
@@ -104,6 +104,10 @@ export function buildHomeStructuredData(
       {
         "@type": "City",
         name: "Buenos Aires",
+      },
+      {
+        "@type": "AdministrativeArea",
+        name: "Tigre, Buenos Aires",
       },
     ],
     makesOffer: {

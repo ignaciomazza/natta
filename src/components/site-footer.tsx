@@ -163,9 +163,16 @@ const footerLinks = [
     iconClass: "h-10 w-10",
   },
   {
-    label: "Ubicación",
-    detail: "Villa Devoto, Buenos Aires",
-    href: "https://www.google.com/maps/search/?api=1&query=Villa%20Devoto%2C%20Buenos%20Aires%2C%20Argentina",
+    label: "Sucursal Devoto",
+    detail: "Av. Francisco Beiró 5015, timbre 302",
+    href: "https://www.google.com/maps/search/?api=1&query=Av.%20Francisco%20Beir%C3%B3%205015%2C%20Villa%20Devoto%2C%20CABA",
+    icon: GoogleMapsIcon,
+    iconClass: "h-12 w-9",
+  },
+  {
+    label: "Sucursal Nordelta",
+    detail: "Boulevard de Todos los Santos 4380, Vila Marina 1",
+    href: "https://www.google.com/maps/search/?api=1&query=Boulevard%20de%20Todos%20los%20Santos%204380%2C%20Vila%20Marina%201%2C%20Tigre",
     icon: GoogleMapsIcon,
     iconClass: "h-12 w-9",
   },
@@ -181,7 +188,7 @@ export function SiteFooter({
         <div className="max-w-sm">
           <p className="font-display text-5xl italic">natta</p>
           <p className="mt-3 text-sm leading-6 text-[var(--milk)]/62">
-            Tartas vascas de queso, encargos con anticipación en Villa Devoto.
+            Tartas vascas de queso, encargos con anticipación en Devoto y Nordelta.
           </p>
           <BrandLoaderLink
             className="motion-button lift-hover mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
@@ -201,7 +208,7 @@ export function SiteFooter({
                 aria-label={`${link.label}: ${link.detail}`}
                 className="group flex items-center gap-4 border-t border-white/14 py-5 text-[var(--milk)] transition hover:border-white/34 hover:text-[var(--caramel-soft)]"
                 href={link.href}
-                key={link.label}
+                key={`${link.label}-${link.detail}`}
                 rel="noreferrer"
                 target="_blank"
               >

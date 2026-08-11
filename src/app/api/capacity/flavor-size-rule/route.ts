@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { logServerError } from "@/lib/server/log";
 
 const flavorSizeRuleSchema = z.object({
+  branchCode: z.enum(["DEVOTO", "NORDELTA"]),
   weekday: z.number().int().min(0).max(6),
   flavorId: z.string().min(1),
   sizeId: z.string().min(1),
@@ -23,6 +24,7 @@ export async function PATCH(req: NextRequest) {
     if (body.maxUnits === null) {
       await prisma.weekdayFlavorSizeCapacityRule.deleteMany({
         where: {
+          branchCode: body.branchCode,
           weekday: body.weekday,
           flavorId: body.flavorId,
           sizeId: body.sizeId,
@@ -33,7 +35,8 @@ export async function PATCH(req: NextRequest) {
 
     const rule = await prisma.weekdayFlavorSizeCapacityRule.upsert({
       where: {
-        weekday_flavorId_sizeId: {
+        branchCode_weekday_flavorId_sizeId: {
+          branchCode: body.branchCode,
           weekday: body.weekday,
           flavorId: body.flavorId,
           sizeId: body.sizeId,
@@ -43,6 +46,7 @@ export async function PATCH(req: NextRequest) {
         maxUnits: body.maxUnits,
       },
       create: {
+        branchCode: body.branchCode,
         weekday: body.weekday,
         flavorId: body.flavorId,
         sizeId: body.sizeId,

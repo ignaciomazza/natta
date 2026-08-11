@@ -16,6 +16,7 @@ import {
   minutesToTimeInput,
   timeInputToMinutes,
 } from "@/lib/pickup-hours";
+import { branches, defaultBranch, type Branch } from "@/lib/branches";
 
 type FlavorOption = {
   id: string;
@@ -106,6 +107,8 @@ type CapacityItem = {
 };
 
 type CalendarPayload = {
+  branch: Branch;
+  branches: Branch[];
   items: CapacityItem[];
   flavors: FlavorOption[];
   weekdayRules: WeekdayRuleItem[];
@@ -587,6 +590,7 @@ function UnitCounter({
 }
 
 export function CapacityAdmin() {
+  const [selectedBranch, setSelectedBranch] = useState<Branch>(defaultBranch);
   const [items, setItems] = useState<CapacityItem[]>([]);
   const [flavors, setFlavors] = useState<FlavorOption[]>([]);
   const [weekdayRules, setWeekdayRules] = useState<WeekdayRuleItem[]>([]);
@@ -653,9 +657,12 @@ export function CapacityAdmin() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/capacity/calendar?days=21", {
+      const response = await fetch(
+        `/api/capacity/calendar?days=21&branch=${selectedBranch.slug}`,
+        {
         cache: "no-store",
-      });
+        },
+      );
       if (!response.ok) {
         throw new Error("No se pudo cargar capacidad");
       }
@@ -695,7 +702,7 @@ export function CapacityAdmin() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedBranch.slug]);
 
   useEffect(() => {
     if (!exceptionEditor && !pickupHoursModalOpen) return;
@@ -730,6 +737,7 @@ export function CapacityAdmin() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          branchCode: selectedBranch.code,
           weekday,
           isOpen: weekdayOpen,
           maxUnits: weekdayOpen
@@ -754,6 +762,7 @@ export function CapacityAdmin() {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              branchCode: selectedBranch.code,
               weekday,
               flavorId: flavor.id,
               maxUnits: parseOptionalUnits(weekdayFlavorCaps[flavor.id] ?? ""),
@@ -773,6 +782,7 @@ export function CapacityAdmin() {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
+                branchCode: selectedBranch.code,
                 weekday,
                 flavorId: flavor.id,
                 sizeId: size.id,
@@ -847,7 +857,10 @@ export function CapacityAdmin() {
           fetch("/api/capacity/weekday", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item),
+            body: JSON.stringify({
+              ...item,
+              branchCode: selectedBranch.code,
+            }),
           }),
         ),
       );
@@ -1020,6 +1033,7 @@ export function CapacityAdmin() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          branchCode: selectedBranch.code,
           date: exceptionEditor.date,
           isClosed: exceptionEditor.isClosed,
           maxUnits: exceptionEditor.isClosed
@@ -1060,6 +1074,7 @@ export function CapacityAdmin() {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              branchCode: selectedBranch.code,
               date: exceptionEditor.date,
               flavorId: flavor.flavorId,
               clear,
@@ -1084,6 +1099,7 @@ export function CapacityAdmin() {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
+                branchCode: selectedBranch.code,
                 date: exceptionEditor.date,
                 flavorId: flavor.flavorId,
                 sizeId: size.sizeId,
@@ -1197,6 +1213,33 @@ export function CapacityAdmin() {
         icon={CalendarDays}
         title="Cupos de producción"
       />
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-[color:var(--line)] pb-5">
+        <span className="mr-1 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+          Sucursal
+        </span>
+        {branches.map((branch) => (
+          <button
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              selectedBranch.slug === branch.slug
+                ? "border-[color:var(--accent)] bg-[color:var(--accent-strong)] text-white"
+                : "border-[color:var(--line)] bg-[color:var(--milk)] text-zinc-700 hover:border-[color:var(--accent)]"
+            }`}
+            key={branch.slug}
+            onClick={() => {
+              setExceptionEditor(null);
+              setPickupHoursModalOpen(false);
+              setSelectedBranch(branch);
+            }}
+            type="button"
+          >
+            {branch.name}
+          </button>
+        ))}
+        <span className="basis-full text-xs text-zinc-500 sm:ml-auto sm:basis-auto">
+          {selectedBranch.addressLine}
+        </span>
+      </div>
 
       {error ? (
         <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
