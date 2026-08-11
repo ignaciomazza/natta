@@ -6,6 +6,7 @@ import { OrderAssistant } from "@/components/order-assistant";
 import { SiteLogo } from "@/components/site-logo";
 import { SiteFooter } from "@/components/site-footer";
 import { StructuredData } from "@/components/structured-data";
+import { isPublicBranchSelectionEnabled } from "@/lib/branches";
 import {
   buildOrderStructuredData,
   sharedOpenGraph,
@@ -80,8 +81,11 @@ export default function PedidoPage() {
               pedido
             </h1>
             <p className="mt-4 max-w-2xl break-words text-[0.8rem] leading-5 text-[var(--chocolate)]/80 sm:mt-5 sm:text-sm sm:leading-6 md:mt-4 md:text-xl md:leading-8">
-              Elegí sucursal, sabores, cantidades, fecha y modalidad. El pago
-              se hace desde la web y Natta te escribe para confirmar el pedido.
+              {isPublicBranchSelectionEnabled
+                ? "Elegí sucursal, sabores, cantidades, fecha y modalidad."
+                : "Elegí sabores, cantidades, fecha y modalidad para retirar por Devoto."}{" "}
+              El pago se hace desde la web y Natta te escribe para confirmar el
+              pedido.
             </p>
           </div>
         </div>

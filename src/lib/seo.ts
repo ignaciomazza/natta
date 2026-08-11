@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { isPublicBranchSelectionEnabled } from "@/lib/branches";
 import { cakeSizes, flavors, type SizeId } from "@/lib/catalog";
 
 export const siteConfig = {
@@ -7,9 +8,12 @@ export const siteConfig = {
   url: "https://www.nattavascas.com",
   locale: "es_AR",
   language: "es-AR",
-  title: "Natta Vascas | Tartas vascas de queso en Devoto y Nordelta",
-  description:
-    "Tartas vascas de queso hechas por encargo en Devoto y Nordelta. Menu corto, textura cremosa y pedidos con anticipacion.",
+  title: isPublicBranchSelectionEnabled
+    ? "Natta Vascas | Tartas vascas de queso en Devoto y Nordelta"
+    : "Natta Vascas | Tartas vascas de queso en Devoto",
+  description: isPublicBranchSelectionEnabled
+    ? "Tartas vascas de queso hechas por encargo en Devoto y Nordelta. Menu corto, textura cremosa y pedidos con anticipacion."
+    : "Tartas vascas de queso hechas por encargo en Devoto. Menu corto, textura cremosa y pedidos con anticipacion.",
   orderDescription:
     "Arma tu pedido de tartas vascas Natta con sabores, fecha, modalidad y pago online.",
   statusDescription:
@@ -24,7 +28,9 @@ export const siteConfig = {
   whatsapp: "https://wa.me/5491173588459",
   phoneDisplay: "+54 9 11 7358-8459",
   phone: "+5491173588459",
-  location: "Devoto y Nordelta, Buenos Aires",
+  location: isPublicBranchSelectionEnabled
+    ? "Devoto y Nordelta, Buenos Aires"
+    : "Devoto, Buenos Aires",
   maps:
     "https://www.google.com/maps/search/?api=1&query=Villa%20Devoto%2C%20Buenos%20Aires%2C%20Argentina",
 };
@@ -36,8 +42,9 @@ export const sharedOpenGraph: NonNullable<Metadata["openGraph"]> = {
   locale: siteConfig.locale,
   siteName: siteConfig.name,
   title: siteConfig.name,
-  description:
-    "Tartas vascas de queso, lattas y pedidos por encargo en Devoto y Nordelta.",
+  description: isPublicBranchSelectionEnabled
+    ? "Tartas vascas de queso, lattas y pedidos por encargo en Devoto y Nordelta."
+    : "Tartas vascas de queso, lattas y pedidos por encargo en Devoto.",
   url: siteConfig.url,
   images: [
     {
@@ -105,10 +112,14 @@ export function buildHomeStructuredData(
         "@type": "City",
         name: "Buenos Aires",
       },
-      {
-        "@type": "AdministrativeArea",
-        name: "Tigre, Buenos Aires",
-      },
+      ...(isPublicBranchSelectionEnabled
+        ? [
+            {
+              "@type": "AdministrativeArea",
+              name: "Tigre, Buenos Aires",
+            },
+          ]
+        : []),
     ],
     makesOffer: {
       "@id": menuId,

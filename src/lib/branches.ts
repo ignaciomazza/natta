@@ -30,6 +30,12 @@ export type BranchCodeValue = Branch["code"];
 
 export const defaultBranch = branches[0];
 
+// Temporal: cambiar a `true` cuando se habilite la eleccion para Zona Norte.
+export const isPublicBranchSelectionEnabled = false;
+
+export const publicBranches: readonly Branch[] =
+  isPublicBranchSelectionEnabled ? branches : [defaultBranch];
+
 export function getBranchBySlug(value: string | null | undefined) {
   return branches.find((branch) => branch.slug === value) ?? null;
 }

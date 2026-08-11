@@ -1,6 +1,7 @@
 import type { SVGProps } from "react";
 import { ArrowRight } from "lucide-react";
 import { BrandLoaderLink } from "@/components/brand-loader-link";
+import { isPublicBranchSelectionEnabled } from "@/lib/branches";
 
 type SiteFooterProps = {
   ctaHref?: string;
@@ -169,13 +170,17 @@ const footerLinks = [
     icon: GoogleMapsIcon,
     iconClass: "h-12 w-9",
   },
-  {
-    label: "Sucursal Nordelta",
-    detail: "Boulevard de Todos los Santos 4380, Vila Marina 1",
-    href: "https://www.google.com/maps/search/?api=1&query=Boulevard%20de%20Todos%20los%20Santos%204380%2C%20Vila%20Marina%201%2C%20Tigre",
-    icon: GoogleMapsIcon,
-    iconClass: "h-12 w-9",
-  },
+  ...(isPublicBranchSelectionEnabled
+    ? [
+        {
+          label: "Sucursal Nordelta",
+          detail: "Boulevard de Todos los Santos 4380, Vila Marina 1",
+          href: "https://www.google.com/maps/search/?api=1&query=Boulevard%20de%20Todos%20los%20Santos%204380%2C%20Vila%20Marina%201%2C%20Tigre",
+          icon: GoogleMapsIcon,
+          iconClass: "h-12 w-9",
+        },
+      ]
+    : []),
 ];
 
 export function SiteFooter({
@@ -188,7 +193,8 @@ export function SiteFooter({
         <div className="max-w-sm">
           <p className="font-display text-5xl italic">natta</p>
           <p className="mt-3 text-sm leading-6 text-[var(--milk)]/62">
-            Tartas vascas de queso, encargos con anticipación en Devoto y Nordelta.
+            Tartas vascas de queso, encargos con anticipación en{" "}
+            {isPublicBranchSelectionEnabled ? "Devoto y Nordelta" : "Devoto"}.
           </p>
           <BrandLoaderLink
             className="motion-button lift-hover mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--milk)] px-6 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"

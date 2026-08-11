@@ -31,9 +31,10 @@ import {
   PICKUP_HOURS_SUMMARY,
 } from "@/lib/pickup-hours";
 import {
-  branches,
   defaultBranch,
   getBranchBySlug,
+  isPublicBranchSelectionEnabled,
+  publicBranches,
   type Branch,
 } from "@/lib/branches";
 
@@ -565,9 +566,10 @@ export function OrderAssistant() {
     const frame = requestAnimationFrame(() => {
       const searchParams = new URLSearchParams(window.location.search);
       const orderId = searchParams.get("order");
-      const initialBranch =
-        getBranchBySlug(searchParams.get("sucursal")) ??
-        (orderId ? defaultBranch : null);
+      const initialBranch = isPublicBranchSelectionEnabled
+        ? getBranchBySlug(searchParams.get("sucursal")) ??
+          (orderId ? defaultBranch : null)
+        : defaultBranch;
 
       setSelectedBranch(initialBranch);
       setLoadingCatalog(Boolean(initialBranch));
@@ -1358,7 +1360,7 @@ export function OrderAssistant() {
     );
   }
 
-  if (!selectedBranch && !createdOrderId) {
+  if (isPublicBranchSelectionEnabled && !selectedBranch && !createdOrderId) {
     return (
       <section
         aria-labelledby="branch-selector-title"
@@ -1392,7 +1394,7 @@ export function OrderAssistant() {
         </div>
 
         <div className="grid md:grid-cols-2">
-          {branches.map((branch, index) => (
+          {publicBranches.map((branch, index) => (
             <button
               className={`group relative flex min-h-[13rem] flex-col justify-between overflow-hidden px-5 py-6 text-left transition duration-300 sm:min-h-[14rem] sm:px-7 sm:py-7 lg:px-8 ${
                 index === 0
