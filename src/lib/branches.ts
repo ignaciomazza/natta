@@ -30,8 +30,8 @@ export type BranchCodeValue = Branch["code"];
 
 export const defaultBranch = branches[0];
 
-// Temporal: cambiar a `true` cuando se habilite la eleccion para Zona Norte.
-export const isPublicBranchSelectionEnabled = false;
+// Control central para habilitar u ocultar la eleccion publica de sucursal.
+export const isPublicBranchSelectionEnabled = true;
 
 export const publicBranches: readonly Branch[] =
   isPublicBranchSelectionEnabled ? branches : [defaultBranch];
