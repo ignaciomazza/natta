@@ -297,7 +297,7 @@ function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | n
                         <td style="padding:22px;">
                           <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:#64746a;">Código del comprobante</div>
                           <div class="code" style="margin-top:8px;font-size:31px;line-height:36px;font-weight:800;color:#262321;letter-spacing:-.02em;word-break:break-word;">${escapeHtml(order.publicReceiptCode)}</div>
-                          <p style="margin:13px 0 0 0;font-size:14px;line-height:23px;color:#403a37;">Natta te escribe para confirmar el pedido y coordinar ${isPickup ? "el retiro" : "la entrega"}.</p>
+                          <p style="margin:13px 0 0 0;font-size:14px;line-height:23px;color:#403a37;">${isPickup ? "Tu pedido fue confirmado. Retiralo en la sucursal indicada, en la fecha seleccionada." : "Tu pedido fue confirmado. Lo llevamos a la dirección indicada, en la fecha acordada."}</p>
                         </td>
                       </tr>
                     </table>

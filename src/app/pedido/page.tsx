@@ -84,8 +84,8 @@ export default function PedidoPage() {
               {isPublicBranchSelectionEnabled
                 ? "Elegí sucursal, sabores, cantidades, fecha y modalidad."
                 : "Elegí sabores, cantidades, fecha y modalidad para retirar por Devoto."}{" "}
-              El pago se hace desde la web y Natta te escribe para confirmar el
-              pedido.
+              El pago se hace desde la web y, una vez acreditado, el pedido
+              queda confirmado.
             </p>
           </div>
         </div>

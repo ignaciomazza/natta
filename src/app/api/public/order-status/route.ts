@@ -156,7 +156,9 @@ function getStatusCopy(order: PublicOrder) {
       label: "Confirmado",
       tone: "confirmed",
       detail:
-        "El pedido ya fue tomado. Natta te escribe si falta coordinar algún detalle.",
+        order.fulfillmentMode === "PICKUP"
+          ? "Tu pedido fue confirmado. Retiralo en la sucursal indicada, en la fecha seleccionada."
+          : "Tu pedido fue confirmado. Lo llevamos a la dirección indicada, en la fecha acordada.",
     };
   }
 

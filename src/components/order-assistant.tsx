@@ -817,7 +817,9 @@ export function OrderAssistant() {
             "Tu pago quedó registrado. Te dejamos el comprobante y el detalle para tenerlo a mano.",
           label: "Pago recibido",
           notes: [
-            "Natta te escribe para confirmar el pedido.",
+            isDeliveryMode(summaryMode)
+              ? "Tu pedido fue confirmado. Lo llevamos a la dirección indicada, en la fecha acordada."
+              : "Tu pedido fue confirmado. Retiralo en la sucursal indicada, en la fecha seleccionada.",
             summaryBalanceArs > 0
               ? `Queda un saldo para el retiro: ${formatMoney(summaryBalanceArs)}.`
               : "No queda saldo pendiente.",
@@ -2309,7 +2311,9 @@ export function OrderAssistant() {
                 Ya podés guardar el comprobante.
               </h3>
               <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--chocolate)]/76 sm:text-base">
-                Tu pedido quedó registrado y el pago ya figura acreditado. Natta te escribe para confirmar el pedido.
+                {isDeliveryMode(summaryMode)
+                  ? "Tu pedido fue confirmado. Lo llevamos a la dirección indicada, en la fecha acordada."
+                  : "Tu pedido fue confirmado. Retiralo en la sucursal indicada, en la fecha seleccionada."}
               </p>
 
               {receiptCode ? (

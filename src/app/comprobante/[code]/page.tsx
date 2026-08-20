@@ -78,14 +78,16 @@ function getReceiptTone(state: string) {
   };
 }
 
-function getReceiptHeadline(state: string) {
+function getReceiptHeadline(state: string, fulfillmentMode: string) {
   if (state === "Pago recibido") {
     return {
       title: "Ya podés guardar el comprobante",
       description:
         "El pago ya figura acreditado y acá tenés el detalle completo para tenerlo a mano.",
       nextStep:
-        "Natta te escribe para confirmar el pedido y coordinar el retiro o la entrega.",
+        fulfillmentMode === "PICKUP"
+          ? "Tu pedido fue confirmado. Retiralo en la sucursal indicada, en la fecha seleccionada."
+          : "Tu pedido fue confirmado. Lo llevamos a la dirección indicada, en la fecha acordada.",
     };
   }
 
@@ -206,7 +208,7 @@ export default async function ComprobantePage({
 
   const stateLabel = getReceiptState(order);
   const tone = getReceiptTone(stateLabel);
-  const headline = getReceiptHeadline(stateLabel);
+  const headline = getReceiptHeadline(stateLabel, order.fulfillmentMode);
   const customerName = order.customer?.name?.trim() || "Sin nombre cargado";
   const customerPhone = order.customer?.phone?.trim() || "Sin teléfono cargado";
   const firstPayment = order.payments[0] ?? null;
