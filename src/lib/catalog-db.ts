@@ -62,10 +62,10 @@ const sizeContentOverrides: Partial<
     grams: 300,
   },
   chica: {
-    description: "15 cm · 950 g aprox.",
+    description: "15 cm · 650 g aprox.",
     servings: "Entre 4 y 6 porciones",
     diameterCm: 15,
-    grams: 950,
+    grams: 650,
   },
   grande: {
     description: "24 cm · 2 kg aprox.",

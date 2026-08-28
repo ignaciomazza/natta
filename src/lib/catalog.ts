@@ -36,7 +36,7 @@ export const cakeSizes: CakeSize[] = [
   {
     id: "chica",
     label: "Chica",
-    detail: "15 cm · 950 g aprox.",
+    detail: "15 cm · 650 g aprox.",
     servings: "Entre 4 y 6 porciones",
     diameter: "15 cm",
   },

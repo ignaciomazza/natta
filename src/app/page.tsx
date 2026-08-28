@@ -99,7 +99,7 @@ const faq = [
   {
     question: "¿Qué diferencia hay entre chica y grande?",
     answer:
-      "La Latta mide 11 cm y pesa 300 g. La chica mide 15 cm, pesa 950 g aprox. y rinde entre 4 y 6 porciones. La grande mide 24 cm, pesa 2 kg aprox. y rinde entre 10 y 12 porciones.",
+      "La Latta mide 11 cm y pesa 300 g. La chica mide 15 cm, pesa 650 g aprox. y rinde entre 4 y 6 porciones. La grande mide 24 cm, pesa 2 kg aprox. y rinde entre 10 y 12 porciones.",
   },
   {
     question: "¿Hacen envíos?",

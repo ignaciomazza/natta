@@ -512,7 +512,7 @@ function getSizeDetail(size: CatalogSize | undefined) {
 }
 
 const mobileSizeWeightLabels: Record<string, string> = {
-  chica: "950g",
+  chica: "650g",
   grande: "1.900g",
   latta: "300g",
 };
