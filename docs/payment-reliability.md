@@ -10,9 +10,13 @@ El pedido, su pago inicial y su referencia se crean en una transacción. El nave
 
 ## Respaldo sin una visita al sitio
 
+Cada operación conserva su identidad también cuando es rechazada o devuelta. Un intento distinto no reemplaza el historial ni la fecha de la devolución anterior. Para tarjeta, la reserva de procesamiento vence a los dos minutos, por encima del límite de 60 segundos de la función. Un reintento verifica primero Mercado Pago, conserva la clave de idempotencia y adquiere una marca local nueva, para que un intento antiguo no libere una reserva posterior.
+
 `.github/workflows/reconcile-payments.yml` solicita una ejecución cada diez minutos. Primero procesa hasta 30 avisos guardados, en grupos de tres. Prioriza los que nunca se intentaron y luego los intentos más antiguos, para que fallos persistentes no oculten avisos posteriores. Usa un corte fijo para no repetir un aviso durante la misma revisión. No limita la antigüedad de los avisos pendientes. Si alcanza el límite, informa que queda trabajo para otra ejecución y continúa con la revisión de pagos.
 
 Luego consulta los pagos de Mercado Pago modificados durante los últimos 32 días. Recorre todas las páginas, selecciona las referencias de Natta, verifica discrepancias con una consulta directa del pago y recupera la confirmación y el comprobante pendiente. Un fallo individual se registra y permite seguir recorriendo páginas. Un fallo de la búsqueda de una página hace fallar la ejecución y la siguiente vuelve a recorrer el período.
+
+Cada solicitud procesa como máximo tres pagos concurrentes y devuelve el desplazamiento exacto del siguiente elemento, incluso dentro de una página de Mercado Pago. Así evita acumular consultas y correos lentos dentro de una función de 60 segundos. El workflow sigue ese desplazamiento hasta terminar, sujeto a su límite total de diez minutos. Deja de iniciar grupos de avisos tras 90 segundos para reservar tiempo para los pagos, y renueva su identidad cada dos minutos. Los errores de correo también se informan sin revertir un pago confirmado.
 
 GitHub autentica cada ejecución con un token OIDC de corta duración. El servidor verifica firma, emisor, audiencia, antigüedad, repositorio e ID del repositorio, rama `main`, archivo de workflow y tipo de evento. No hay un secreto de producción guardado en el repositorio. `CRON_SECRET` es una alternativa opcional para un futuro programador externo.
 
@@ -29,5 +33,7 @@ La pantalla del cliente conserva la fecha guardada al actualizar el estado. Abri
 ## Pruebas
 
 `npm run test:payments` requiere `TEST_DATABASE_URL` apuntando a PostgreSQL local y a una base llamada **natta_payment_test**. Borra y recrea datos ficticios de esa base; rechaza hosts externos y cualquier otro nombre. Todas las llamadas a Mercado Pago y Resend están simuladas. No usar credenciales ni bases reales.
+
+`npm run test:payment-workflow` ejecuta el código del workflow con HTTP y reloj simulados, sin contactar a GitHub ni Vercel. Comprueba páginas parciales, renovación de la identidad y continuidad ante avisos lentos o fallidos. CI también ejecuta estos cuatro escenarios.
 
 CI inicia PostgreSQL 17 aislado y ejecuta las pruebas de pagos, las comprobaciones de seguridad, lint y build. Los escenarios cubren los avisos numéricos/repetidos/inválidos, pagos sin vínculo, recuperación sin visitas, edición durante fallos, concurrencia en creación y checkout, devoluciones y búsqueda global. No hay cambios de esquema ni migraciones para esta corrección.

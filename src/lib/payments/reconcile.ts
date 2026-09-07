@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { searchRecentMercadoPagoPayments } from "@/lib/payments/mercadopago";
+import { getMercadoPagoPayment, searchRecentMercadoPagoPayments } from "@/lib/payments/mercadopago";
 import {
-  syncMercadoPagoPayment,
+  applyMercadoPagoPaymentSnapshot,
   recalculateOrderPaymentSummary,
 } from "@/lib/payments/sync";
 import { sendOrderReceiptEmailIfNeeded } from "@/lib/email/order-receipt";
@@ -10,7 +10,19 @@ import { withOrderPaymentLock } from "@/lib/payments/lock";
 export async function reconcilePaymentPage(offset: number, end: string) {
   const result = await searchRecentMercadoPagoPayments(offset, end);
   const page = result.results ?? [];
-  const remote = page.filter((payment) =>
+  // One invocation has 60 seconds. Bound expensive GET/mail work, run it in
+  // parallel, and return the exact search offset of the first untouched item.
+  // Unrelated account payments can be skipped without spending a worker slot.
+  let consumed = 0;
+  let related = 0;
+  for (const payment of page) {
+    if (payment.external_reference?.startsWith("natta_")) {
+      if (related === 3) break;
+      related++;
+    }
+    consumed++;
+  }
+  const remote = page.slice(0, consumed).filter((payment) =>
     payment.external_reference?.startsWith("natta_"),
   );
   const local = await prisma.payment.findMany({
@@ -25,7 +37,7 @@ export async function reconcilePaymentPage(offset: number, end: string) {
   let recovered = 0;
   const attention: string[] = [];
   const errors: string[] = [];
-  for (const payment of remote) {
+  await Promise.all(remote.map(async (payment) => {
     const current =
       local.find((p) => p.providerPaymentId === String(payment.id)) ??
       local.find((p) => p.externalReference === payment.external_reference);
@@ -34,7 +46,7 @@ export async function reconcilePaymentPage(offset: number, end: string) {
         ["approved", "refunded", "charged_back"].includes(payment.status ?? "")
       )
         attention.push(String(payment.id));
-      continue;
+      return;
     }
     try {
       const saved = current.providerPayload as Record<string, unknown> | null;
@@ -42,10 +54,17 @@ export async function reconcilePaymentPage(offset: number, end: string) {
         current.providerPaymentId !== String(payment.id) ||
         saved?.status !== payment.status ||
         saved?.transaction_amount !== payment.transaction_amount ||
+        saved?.date_last_updated !== payment.date_last_updated ||
         (payment.status === "approved" && current.status !== "APPROVED");
+      let approved = payment.status === "approved";
       if (needsSnapshot) {
         // Search finds candidates; a direct GET gives the authoritative current state.
-        await syncMercadoPagoPayment(String(payment.id));
+        const updated = await applyMercadoPagoPaymentSnapshot(
+          await getMercadoPagoPayment(String(payment.id)),
+          { sendReceipt: false },
+        );
+        if (!updated) throw new Error("PAYMENT_NOT_LINKED");
+        approved = updated.status === "APPROVED";
         recovered += 1;
       } else if (payment.status === "approved") {
         // Also recover a process interrupted between saving payment and sending email.
@@ -57,24 +76,26 @@ export async function reconcilePaymentPage(offset: number, end: string) {
             recalculateOrderPaymentSummary(current.orderId!, tx),
           );
         }
-        if (!current.order?.receiptEmailSentAt)
-          await sendOrderReceiptEmailIfNeeded(current.orderId);
+      }
+      if (approved && !current.order?.receiptEmailSentAt) {
+        const receipt = await sendOrderReceiptEmailIfNeeded(current.orderId);
+        if (receipt.error) throw new Error(receipt.error);
       }
       if (
         current.order?.status === "CANCELLED" &&
-        payment.status === "approved"
+        approved
       )
         attention.push(String(payment.id));
     } catch {
       errors.push(String(payment.id));
     }
-  }
-  const nextOffset = offset + page.length;
+  }));
+  const nextOffset = offset + consumed;
   return {
     checked: remote.length,
     recovered,
-    attention,
-    errors,
+    attention: attention.sort(),
+    errors: errors.sort(),
     nextOffset:
       page.length && nextOffset < (result.paging?.total ?? nextOffset)
         ? nextOffset

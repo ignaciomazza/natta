@@ -26,6 +26,10 @@ const processSchema = z.object({
 });
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+// A terminated invocation cannot leave a card attempt locked indefinitely.
+// Keep the provider idempotency key when reclaiming it after this lease.
+const PROCESSING_LEASE_MS = 120_000;
 
 function getNestedValue(source: Record<string, unknown>, path: string[]) {
   let current: unknown = source;
@@ -227,7 +231,7 @@ export async function POST(req: NextRequest) {
       "mercadopago-payment",
       mercadoPagoEnvironment,
     ]);
-    processingMarker = `PROCESSING:${idempotencyKey}`;
+    processingMarker = `PROCESSING:${idempotencyKey}:${crypto.randomUUID()}`;
     const processingClaim = await withOrderPaymentLock(order.id, async (tx) => {
       const current = await tx.order.findUniqueOrThrow({
         where: { id: order!.id },
@@ -244,6 +248,7 @@ export async function POST(req: NextRequest) {
           OR: [
             { statusDetail: null },
             { statusDetail: { not: { startsWith: "PROCESSING:" } } },
+            { updatedAt: { lt: new Date(Date.now() - PROCESSING_LEASE_MS) } },
           ],
         },
         data: {

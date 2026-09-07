@@ -23,13 +23,25 @@ En la primera revisión, abrir la pantalla de pago ya emitía un enlace y bloque
 
 ## Pruebas automáticas
 
-La suite contiene 24 escenarios con una base PostgreSQL aislada. Ejecuta las rutas de la aplicación y comprueba los registros resultantes, incluyendo solicitudes simultáneas, pagos repetidos, importes insuficientes, devoluciones, búsquedas globales, pagos con tarjeta en curso y recuperación de varias páginas aunque falle un pago. Mercado Pago y Resend se simulan; no se efectuaron cobros ni envíos reales. La comparación con el receptor anterior es una comprobación adicional opcional mediante `BASELINE_WEBHOOK_PATH`.
+La suite contiene 28 escenarios con una base PostgreSQL aislada. Ejecuta las rutas de la aplicación y comprueba los registros resultantes, incluyendo solicitudes simultáneas, pagos repetidos, importes insuficientes, devoluciones, búsquedas globales, pagos con tarjeta en curso y recuperación de varias páginas aunque falle un pago. Mercado Pago y Resend se simulan; no se efectuaron cobros ni envíos reales. La comparación con el receptor anterior es una comprobación adicional opcional mediante `BASELINE_WEBHOOK_PATH`.
 
 También se ejecutaron las comprobaciones de seguridad existentes, lint, TypeScript y la compilación de producción. Los nueve escenarios agregados verifican pérdida de la tarea posterior a la respuesta, correo detenido o fallido, reservas vencidas tras una interrupción, recuperación por lotes ante fallos del proveedor, fallo del guardado inicial, validación y renovación de firmas, y reparto de reintentos para evitar que los mismos errores bloqueen avisos posteriores.
 
 ## Prueba por HTTP del servidor Next.js
 
 Se levantó una copia local con PostgreSQL aislado. Un aviso firmado ficticio obtuvo **200 en 6 ms**, mientras el correo simulado permanecía detenido durante **25 segundos**. La base mostraba el pedido confirmado por $53.000 y el correo aún pendiente. Después de terminar la demora, el correo figuraba enviado y el evento `PROCESSED`. Los logs confirmaron que el simulador de correo había iniciado y terminado: la medición no depende solamente de configurar una demora. Este tiempo corresponde a la copia local; no es una garantía de latencia en Vercel.
+
+## Revisión adicional del código
+
+Se reprodujeron y corrigieron dos defectos adicionales: una reserva de tarjeta abandonada por una interrupción impedía todos los reintentos; y un intento distinto podía reemplazar el historial de una operación devuelta, permitiendo que un aviso antiguo volviera a contabilizarla. Antes de corregirlos, las nuevas pruebas observaron dos respuestas 409 al intentar retomar el pago y un importe contabilizado de $106.000 donde correspondían $53.000, respectivamente. Después, un solo reintento completa el cobro simulado con la misma clave de idempotencia y el importe devuelto no vuelve a contarse.
+
+También se corrigió la acumulación de hasta 50 consultas y correos secuenciales dentro de una función de 60 segundos. La revisión procesa como máximo tres pagos concurrentes y devuelve el desplazamiento del siguiente sin procesar. Las pruebas verifican que continúa desde ahí aunque fallen los tres primeros pagos y que un correo fallido se informa y luego se recupera sin revertir la confirmación.
+
+Se ejecutó la compilación de producción local con una base aislada. Por HTTP, tres consultas simuladas de **11 segundos** seguidas cada una por un correo simulado de **9 segundos** completaron el lote en **20.040 ms**, con respuesta 200, tres recuperaciones y cero errores. Los logs mostraron el inicio concurrente de las tres consultas y de los tres correos. La base conservó los tres pedidos confirmados por $53.000 y la fecha del sábado 12. Una página posterior también recuperó el cuarto pedido. En el navegador aislado se observó el paso de la pantalla de pago a **Pago recibido**, con el mismo comprobante y sábado 12 de septiembre; no se registraron errores del navegador. Estos tiempos corresponden a simuladores y al servidor local.
+
+Las **cuatro pruebas del workflow** ejecutan su código real con HTTP y reloj simulados: recorren 101 solicitudes con páginas parciales, renuevan la identidad durante ejecuciones largas, continúan hacia los pagos ante una cola de avisos lenta o inaccesible y reportan fallos individuales después de visitar las páginas restantes. No certifican la firma OIDC ni la conexión real entre GitHub y Vercel, que siguen pendientes. Se incluyeron en CI.
+
+Verificación final: 28 escenarios de pagos, cuatro del workflow, comprobaciones de seguridad, lint, TypeScript y build aprobados. No se modificaron las credenciales productivas ni se publicó esta versión.
 
 ## Contacto con los servicios reales de Mercado Pago
 
@@ -48,6 +60,18 @@ Se creó un comprador ficticio mediante el endpoint oficial `/users/test`. Merca
 La [referencia oficial de creación de pagos](https://www.mercadopago.com.ar/developers/es/reference/online-payments/subscriptions/create-payment/post) relaciona el mensaje de autorización con el alcance `payment` del token. Hay que verificar el par Public Key/Access Token y sus permisos para la integración con `/v1/payments`; no se cambiaron las credenciales productivas. No se presume una causa del error de acceso del navegador a partir del mensaje genérico.
 
 El receptor HTTPS temporal solo exponía la ruta del aviso y el regreso del checkout. Se cerraron el túnel, el receptor, los navegadores de prueba y la copia local. No hubo cobros ni correos reales. La cuenta ficticia y la preferencia de prueba creadas en Mercado Pago permanecen como datos de prueba.
+
+### Revisión adicional de las credenciales
+
+El servicio MCP oficial aceptó las credenciales existentes para listar las aplicaciones. El token productivo corresponde a **Natta Web Checkout** y el token guardado como prueba a **TestApp-9c506865**, una aplicación automática de prueba. Que sean aplicaciones distintas puede ser parte del mecanismo de pruebas de Mercado Pago; no demuestra por sí solo un error ni certifica el permiso de crear pagos mediante `/v1/payments`.
+
+La descripción vigente de `get_credentials` en el servicio oficial distingue credenciales de prueba `TEST-` para Payments API/Bricks y `APP_USR-` para otros productos, entre ellos Checkout Pro y Orders, con excepciones para aplicaciones creadas por su automatización. No se debe modificar un prefijo manualmente ni diagnosticar la integración solamente por ese prefijo. Sigue pendiente verificar el par de prueba correspondiente a la aplicación y al flujo de tarjeta de Natta.
+
+Con autorización expresa del usuario, se solicitó `get_credentials` para **Natta Web Checkout**, conservando únicamente claves de prueba si la consulta las devolvía. El servicio respondió HTTP 200, pero el resultado de la herramienta fue `isError: true`: `OAuth ownership validation failed`. La descripción indicó que el token disponible no pertenece a una aplicación OAuth y que esa herramienta solo admite aplicaciones OAuth. No devolvió credenciales: no se guardaron claves nuevas ni se cambiaron las existentes. Que `application_list` funcione con el token no habilita la extracción de credenciales. Este bloqueo corresponde al acceso a las claves y no demuestra una falla del cobro productivo.
+
+La [guía oficial de compras de prueba de Bricks](https://www.mercadopago.com.ar/developers/es/docs/checkout-bricks/integration-test/test-payment-flow) distingue los dos recorridos: para tarjeta pide las credenciales **de prueba de la cuenta real**; para redirigir al checkout pide las credenciales **productivas de una cuenta vendedora ficticia**, junto con una compradora ficticia. No debe usarse un único par indistintamente en ambos recorridos de prueba. Esto explica por qué crear una preferencia correctamente no certifica que ese token sirva para simular el pago con tarjeta.
+
+Para continuar la prueba de tarjeta, el titular debe facilitar el par **Public Key y Access Token de prueba** correspondiente a Natta Web Checkout y a Payments API/Bricks. La sección **Pruebas → Credenciales de prueba → Compartir credenciales** permite compartir acceso con la cuenta de Mercado Pago del desarrollador, según la [guía oficial de credenciales](https://www.mercadopago.com.ar/developers/es/docs/checkout-bricks/additional-content/your-integrations/credentials). No hace falta renovar las claves productivas. Si el panel de esa aplicación no ofrece el par de prueba para tarjeta, se debe verificar primero el producto configurado en ella, sin sustituirlo por claves de otro flujo.
 
 ## Qué falta para darlo por verificado en producción
 

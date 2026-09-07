@@ -25,20 +25,29 @@ jobs:
           const endpoint = 'https://www.nattavascas.com/api/payments/reconcile';
           const identity = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
           identity.searchParams.set('audience', endpoint);
-          const response = await fetch(identity, {
-            headers: { Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
-            signal: AbortSignal.timeout(15000),
-          });
-          if (!response.ok) throw new Error(`GitHub identity request failed: ${response.status}`);
-          const { value: token } = await response.json();
+          let token, tokenAt = 0;
+          async function authorization() {
+            if (!token || Date.now() - tokenAt >= 120000) {
+              const response = await fetch(identity, {
+                headers: { Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
+                signal: AbortSignal.timeout(15000),
+              });
+              if (!response.ok) throw new Error(`GitHub identity request failed: ${response.status}`);
+              ({ value: token } = await response.json());
+              tokenAt = Date.now();
+            }
+            return `Bearer ${token}`;
+          }
           const end = new Date().toISOString();
           let offset = 0, checked = 0, recovered = 0, attention = 0, errors = 0;
           let inboxComplete = false;
+          const inboxDeadline = Date.now() + 90000;
           // Bound the inbox sweep so payment searches still run if many old
           // notices fail. Further notices remain durable for the next run.
           for (let batch = 0; batch < 10; batch++) {
+            if (Date.now() >= inboxDeadline) break;
             const review = await fetch(endpoint, {
-              method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' },
               body: JSON.stringify({ mode: 'notifications', end }), signal: AbortSignal.timeout(65000),
             }).catch(() => null);
             if (!review?.ok) { errors++; break; }
@@ -47,9 +56,11 @@ jobs:
             if (!result.hasMore) { inboxComplete = true; break; }
           }
           if (!inboxComplete) errors++;
-          for (let page = 0; page < 100; page++) {
+          // The endpoint may return part of an MP page to stay within its
+          // invocation budget. Follow its cursor rather than assuming 50 rows.
+          for (let page = 0; page < 10000; page++) {
             const review = await fetch(endpoint, {
-              method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' },
               body: JSON.stringify({ offset, end }), signal: AbortSignal.timeout(65000),
             });
             if (!review.ok) throw new Error(`Payment reconciliation failed: HTTP ${review.status}`);

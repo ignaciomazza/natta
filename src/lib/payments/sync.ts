@@ -155,6 +155,9 @@ export async function applyMercadoPagoPaymentSnapshot(
         where: { providerPaymentId: String(remotePayment.id) },
       })) ?? (await tx.payment.findUnique({ where: { id: candidate.id } }));
     if (!current) return null;
+    if (current.orderId !== candidate.orderId) {
+      throw new Error("PAYMENT_ORDER_CHANGED");
+    }
     const remotePaymentId = `${remotePayment.id}`;
     const previousPayload = current.providerPayload as Record<
       string,
@@ -174,15 +177,6 @@ export async function applyMercadoPagoPaymentSnapshot(
     ) {
       return current;
     }
-    if (
-      current.status === "APPROVED" &&
-      current.providerPaymentId &&
-      current.providerPaymentId !== remotePaymentId &&
-      mappedStatus !== "APPROVED"
-    ) {
-      return current;
-    }
-
     const providerAmountArs = normalizeProviderAmountArs(
       remotePayment.transaction_amount,
     );
@@ -207,10 +201,11 @@ export async function applyMercadoPagoPaymentSnapshot(
         remotePayment.transaction_details?.payment_method_reference_id ??
         current.referenceNote,
     };
-    // Two genuinely approved operations must both be accounted for. A repeated
-    // notification for the same operation continues to update one payment only.
+    // Keep every known operation's identity, including rejected/refunded ones.
+    // Otherwise another attempt can erase the timestamp of a refund, letting
+    // an older approval resurrect money that has already been returned.
     const updatedPayment =
-      current.status === "APPROVED" &&
+      current.providerPaymentId &&
       current.providerPaymentId !== remotePaymentId
         ? await tx.payment.upsert({
             where: { providerPaymentId: remotePaymentId },

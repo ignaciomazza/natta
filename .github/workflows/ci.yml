@@ -49,6 +49,9 @@ jobs:
       - name: Payment security smoke tests
         run: npm run security:smoke
 
+      - name: Payment recovery workflow tests
+        run: npm run test:payment-workflow
+
       - name: Payment regression tests with isolated PostgreSQL
         run: npm run test:payments
         env:

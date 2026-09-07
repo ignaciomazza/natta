@@ -72,6 +72,7 @@ async function main() {
   let releaseEmail: Promise<void> = Promise.resolve();
   let preferences = 0;
   let cardRequests = 0;
+  const cardIdempotencyKeys: string[] = [];
   let cardStarted: (() => void) | null = null;
   let releaseCard: Promise<void> = Promise.resolve();
   let passed = 0;
@@ -97,6 +98,7 @@ async function main() {
     );
     if (url.pathname === "/v1/payments" && init?.method === "POST") {
       cardRequests++;
+      cardIdempotencyKeys.push(new Headers(init.headers).get("X-Idempotency-Key")!);
       cardStarted?.();
       await releaseCard;
       const body = JSON.parse(String(init.body));
@@ -1051,6 +1053,79 @@ async function main() {
     ok(
       "bounded retries prioritize the oldest attempt so persistent failures do not starve later events",
     );
+
+    const interruptedCard = await fixture("interrupted-card");
+    const interruptedKey = crypto.createHash("sha256").update(JSON.stringify([
+      interruptedCard.payments[0].id, "mercadopago-payment", "production",
+    ])).digest("hex");
+    await prisma.payment.update({
+      where: { id: interruptedCard.payments[0].id },
+      data: {
+        statusDetail: `PROCESSING:${interruptedKey}`,
+        updatedAt: new Date(Date.now() - 180_000),
+      },
+    });
+    const beforeInterruptedRetry = cardRequests;
+    const interruptedRequest = () => request("/process", {
+      orderId: interruptedCard.id,
+      receiptCode: interruptedCard.publicReceiptCode,
+      formData: { payment_method_id: "visa", token: "new-fake-token", payer: { email: "retry@example.test" } },
+    });
+    const interruptedResponses = await Promise.all([
+      processPayment(interruptedRequest()), processPayment(interruptedRequest()),
+    ]);
+    assert.deepEqual(interruptedResponses.map(r => r.status).sort(), [200, 409]);
+    assert.equal(cardRequests, beforeInterruptedRetry + 1);
+    assert.equal(cardIdempotencyKeys.at(-1), interruptedKey);
+    assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: interruptedCard.id } })).status, "CONFIRMED");
+    ok("an interrupted card attempt can be resumed once, with the original provider idempotency key");
+
+    const history = await fixture("refund-before-another-attempt");
+    await apply(payment(history, 9301), { sendReceipt: false });
+    await apply({ ...payment(history, 9301), status: "refunded", date_last_updated: "2026-09-07T14:00:00Z" }, { sendReceipt: false });
+    await apply({ ...payment(history, 9302), status: "rejected" }, { sendReceipt: false });
+    await apply({ ...payment(history, 9302), date_last_updated: "2026-09-07T15:00:00Z" }, { sendReceipt: false });
+    await apply(payment(history, 9301), { sendReceipt: false });
+    assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: history.id } })).amountPaidArs, 53000);
+    assert.equal((await prisma.payment.findUniqueOrThrow({ where: { providerPaymentId: "9301" } })).status, "REFUNDED");
+    ok("a different attempt preserves an earlier refund so delayed notices cannot count refunded money again");
+
+    remote.clear();
+    failedPaymentIds.clear();
+    for (let id = 9401; id <= 9407; id++) {
+      const dense = await fixture("dense-reconciliation-" + id);
+      remote.set(String(id), payment(dense, id));
+      if (id <= 9403) failedPaymentIds.add(String(id));
+    }
+    const denseFirst = await reconcilePaymentPage(0, end);
+    assert.equal(denseFirst.checked, 3, "each request must bound direct provider lookups");
+    assert.equal(denseFirst.nextOffset, 3);
+    assert.equal(denseFirst.errors.length, 3);
+    const denseSecond = await reconcilePaymentPage(denseFirst.nextOffset!, end);
+    assert.equal(denseSecond.checked, 3);
+    assert.equal(denseSecond.nextOffset, 6);
+    assert.equal(denseSecond.recovered, 3);
+    const denseLast = await reconcilePaymentPage(denseSecond.nextOffset!, end);
+    assert.equal(denseLast.recovered, 1);
+    assert.equal(denseLast.nextOffset, null);
+    ok("dense reconciliation advances in bounded batches after failed lookups without skipping later payments");
+
+    remote.clear();
+    const missingReceipt = await fixture("reconcile-mail-failure");
+    remote.set("9601", payment(missingReceipt, 9601));
+    failEmail = true;
+    const failedReceipt = await reconcilePaymentPage(0, end);
+    assert.deepEqual(failedReceipt.errors, ["9601"]);
+    const confirmedWithoutMail = await prisma.order.findUniqueOrThrow({ where: { id: missingReceipt.id } });
+    assert.equal(confirmedWithoutMail.status, "CONFIRMED");
+    assert.equal(confirmedWithoutMail.receiptEmailSentAt, null);
+    failEmail = false;
+    await prisma.order.update({ where: { id: missingReceipt.id }, data: { receiptEmailLastAttemptAt: new Date(Date.now() - 600_000) } });
+    assert.deepEqual((await reconcilePaymentPage(0, end)).errors, []);
+    const recoveredReceipt = await prisma.order.findUniqueOrThrow({ where: { id: missingReceipt.id } });
+    assert.ok(recoveredReceipt.receiptEmailSentAt);
+    assert.equal(recoveredReceipt.amountPaidArs, 53000);
+    ok("reconciliation reports a failed receipt and later recovers it without reverting or duplicating the payment");
     console.log(
       `${passed} payment regression scenarios passed; no real payments or emails sent.`,
     );
