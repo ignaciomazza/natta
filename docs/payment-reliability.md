@@ -18,7 +18,7 @@ GitHub puede demorar las ejecuciones programadas y desactivarlas tras 60 días s
 
 El panel abre con todos los estados y se actualiza cada 30 segundos mientras está visible, además de actualizarse al volver a la pestaña. Conserva los últimos filtros aplicados y descarta respuestas antiguas. Buscar un nombre, teléfono, comprobante o número de operación consulta todos los estados, fechas y sucursales; un aviso explica ese alcance. Se recorren todas las páginas de resultados.
 
-La pantalla del cliente conserva la fecha guardada al actualizar el estado. Antes de volver a editar verifica Mercado Pago: si hay un pago recibido o no se puede verificar, mantiene el pedido. También protege un enlace de pago ya emitido, porque una búsqueda vacía no garantiza que ese enlace no se pague después. En ese caso se puede reintentar el mismo pago; para cambiar productos o fecha se indica contactar a Natta. Esta protección evita cancelar automáticamente un pedido cuyo pago aún puede acreditarse.
+La pantalla del cliente conserva la fecha guardada al actualizar el estado. Abrir la pantalla de pago carga solamente su configuración: el enlace de Mercado Pago se emite al pulsar **Abrir Mercado Pago**. Por eso se puede volver a editar antes de empezar a pagar. Antes de volver a editar verifica Mercado Pago: si hay un pago recibido o no se puede verificar, mantiene el pedido. También protege un enlace de pago ya emitido o un cobro con tarjeta en curso, porque una búsqueda vacía no garantiza que no se paguen después. En ese caso se puede reintentar el mismo pago; para cambiar productos o fecha se indica contactar a Natta. Esta protección evita cancelar automáticamente un pedido cuyo pago aún puede acreditarse.
 
 ## Pruebas
 

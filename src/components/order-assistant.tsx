@@ -104,7 +104,7 @@ type CatalogResponse = {
 type CheckoutSession = {
   orderId: string;
   paymentId: string;
-  preferenceId: string;
+  preferenceId: string | null;
   amountArs: number;
   publicKey: string;
   receiptCode: string;
@@ -939,6 +939,7 @@ export function OrderAssistant() {
   const refreshCheckoutSession = useCallback(async (
     orderId: string,
     receiptCodeOverride?: string | null,
+    prepareWallet = false,
   ) => {
     const currentReceiptCode = getCurrentReceiptCode(receiptCodeOverride);
     if (!currentReceiptCode) {
@@ -953,6 +954,7 @@ export function OrderAssistant() {
       body: JSON.stringify({
         orderId,
         receiptCode: currentReceiptCode,
+        prepareWallet,
       }),
     });
 
@@ -960,7 +962,7 @@ export function OrderAssistant() {
       | ({ error?: string } & CheckoutSession)
       | null;
 
-    if (!checkoutResponse.ok || !checkoutResult?.preferenceId) {
+    if (!checkoutResponse.ok || !checkoutResult?.paymentId || (prepareWallet && !checkoutResult.walletInitPoint)) {
       throw new Error(
         sanitizeUiMessage(
           checkoutResult?.error ??
@@ -1308,17 +1310,14 @@ export function OrderAssistant() {
   }
 
   async function openWalletPayment() {
-    if (!checkoutSession?.walletInitPoint) {
-      setSubmitError("No se pudo abrir Mercado Pago. Probá preparar el pago de nuevo.");
-      return;
-    }
-
     if (!createdOrderId || checkingPaymentRef.current) return;
     checkingPaymentRef.current = true;
     try {
       const snapshot = await refreshPaymentSnapshot(createdOrderId, { review: true });
       if (snapshot.order.status === "CANCELLED" || snapshot.order.amountPaidArs >= snapshot.order.amountDueNowArs) return;
-      window.location.href = checkoutSession.walletInitPoint;
+      const wallet = await refreshCheckoutSession(createdOrderId, undefined, true);
+      if (!wallet.walletInitPoint) throw new Error("No se pudo abrir Mercado Pago. Volvé a intentarlo.");
+      window.location.href = wallet.walletInitPoint;
     } catch (error) {
       setSubmitError(error instanceof Error ? sanitizeUiMessage(error.message) : "No pudimos verificar el pago. Tu pedido se conserva.");
     } finally { checkingPaymentRef.current = false; }

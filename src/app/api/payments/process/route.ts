@@ -10,8 +10,12 @@ import {
   mapMercadoPagoPaymentStatus,
   MercadoPagoConfigError,
 } from "@/lib/payments/mercadopago";
-import { applyMercadoPagoPaymentSnapshot, syncMercadoPagoOrder } from "@/lib/payments/sync";
+import {
+  applyMercadoPagoPaymentSnapshot,
+  syncMercadoPagoOrder,
+} from "@/lib/payments/sync";
 import { logServerError } from "@/lib/server/log";
+import { withOrderPaymentLock } from "@/lib/payments/lock";
 
 const processSchema = z.object({
   orderId: z.string().min(1),
@@ -34,10 +38,7 @@ function getNestedValue(source: Record<string, unknown>, path: string[]) {
   return current;
 }
 
-function getStringValue(
-  source: Record<string, unknown>,
-  paths: string[][],
-) {
+function getStringValue(source: Record<string, unknown>, paths: string[][]) {
   for (const path of paths) {
     const value = getNestedValue(source, path);
     if (typeof value === "string" && value.trim()) {
@@ -47,10 +48,7 @@ function getStringValue(
   return undefined;
 }
 
-function getNumberValue(
-  source: Record<string, unknown>,
-  paths: string[][],
-) {
+function getNumberValue(source: Record<string, unknown>, paths: string[][]) {
   for (const path of paths) {
     const value = getNestedValue(source, path);
     if (typeof value === "number" && Number.isFinite(value)) {
@@ -93,24 +91,28 @@ export async function POST(req: NextRequest) {
   try {
     const body = processSchema.parse(await req.json());
 
-    const loadOrder = () => prisma.order.findFirst({
-      where: {
-        id: body.orderId,
-        publicReceiptCode: body.receiptCode,
-      },
-      include: {
-        customer: true,
-        payments: {
-          where: { status: "PENDING" },
-          orderBy: { createdAt: "asc" },
-          take: 1,
+    const loadOrder = () =>
+      prisma.order.findFirst({
+        where: {
+          id: body.orderId,
+          publicReceiptCode: body.receiptCode,
         },
-      },
-    });
+        include: {
+          customer: true,
+          payments: {
+            where: { status: "PENDING" },
+            orderBy: { createdAt: "asc" },
+            take: 1,
+          },
+        },
+      });
     let order = await loadOrder();
 
     if (!order) {
-      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Pedido no encontrado" },
+        { status: 404 },
+      );
     }
 
     if (order.status === "CANCELLED") {
@@ -119,13 +121,26 @@ export async function POST(req: NextRequest) {
 
     await syncMercadoPagoOrder(order.id);
     order = await loadOrder();
-    if (!order || order.status === "CANCELLED" || order.amountPaidArs >= order.amountDueNowArs) {
-      return NextResponse.json({ error: "El pedido ya no tiene un cobro pendiente. Revisá su estado antes de continuar." }, { status: 409 });
+    if (
+      !order ||
+      order.status === "CANCELLED" ||
+      order.amountPaidArs >= order.amountDueNowArs
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "El pedido ya no tiene un cobro pendiente. Revisá su estado antes de continuar.",
+        },
+        { status: 409 },
+      );
     }
 
     const pendingPayment = order.payments[0];
     if (!pendingPayment) {
-      return NextResponse.json({ error: "No hay cobro pendiente" }, { status: 409 });
+      return NextResponse.json(
+        { error: "No hay cobro pendiente" },
+        { status: 409 },
+      );
     }
 
     const paymentMethodId = getStringValue(body.formData, [
@@ -149,7 +164,8 @@ export async function POST(req: NextRequest) {
       ["number"],
     ]);
 
-    const selectedMethod = body.selectedPaymentMethod ?? paymentMethodId ?? "card";
+    const selectedMethod =
+      body.selectedPaymentMethod ?? paymentMethodId ?? "card";
     const isWalletRedirectMethod = [
       "wallet_purchase",
       "onboarding_credits",
@@ -182,7 +198,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!Number.isInteger(installments) || installments < 1 || installments > 24) {
+    if (
+      !Number.isInteger(installments) ||
+      installments < 1 ||
+      installments > 24
+    ) {
       return NextResponse.json(
         { error: "Cantidad de cuotas invalida" },
         { status: 400 },
@@ -208,18 +228,28 @@ export async function POST(req: NextRequest) {
       mercadoPagoEnvironment,
     ]);
     processingMarker = `PROCESSING:${idempotencyKey}`;
-    const processingClaim = await prisma.payment.updateMany({
-      where: {
-        id: pendingPayment.id,
-        status: "PENDING",
-        OR: [
-          { statusDetail: null },
-          { statusDetail: { not: { startsWith: "PROCESSING:" } } },
-        ],
-      },
-      data: {
-        statusDetail: processingMarker,
-      },
+    const processingClaim = await withOrderPaymentLock(order.id, async (tx) => {
+      const current = await tx.order.findUniqueOrThrow({
+        where: { id: order!.id },
+      });
+      if (
+        current.status === "CANCELLED" ||
+        current.amountPaidArs >= current.amountDueNowArs
+      )
+        return { count: 0 };
+      return tx.payment.updateMany({
+        where: {
+          id: pendingPayment.id,
+          status: "PENDING",
+          OR: [
+            { statusDetail: null },
+            { statusDetail: { not: { startsWith: "PROCESSING:" } } },
+          ],
+        },
+        data: {
+          statusDetail: processingMarker,
+        },
+      });
     });
 
     if (processingClaim.count !== 1) {
@@ -239,7 +269,9 @@ export async function POST(req: NextRequest) {
       ),
       paymentMethodId,
       externalReference:
-        pendingPayment.externalReference ?? order.mercadoPagoExternalReference ?? `natta_${order.id}`,
+        pendingPayment.externalReference ??
+        order.mercadoPagoExternalReference ??
+        `natta_${order.id}`,
       payerEmail: email,
       payerFirstName: firstName,
       payerLastName: lastName,
@@ -264,7 +296,8 @@ export async function POST(req: NextRequest) {
         providerPaymentId: `${remotePayment.id}`,
         method: paymentMethodId,
         status: syncedPayment?.status ?? mappedStatus,
-        statusDetail: syncedPayment?.statusDetail ?? remotePayment.status_detail ?? null,
+        statusDetail:
+          syncedPayment?.statusDetail ?? remotePayment.status_detail ?? null,
         amountArs:
           typeof remotePayment.transaction_amount === "number"
             ? Math.round(remotePayment.transaction_amount)
@@ -272,7 +305,8 @@ export async function POST(req: NextRequest) {
         receiptUrl:
           remotePayment.transaction_details?.external_resource_url ?? null,
         reference:
-          remotePayment.transaction_details?.payment_method_reference_id ?? null,
+          remotePayment.transaction_details?.payment_method_reference_id ??
+          null,
         financialInstitution:
           remotePayment.transaction_details?.financial_institution ?? null,
       },
@@ -304,6 +338,9 @@ export async function POST(req: NextRequest) {
     }
 
     logServerError("api.payments.process.post", error);
-    return NextResponse.json({ error: "No se pudo procesar el pago" }, { status: 500 });
+    return NextResponse.json(
+      { error: "No se pudo procesar el pago" },
+      { status: 500 },
+    );
   }
 }

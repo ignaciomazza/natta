@@ -26,9 +26,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Período inválido" }, { status: 400 });
     const result = await reconcilePaymentPage(offset, end);
     console.info("[payments.reconcile]", result);
-    return NextResponse.json(result, {
-      status: result.errors.length ? 503 : 200,
-    });
+    // Preserve pagination on an individual failure. The worker reports errors
+    // after visiting every page, so one bad payment cannot hide other orders.
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError)
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });

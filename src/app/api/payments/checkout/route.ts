@@ -17,6 +17,9 @@ import { withOrderPaymentLock } from "@/lib/payments/lock";
 const checkoutSchema = z.object({
   orderId: z.string().min(1),
   receiptCode: z.string().min(1),
+  // Older clients request a wallet preference immediately. New clients can
+  // load card configuration without issuing a payable link.
+  prepareWallet: z.boolean().default(true),
 });
 
 export const runtime = "nodejs";
@@ -77,6 +80,19 @@ export async function POST(req: NextRequest) {
       }
 
       const mercadoPagoEnvironment = getMercadoPagoEnvironment();
+
+      if (!body.prepareWallet) {
+        return NextResponse.json({
+          orderId: order.id,
+          paymentId: pendingPayment.id,
+          preferenceId: null,
+          amountArs: pendingPayment.amountArs,
+          publicKey: getMercadoPagoPublicKey(),
+          receiptCode: order.publicReceiptCode,
+          ticketExpirationDays: getMercadoPagoTicketExpirationDays(),
+          walletInitPoint: null,
+        });
+      }
 
       const preference =
         pendingPayment.providerPreferenceId &&

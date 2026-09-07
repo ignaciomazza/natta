@@ -32,7 +32,7 @@ jobs:
           if (!response.ok) throw new Error(`GitHub identity request failed: ${response.status}`);
           const { value: token } = await response.json();
           const end = new Date().toISOString();
-          let offset = 0, checked = 0, recovered = 0, attention = 0;
+          let offset = 0, checked = 0, recovered = 0, attention = 0, errors = 0;
           for (let page = 0; page < 100; page++) {
             const review = await fetch(endpoint, {
               method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -41,8 +41,10 @@ jobs:
             if (!review.ok) throw new Error(`Payment reconciliation failed: HTTP ${review.status}`);
             const result = await review.json();
             checked += result.checked; recovered += result.recovered; attention += result.attention.length;
+            errors += result.errors.length;
             if (result.nextOffset === null) {
-              console.log(JSON.stringify({ checked, recovered, attention }));
+              console.log(JSON.stringify({ checked, recovered, attention, errors }));
+              if (errors) throw new Error('Some payment checks failed. See the Natta server logs.');
               if (attention) throw new Error('Some payments require review in the Natta server logs.');
               process.exit(0);
             }

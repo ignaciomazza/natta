@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 import { NextRequest } from "next/server";
 import type { MercadoPagoPaymentResponse } from "@/lib/payments/mercadopago";
 
@@ -40,7 +42,8 @@ async function main() {
   const { POST: discard } =
     await import("@/app/api/public/order/[orderId]/discard/route");
   const { POST: checkout } = await import("@/app/api/payments/checkout/route");
-  const { POST: processPayment } = await import("@/app/api/payments/process/route");
+  const { POST: processPayment } =
+    await import("@/app/api/payments/process/route");
   const { POST: createOrder, GET: listOrders } =
     await import("@/app/api/orders/route");
   const { POST: reconcileRoute } =
@@ -53,8 +56,12 @@ async function main() {
   const { signToken, AUTH_COOKIE_NAME } = await import("@/lib/auth/jwt");
   const remote = new Map<string, MercadoPagoPaymentResponse>();
   let failSearch = false;
+  const failedPaymentIds = new Set<string>();
   let emails = 0;
   let preferences = 0;
+  let cardRequests = 0;
+  let cardStarted: (() => void) | null = null;
+  let releaseCard: Promise<void> = Promise.resolve();
   let passed = 0;
   const originalFetch = globalThis.fetch;
   // All outbound HTTP is simulated; unexpected destinations fail closed.
@@ -69,6 +76,23 @@ async function main() {
       "https://api.mercadopago.com",
       "Unexpected external request",
     );
+    if (url.pathname === "/v1/payments" && init?.method === "POST") {
+      cardRequests++;
+      cardStarted?.();
+      await releaseCard;
+      const body = JSON.parse(String(init.body));
+      const payment: MercadoPagoPaymentResponse = {
+        id: 9000 + cardRequests,
+        status: "approved",
+        transaction_amount: body.transaction_amount,
+        external_reference: body.external_reference,
+        currency_id: "ARS",
+        date_last_updated: new Date().toISOString(),
+        date_approved: new Date().toISOString(),
+      };
+      remote.set(String(payment.id), payment);
+      return Response.json(payment);
+    }
     if (url.pathname === "/checkout/preferences") {
       preferences++;
       const body = JSON.parse(String(init?.body));
@@ -95,6 +119,11 @@ async function main() {
         paging: { total: all.length, offset, limit },
       });
     }
+    if (failedPaymentIds.has(url.pathname.split("/").at(-1)!))
+      return Response.json(
+        { error: "Simulated payment lookup failure" },
+        { status: 503 },
+      );
     const payment = remote.get(url.pathname.split("/").at(-1)!);
     return payment
       ? Response.json(payment)
@@ -207,6 +236,21 @@ async function main() {
 
     const first = await fixture("paid-saturday", { preference: true });
     remote.set("1001", payment(first, 1001));
+    if (process.env.BASELINE_WEBHOOK_PATH) {
+      const before = await import(
+        pathToFileURL(resolve(process.env.BASELINE_WEBHOOK_PATH)).href
+      );
+      const response = await before.POST(notification(1001, 7001));
+      assert.equal(response.status, 500);
+      assert.equal(
+        (await prisma.order.findUniqueOrThrow({ where: { id: first.id } }))
+          .status,
+        "PENDING",
+      );
+      ok(
+        "before/after: the previous webhook fails on a numeric event ID and leaves the same paid order pending",
+      );
+    }
     assert.equal((await webhook(notification(1001, 7001))).status, 200);
     let saved = await prisma.order.findUniqueOrThrow({
       where: { id: first.id },
@@ -333,13 +377,33 @@ async function main() {
     assert.equal(preferences, 0);
     ok("paid orders cannot be discarded or start another checkout");
 
-    assert.equal((await processPayment(request("/process", { orderId: first.id, receiptCode: first.publicReceiptCode, formData: {} }))).status, 409);
+    assert.equal(
+      (
+        await processPayment(
+          request("/process", {
+            orderId: first.id,
+            receiptCode: first.publicReceiptCode,
+            formData: {},
+          }),
+        )
+      ).status,
+      409,
+    );
     const partial = await fixture("partial-amount");
     await apply({ ...payment(partial, 1003), transaction_amount: 1 });
-    assert.equal((await prisma.order.findUniqueOrThrow({ where: { id: partial.id } })).status, "PENDING");
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: partial.id } }))
+        .status,
+      "PENDING",
+    );
     assert.equal(emails, 1);
-    await assert.rejects(apply({ ...payment(partial, 1004), currency_id: "USD" }), /PAYMENT_CURRENCY_MISMATCH/);
-    ok("card processing also refuses covered orders; insufficient amounts and foreign currencies cannot confirm them");
+    await assert.rejects(
+      apply({ ...payment(partial, 1004), currency_id: "USD" }),
+      /PAYMENT_CURRENCY_MISMATCH/,
+    );
+    ok(
+      "card processing also refuses covered orders; insufficient amounts and foreign currencies cannot confirm them",
+    );
 
     const late = await fixture("missed-notice", { preference: true });
     remote.set("1002", payment(late, 1002));
@@ -410,6 +474,82 @@ async function main() {
     const checkoutBodies = await Promise.all(checkouts.map((r) => r.json()));
     assert.equal(new Set(checkoutBodies.map((r) => r.preferenceId)).size, 1);
     ok("simultaneous checkout retries reuse one preference and one payment");
+
+    const beforePaying = await fixture("edit-before-paying");
+    const preferencesBefore = preferences;
+    const configuration = await checkout(
+      request("/checkout", {
+        orderId: beforePaying.id,
+        receiptCode: beforePaying.publicReceiptCode,
+        prepareWallet: false,
+      }),
+    );
+    assert.equal(configuration.status, 200);
+    assert.equal((await configuration.json()).preferenceId, null);
+    assert.equal(preferences, preferencesBefore);
+    assert.equal(
+      (
+        await discard(
+          request("/discard", { receiptCode: beforePaying.publicReceiptCode }),
+          params(beforePaying.id),
+        )
+      ).status,
+      200,
+    );
+    ok(
+      "opening the payment screen alone does not issue a payable link or prevent editing",
+    );
+
+    const card = await fixture("card-in-progress");
+    let finishCard!: () => void;
+    releaseCard = new Promise<void>((resolve) => {
+      finishCard = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      cardStarted = resolve;
+    });
+    const cardRequest = () =>
+      request("/process", {
+        orderId: card.id,
+        receiptCode: card.publicReceiptCode,
+        formData: {
+          payment_method_id: "visa",
+          token: "fake-card-token",
+          payer: { email: "card@example.test" },
+        },
+      });
+    const processing = processPayment(cardRequest());
+    await Promise.race([
+      started,
+      new Promise<never>((_, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("Card request did not start")),
+          5000,
+        );
+        timeout.unref();
+      }),
+    ]);
+    assert.equal(
+      (
+        await discard(
+          request("/discard", { receiptCode: card.publicReceiptCode }),
+          params(card.id),
+        )
+      ).status,
+      409,
+    );
+    assert.equal((await processPayment(cardRequest())).status, 409);
+    finishCard();
+    assert.equal((await processing).status, 200);
+    assert.equal(cardRequests, 1);
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: card.id } })).status,
+      "CONFIRMED",
+    );
+    cardStarted = null;
+    ok(
+      "a card payment in flight cannot be discarded or charged twice when the client retries",
+    );
 
     const double = await fixture("two-real-payments");
     await Promise.all([
@@ -600,6 +740,49 @@ async function main() {
     );
     ok(
       "reconciliation requires the trusted workflow identity or secret and validates pagination",
+    );
+
+    remote.clear();
+    const brokenLookup = await fixture("failed-lookup");
+    remote.set("8001", payment(brokenLookup, 8001));
+    failedPaymentIds.add("8001");
+    for (let id = 8100; id < 8149; id++)
+      remote.set(String(id), {
+        id,
+        external_reference: "unrelated",
+        status: "pending",
+      });
+    const laterPage = await fixture("later-page");
+    remote.set("8002", payment(laterPage, 8002));
+    const end = new Date().toISOString();
+    const pageOne = await reconcileRoute(
+      request(
+        "/api/payments/reconcile",
+        { offset: 0, end },
+        { Authorization: "Bearer test-reconciliation-secret" },
+      ),
+    );
+    assert.equal(pageOne.status, 200);
+    const firstPage = await pageOne.json();
+    assert.deepEqual(firstPage.errors, ["8001"]);
+    assert.equal(firstPage.nextOffset, 50);
+    const pageTwo = await reconcileRoute(
+      request(
+        "/api/payments/reconcile",
+        { offset: firstPage.nextOffset, end },
+        { Authorization: "Bearer test-reconciliation-secret" },
+      ),
+    );
+    const secondPage = await pageTwo.json();
+    assert.equal(secondPage.nextOffset, null);
+    assert.equal(secondPage.recovered, 1);
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: laterPage.id } }))
+        .status,
+      "CONFIRMED",
+    );
+    ok(
+      "a failed payment is reported while subsequent pages still recover other paid orders",
     );
     console.log(
       `${passed} payment regression scenarios passed; no real payments or emails sent.`,
