@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   CalendarDays,
@@ -104,7 +104,7 @@ type CatalogResponse = {
 type CheckoutSession = {
   orderId: string;
   paymentId: string;
-  preferenceId: string;
+  preferenceId: string | null;
   amountArs: number;
   publicKey: string;
   receiptCode: string;
@@ -561,6 +561,10 @@ export function OrderAssistant() {
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("wallet");
   const [photoFlavor, setPhotoFlavor] = useState<CatalogFlavor | null>(null);
   const [datePage, setDatePage] = useState(0);
+  const creatingOrderRef = useRef(false);
+  const creationRequestRef = useRef<{ signature: string; id: string } | null>(null);
+  const checkingPaymentRef = useRef(false);
+  const snapshotSequence = useRef(0);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -608,7 +612,7 @@ export function OrderAssistant() {
           (item) => !getDayBlockingReason(item, now),
         );
         const firstAvailable = payload.availability[firstAvailableIndex];
-        setDate(firstAvailable?.date ?? "");
+        setDate((chosenDate) => chosenDate || firstAvailable?.date || "");
         setDatePage(firstAvailableIndex >= 0 ? Math.floor(firstAvailableIndex / DATE_PAGE_SIZE) : 0);
       } catch (error) {
         if (cancelled) return;
@@ -727,8 +731,9 @@ export function OrderAssistant() {
   const currentPaymentStatus = paymentResult?.status ?? primaryPayment?.status ?? null;
   const currentPaymentDetail = paymentResult?.statusDetail ?? primaryPayment?.statusDetail ?? null;
   const hasApprovedPayment =
-    paymentResult?.status === "APPROVED" ||
-    Boolean(paymentSnapshot?.payments.some((payment) => payment.status === "APPROVED"));
+    Boolean(paymentSnapshot && paymentSnapshot.order.status !== "CANCELLED" &&
+      paymentSnapshot.order.amountPaidArs >= paymentSnapshot.order.amountDueNowArs &&
+      paymentSnapshot.payments.some((payment) => payment.status === "APPROVED"));
   const summaryItems = paymentSnapshot?.order.items.length
     ? paymentSnapshot.order.items.map((item) => ({
         key: item.id,
@@ -934,6 +939,7 @@ export function OrderAssistant() {
   const refreshCheckoutSession = useCallback(async (
     orderId: string,
     receiptCodeOverride?: string | null,
+    prepareWallet = false,
   ) => {
     const currentReceiptCode = getCurrentReceiptCode(receiptCodeOverride);
     if (!currentReceiptCode) {
@@ -948,6 +954,7 @@ export function OrderAssistant() {
       body: JSON.stringify({
         orderId,
         receiptCode: currentReceiptCode,
+        prepareWallet,
       }),
     });
 
@@ -955,7 +962,7 @@ export function OrderAssistant() {
       | ({ error?: string } & CheckoutSession)
       | null;
 
-    if (!checkoutResponse.ok || !checkoutResult?.preferenceId) {
+    if (!checkoutResponse.ok || !checkoutResult?.paymentId || (prepareWallet && !checkoutResult.walletInitPoint)) {
       throw new Error(
         sanitizeUiMessage(
           checkoutResult?.error ??
@@ -974,8 +981,10 @@ export function OrderAssistant() {
     options?: {
       receiptCode?: string | null;
       syncPaymentId?: string | null;
+      review?: boolean;
     },
   ) => {
+    const sequence = ++snapshotSequence.current;
     const currentReceiptCode = getCurrentReceiptCode(options?.receiptCode);
     if (!currentReceiptCode) {
       throw new Error("No se pudo verificar el comprobante del pedido.");
@@ -983,6 +992,7 @@ export function OrderAssistant() {
 
     const searchParams = new URLSearchParams();
     searchParams.set("receiptCode", currentReceiptCode);
+    if (options?.review) searchParams.set("review", "1");
     if (options?.syncPaymentId) {
       searchParams.set("syncPaymentId", options.syncPaymentId);
     }
@@ -993,15 +1003,16 @@ export function OrderAssistant() {
       cache: "no-store",
     });
     const payload = (await response.json().catch(() => null)) as
-      | ({ error?: string } & OrderPaymentsSnapshot)
+      | ({ error?: string; syncError?: string | null } & OrderPaymentsSnapshot)
       | null;
 
     if (!response.ok || !payload?.order) {
       throw new Error(payload?.error ?? "No se pudo cargar el estado del pago");
     }
 
+    if (sequence !== snapshotSequence.current) return payload;
     setPaymentSnapshot(payload);
-    setSelectedBranch(payload.order.branch);
+    setSelectedBranch((current) => current?.slug === payload.order.branch.slug ? current : payload.order.branch);
     setSubmittedCode(payload.order.publicReceiptCode);
     const deliveryDate = payload.order.deliveryDate.split("T")[0] ?? payload.order.deliveryDate;
     setDate(deliveryDate);
@@ -1027,6 +1038,7 @@ export function OrderAssistant() {
         return accumulator;
       }, {}),
     );
+    if (payload.syncError) throw new Error(payload.syncError);
     return payload;
   }, [getCurrentReceiptCode]);
 
@@ -1040,10 +1052,11 @@ export function OrderAssistant() {
       try {
         const snapshot = await refreshPaymentSnapshot(createdOrderId, {
           syncPaymentId: returnPaymentId,
+          review: Boolean(returnPaymentState),
         });
         if (cancelled) return;
 
-        if (snapshot.order.amountPaidArs < snapshot.order.amountDueNowArs) {
+        if (snapshot.order.status === "PENDING" && snapshot.order.amountPaidArs < snapshot.order.amountDueNowArs) {
           await refreshCheckoutSession(createdOrderId);
         }
       } catch (error) {
@@ -1071,7 +1084,27 @@ export function OrderAssistant() {
     returnPaymentState,
   ]);
 
+  useEffect(() => {
+    if (!createdOrderId || !submittedCode || hasApprovedPayment || paymentSnapshot?.order.status === "CANCELLED") return;
+    let stopped = false;
+    const reviewPayment = async () => {
+      if (stopped || document.visibilityState !== "visible" || checkingPaymentRef.current) return;
+      checkingPaymentRef.current = true;
+      try {
+        await refreshPaymentSnapshot(createdOrderId, { receiptCode: submittedCode, review: true });
+      } catch (error) {
+        if (!stopped) setSubmitError(error instanceof Error ? sanitizeUiMessage(error.message) : "No se pudo revisar el pago");
+      } finally { checkingPaymentRef.current = false; }
+    };
+    const interval = window.setInterval(() => void reviewPayment(), 30000);
+    const onVisible = () => void reviewPayment();
+    window.addEventListener("focus", onVisible);
+    return () => { stopped = true; window.clearInterval(interval); window.removeEventListener("focus", onVisible); };
+  }, [createdOrderId, submittedCode, hasApprovedPayment, paymentSnapshot?.order.status, refreshPaymentSnapshot]);
+
   function resetPaymentFlow(targetStep: StepIndex, message: string | null = null) {
+    snapshotSequence.current += 1;
+    creationRequestRef.current = null;
     setCreatedOrderId(null);
     setCheckoutSession(null);
     setPaymentSnapshot(null);
@@ -1118,9 +1151,8 @@ export function OrderAssistant() {
 
     setLoadingPaymentView(true);
 
-    let message: string | null = null;
-
     try {
+      if (!receiptCode) throw new Error("No pudimos verificar tu pedido. Volvé a revisar su estado.");
       if (receiptCode) {
         const response = await fetch(`/api/public/order/${createdOrderId}/discard`, {
           method: "POST",
@@ -1133,35 +1165,40 @@ export function OrderAssistant() {
         });
 
         const payload = (await response.json().catch(() => null)) as
-          | { error?: string }
+          | { error?: string; code?: string }
           | null;
 
         if (!response.ok) {
+          if (payload?.code === "PAYMENT_ALREADY_RECEIVED") {
+            await refreshPaymentSnapshot(createdOrderId, { receiptCode });
+          }
           throw new Error(
             payload?.error ??
-              "No se pudo cerrar el intento anterior. Podés corregir el pedido y volver a confirmar.",
+              "No se pudo verificar el pago. Conservamos tu pedido; volvé a revisar su estado.",
           );
         }
       }
+      resetPaymentFlow(targetStep);
     } catch (error) {
-      message = sanitizeUiMessage(
+      setSubmitError(sanitizeUiMessage(
         error instanceof Error
           ? error.message
-          : "No se pudo cerrar el intento anterior. Podés corregir el pedido y volver a confirmar.",
-      );
+          : "No se pudo verificar el pago. Conservamos tu pedido.",
+      ));
     } finally {
-      resetPaymentFlow(targetStep, message);
+      setLoadingPaymentView(false);
     }
   }
 
   async function createOrderAndPreparePayment() {
-    if (!catalog || !selectedBranch || !canSubmit) return;
+    if (!catalog || !selectedBranch || !canSubmit || creatingOrderRef.current) return;
 
     if (selectedDayBlockingReason) {
       setSubmitError(`La fecha elegida no está disponible: ${selectedDayBlockingReason}.`);
       return;
     }
 
+    creatingOrderRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
     setCreatedOrderId(null);
@@ -1194,12 +1231,17 @@ export function OrderAssistant() {
         })),
       };
 
+      const signature = JSON.stringify(orderPayload);
+      if (creationRequestRef.current?.signature !== signature) {
+        creationRequestRef.current = { signature, id: crypto.randomUUID() };
+      }
+
       const createOrderResponse = await fetch("/api/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(orderPayload),
+        body: JSON.stringify({ ...orderPayload, requestId: creationRequestRef.current.id }),
       });
 
       const createOrderResult = (await createOrderResponse.json().catch(() => null)) as
@@ -1225,14 +1267,6 @@ export function OrderAssistant() {
       nextUrl.searchParams.delete("payment");
       window.history.replaceState({}, "", nextUrl);
 
-      await refreshCheckoutSession(
-        createOrderResult.orderId,
-        createOrderResult.publicReceiptCode ?? null,
-      );
-      await refreshPaymentSnapshot(createOrderResult.orderId, {
-        receiptCode: createOrderResult.publicReceiptCode ?? null,
-      });
-
       requestAnimationFrame(() => {
         document
           .getElementById("pago-final")
@@ -1245,6 +1279,7 @@ export function OrderAssistant() {
         ),
       );
     } finally {
+      creatingOrderRef.current = false;
       setLoadingPaymentView(false);
       setSubmitting(false);
     }
@@ -1258,8 +1293,9 @@ export function OrderAssistant() {
     try {
       const snapshot = await refreshPaymentSnapshot(createdOrderId, {
         syncPaymentId: returnPaymentId,
+        review: true,
       });
-      if (snapshot.order.amountPaidArs < snapshot.order.amountDueNowArs) {
+      if (snapshot.order.status === "PENDING" && snapshot.order.amountPaidArs < snapshot.order.amountDueNowArs) {
         await refreshCheckoutSession(createdOrderId);
       }
     } catch (error) {
@@ -1273,13 +1309,18 @@ export function OrderAssistant() {
     }
   }
 
-  function openWalletPayment() {
-    if (!checkoutSession?.walletInitPoint) {
-      setSubmitError("No se pudo abrir Mercado Pago. Probá preparar el pago de nuevo.");
-      return;
-    }
-
-    window.location.href = checkoutSession.walletInitPoint;
+  async function openWalletPayment() {
+    if (!createdOrderId || checkingPaymentRef.current) return;
+    checkingPaymentRef.current = true;
+    try {
+      const snapshot = await refreshPaymentSnapshot(createdOrderId, { review: true });
+      if (snapshot.order.status === "CANCELLED" || snapshot.order.amountPaidArs >= snapshot.order.amountDueNowArs) return;
+      const wallet = await refreshCheckoutSession(createdOrderId, undefined, true);
+      if (!wallet.walletInitPoint) throw new Error("No se pudo abrir Mercado Pago. Volvé a intentarlo.");
+      window.location.href = wallet.walletInitPoint;
+    } catch (error) {
+      setSubmitError(error instanceof Error ? sanitizeUiMessage(error.message) : "No pudimos verificar el pago. Tu pedido se conserva.");
+    } finally { checkingPaymentRef.current = false; }
   }
 
   async function handlePaymentResult(result: ProcessPaymentResponse) {
@@ -2018,7 +2059,12 @@ export function OrderAssistant() {
             void returnToBuilder(targetStep);
           })}
 
-          {loadingPaymentView ? (
+          {paymentSnapshot?.order.status === "CANCELLED" ? (
+            <div className="mt-5 rounded-2xl bg-amber-50 px-4 py-4 text-sm text-amber-900">
+              <p>Este pedido está cancelado. Si ya pagaste o querés retomarlo, escribinos con su código y te ayudamos.</p>
+              {receiptCode ? <a className="mt-3 inline-block underline" href={`/comprobante/${receiptCode}`}>Ver comprobante {receiptCode}</a> : null}
+            </div>
+          ) : loadingPaymentView ? (
             <div className="mt-8 flex min-h-72 flex-col items-center justify-center gap-3 rounded-[24px] bg-white/60 px-6 text-center shadow-[0_8px_22px_rgba(43,26,24,0.07)]">
               <LoaderCircle className="h-5 w-5 animate-spin text-[var(--sage)]" />
               <p className="text-sm text-[var(--chocolate)]/72">

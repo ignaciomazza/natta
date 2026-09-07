@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -415,7 +415,7 @@ export function OrdersAdmin() {
     previous: 0,
   });
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("CONFIRMED");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("ALL");
   const [modeFilter, setModeFilter] = useState<"ALL" | "pickup" | "delivery">("ALL");
   const [branchFilter, setBranchFilter] = useState<"ALL" | BranchSlug>("ALL");
   const [dateMode, setDateMode] = useState<PeriodMode>("week");
@@ -426,6 +426,11 @@ export function OrdersAdmin() {
   const [customDraftTo, setCustomDraftTo] = useState("");
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [customRangeError, setCustomRangeError] = useState<string | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
+  const [searchAll, setSearchAll] = useState(false);
+  const loadSequence = useRef(0);
+  const activeLoad = useRef<AbortController | null>(null);
+  const refreshApplied = useRef<(() => Promise<void>) | null>(null);
 
   const load = async (
     overrides: Partial<{
@@ -438,9 +443,14 @@ export function OrdersAdmin() {
       periodAnchor: Date;
       customRange: DateRange | null;
     }> = {},
+    silent = false,
   ) => {
-    setLoading(true);
-    setError(null);
+    if (silent && activeLoad.current) return;
+    activeLoad.current?.abort();
+    const controller = new AbortController();
+    activeLoad.current = controller;
+    const sequence = ++loadSequence.current;
+    if (!silent) { setLoading(true); setError(null); }
     try {
       const nextQuery = overrides.query ?? query;
       const nextStatus = overrides.status ?? statusFilter;
@@ -463,42 +473,60 @@ export function OrdersAdmin() {
       if (nextStatus !== "ALL") baseParams.set("status", nextStatus.toLowerCase());
       if (nextMode !== "ALL") baseParams.set("mode", nextMode);
       if (nextBranch !== "ALL") baseParams.set("branch", nextBranch);
-      const fetchRange = async (from: Date, to: Date) => {
+      refreshApplied.current = () => load({ query: nextQuery, status: nextStatus, mode: nextMode, branch: nextBranch,
+        dateMode: nextDateMode, periodUnit: nextPeriodUnit, periodAnchor: nextPeriodAnchor, customRange: nextCustomRange }, true);
+      const fetchRange = async (from: Date, to: Date, countOnly = false) => {
         const params = new URLSearchParams(baseParams);
         params.set("from", formatDateParam(from));
         params.set("to", formatDateParam(to));
 
+        let allItems: OrderItem[] = [];
+        for (let page = 0; page <= 100; page += 1) {
+        params.set("page", String(page));
         const response = await fetch(`/api/orders?${params.toString()}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error("No se pudieron cargar pedidos");
         }
-        const payload = (await response.json()) as { items: OrderItem[] };
-        return payload.items;
+        const payload = (await response.json()) as { items: OrderItem[]; total: number };
+        if (countOnly) return { items: [], total: payload.total ?? payload.items.length };
+        allItems = allItems.concat(payload.items);
+        if (!payload.items.length || allItems.length >= (payload.total ?? allItems.length)) return { items: allItems, total: payload.total ?? allItems.length };
+        }
+        throw new Error("Hay demasiados pedidos para esta búsqueda. Acotá el período o buscá un comprobante.");
       };
 
       const [currentItems, previousItems, nextItems] = await Promise.all([
         fetchRange(nextPeriodRange.from, nextPeriodRange.to),
-        fetchRange(addDays(nextPeriodRange.from, -3), addDays(nextPeriodRange.from, -1)),
-        fetchRange(addDays(nextPeriodRange.to, 1), addDays(nextPeriodRange.to, 3)),
+        nextQuery.trim() ? Promise.resolve({ total: 0 }) : fetchRange(addDays(nextPeriodRange.from, -3), addDays(nextPeriodRange.from, -1), true).catch(() => ({ total: 0 })),
+        nextQuery.trim() ? Promise.resolve({ total: 0 }) : fetchRange(addDays(nextPeriodRange.to, 1), addDays(nextPeriodRange.to, 3), true).catch(() => ({ total: 0 })),
       ]);
 
+      if (sequence !== loadSequence.current) return;
       setNearbyCounts({
-        next: nextItems.length,
-        previous: previousItems.length,
+        next: nextItems.total,
+        previous: previousItems.total,
       });
-      setItems(currentItems);
+      setItems(currentItems.items);
+      setLastLoadedAt(new Date());
+      setSearchAll(Boolean(nextQuery.trim()));
     } catch (loadError) {
+      if (controller.signal.aborted || sequence !== loadSequence.current) return;
       setError(loadError instanceof Error ? loadError.message : "Error");
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) { setLoading(false); activeLoad.current = null; }
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    const refresh = () => { if (document.visibilityState === "visible") void refreshApplied.current?.(); };
+    const interval = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { activeLoad.current?.abort(); window.clearInterval(interval); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -576,11 +604,10 @@ export function OrdersAdmin() {
         throw new Error(result?.error ?? "No se pudo revisar Mercado Pago");
       }
 
-      if (result?.found === 0) {
-        setError("Mercado Pago no encontró pagos para esa referencia");
-      }
-
       await load();
+      if (result?.found === 0) {
+        setError("Mercado Pago no encontró pagos para este pedido. Si tenés un comprobante con otro código, buscalo para revisar el pedido correspondiente.");
+      }
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "Error");
     } finally {
@@ -717,6 +744,10 @@ export function OrdersAdmin() {
         icon={ClipboardList}
         title="Pedidos"
       />
+      <p className="text-xs text-zinc-500" aria-live="polite">
+        {lastLoadedAt ? `Actualizado ${lastLoadedAt.toLocaleTimeString("es-AR")}. Se actualiza automáticamente cada 30 segundos.` : "Cargando pedidos"}
+      </p>
+      {searchAll ? <p className="text-sm text-zinc-600">La búsqueda incluye todas las fechas, sucursales y estados, también los cancelados.</p> : null}
 
       <div className="flex flex-wrap gap-2">
         <Pill>Total: {counts.total}</Pill>
@@ -739,7 +770,7 @@ export function OrdersAdmin() {
               <input
                 className={`${inputClassName} pl-9`}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Cliente, teléfono o código"
+                placeholder="Cliente, teléfono, comprobante u operación MP"
                 value={query}
               />
             </div>
@@ -926,6 +957,11 @@ export function OrdersAdmin() {
                     Pagado {formatMoney(item.amountPaidArs)} · Saldo{" "}
                     {formatMoney(item.amountBalanceArs)}
                   </p>
+                  {item.status === "CANCELLED" && item.amountPaidArs > 0 ? (
+                    <p className="mt-1 text-xs font-semibold text-amber-800">
+                      Tiene un pago recibido. Revisar antes de volver a confirmar.
+                    </p>
+                  ) : null}
                   <p className="mt-1 truncate text-[11px] text-zinc-500" title={mercadoPagoSummary.title}>
                     {mercadoPagoSummary.title}
                   </p>

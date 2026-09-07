@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 type CheckoutSession = {
   orderId: string;
   paymentId: string;
-  preferenceId: string;
+  preferenceId: string | null;
   amountArs: number;
   publicKey: string;
   receiptCode: string;

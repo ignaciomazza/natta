@@ -19,7 +19,9 @@
     "assets:optimize": "node scripts/optimize-static-images.mjs",
     "assets:placeholder": "node scripts/generate-placeholder-assets.mjs",
     "assets:favicon": "node scripts/generate-brand-icons.mjs",
-    "security:smoke": "node --import tsx scripts/payment-security-smoke-tests.ts"
+    "security:smoke": "node --import tsx scripts/payment-security-smoke-tests.ts",
+    "test:payments": "node --import tsx scripts/payment-regression-tests.ts",
+    "test:payment-workflow": "node scripts/payment-workflow-tests.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

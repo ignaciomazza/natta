@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@prisma/client";
+import type { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   getMercadoPagoPayment,
@@ -8,6 +8,7 @@ import {
   mapMercadoPagoPaymentStatus,
 } from "@/lib/payments/mercadopago";
 import { sendOrderReceiptEmailIfNeeded } from "@/lib/email/order-receipt";
+import { withOrderPaymentLock } from "@/lib/payments/lock";
 
 type OrderPaymentSummaryInput = {
   amountDueNowArs: number;
@@ -40,7 +41,10 @@ export function normalizeProviderAmountArs(value: number | null | undefined) {
 }
 
 export function getOrderPaymentSummaryUpdate(input: OrderPaymentSummaryInput) {
-  if (input.currentStatus === "DELIVERED" || input.currentStatus === "CANCELLED") {
+  if (
+    input.currentStatus === "DELIVERED" ||
+    input.currentStatus === "CANCELLED"
+  ) {
     return {
       amountPaidArs: input.totalPaidArs,
       status: input.currentStatus,
@@ -65,7 +69,8 @@ export function getOrderPaymentSummaryUpdate(input: OrderPaymentSummaryInput) {
 
 export function getMercadoPagoWebhookResourceId(payload: WebhookPayload) {
   if (payload.data?.id) return payload.data.id;
-  if (payload.resource) return payload.resource.split("/").filter(Boolean).at(-1) ?? null;
+  if (payload.resource)
+    return payload.resource.split("/").filter(Boolean).at(-1) ?? null;
   return null;
 }
 
@@ -73,8 +78,11 @@ export function getMercadoPagoWebhookTopic(payload: WebhookPayload) {
   return payload.type ?? payload.topic ?? null;
 }
 
-export async function recalculateOrderPaymentSummary(orderId: string) {
-  const approvedPayments = await prisma.payment.findMany({
+export async function recalculateOrderPaymentSummary(
+  orderId: string,
+  tx: Prisma.TransactionClient = prisma,
+) {
+  const approvedPayments = await tx.payment.findMany({
     where: {
       orderId,
       status: "APPROVED",
@@ -84,9 +92,12 @@ export async function recalculateOrderPaymentSummary(orderId: string) {
     },
   });
 
-  const totalPaid = approvedPayments.reduce((sum, payment) => sum + payment.amountArs, 0);
+  const totalPaid = approvedPayments.reduce(
+    (sum, payment) => sum + payment.amountArs,
+    0,
+  );
 
-  const order = await prisma.order.findUnique({
+  const order = await tx.order.findUnique({
     where: { id: orderId },
     select: {
       id: true,
@@ -100,7 +111,7 @@ export async function recalculateOrderPaymentSummary(orderId: string) {
     return null;
   }
 
-  return prisma.order.update({
+  return tx.order.update({
     where: { id: order.id },
     data: {
       ...getOrderPaymentSummaryUpdate({
@@ -115,47 +126,66 @@ export async function recalculateOrderPaymentSummary(orderId: string) {
 
 export async function applyMercadoPagoPaymentSnapshot(
   remotePayment: MercadoPagoPaymentResponse,
+  options: { sendReceipt?: boolean } = {},
 ) {
+  if (remotePayment.currency_id && remotePayment.currency_id !== "ARS") {
+    throw new Error("PAYMENT_CURRENCY_MISMATCH");
+  }
   const mappedStatus = mapMercadoPagoPaymentStatus(remotePayment.status);
 
-  const candidate = await prisma.payment.findFirst({
-    where: {
-      OR: [
-        { providerPaymentId: `${remotePayment.id}` },
-        remotePayment.external_reference
-          ? { externalReference: remotePayment.external_reference }
-          : undefined,
-      ].filter(Boolean) as Array<{ providerPaymentId?: string; externalReference?: string }>,
-    },
-    include: {
-      order: true,
-    },
-  });
+  // An operation ID is more specific than the checkout reference, which can
+  // have several attempts. In particular, a refund must update its own payment.
+  const candidate =
+    (await prisma.payment.findUnique({
+      where: { providerPaymentId: String(remotePayment.id) },
+    })) ??
+    (remotePayment.external_reference
+      ? await prisma.payment.findUnique({
+          where: { externalReference: remotePayment.external_reference },
+        })
+      : null);
 
   if (!candidate) {
     return null;
   }
 
-  const remotePaymentId = `${remotePayment.id}`;
-  if (
-    candidate.status === "APPROVED" &&
-    candidate.providerPaymentId &&
-    candidate.providerPaymentId !== remotePaymentId
-  ) {
-    return candidate;
-  }
+  const apply = async (tx: Prisma.TransactionClient) => {
+    const current =
+      (await tx.payment.findUnique({
+        where: { providerPaymentId: String(remotePayment.id) },
+      })) ?? (await tx.payment.findUnique({ where: { id: candidate.id } }));
+    if (!current) return null;
+    if (current.orderId !== candidate.orderId) {
+      throw new Error("PAYMENT_ORDER_CHANGED");
+    }
+    const remotePaymentId = `${remotePayment.id}`;
+    const previousPayload = current.providerPayload as Record<
+      string,
+      unknown
+    > | null;
+    const previousUpdatedAt = parseDate(
+      typeof previousPayload?.date_last_updated === "string"
+        ? previousPayload.date_last_updated
+        : null,
+    );
+    const incomingUpdatedAt = parseDate(remotePayment.date_last_updated);
+    if (
+      current.providerPaymentId === remotePaymentId &&
+      previousUpdatedAt &&
+      incomingUpdatedAt &&
+      previousUpdatedAt > incomingUpdatedAt
+    ) {
+      return current;
+    }
+    const providerAmountArs = normalizeProviderAmountArs(
+      remotePayment.transaction_amount,
+    );
+    const effectiveStatus =
+      mappedStatus === "APPROVED" && providerAmountArs === null
+        ? "PENDING"
+        : mappedStatus;
 
-  const providerAmountArs = normalizeProviderAmountArs(
-    remotePayment.transaction_amount,
-  );
-  const effectiveStatus =
-    mappedStatus === "APPROVED" && providerAmountArs === null
-      ? "PENDING"
-      : mappedStatus;
-
-  const updatedPayment = await prisma.payment.update({
-    where: { id: candidate.id },
-    data: {
+    const data = {
       providerPaymentId: remotePaymentId,
       status: effectiveStatus,
       statusDetail:
@@ -163,26 +193,49 @@ export async function applyMercadoPagoPaymentSnapshot(
           ? "Mercado Pago no informó un monto válido"
           : (remotePayment.status_detail ?? null),
       paidAt: parseDate(remotePayment.date_approved),
-      providerPayload: remotePayment,
-      method: "MERCADO_PAGO",
-      amountArs: providerAmountArs ?? candidate.amountArs,
+      providerPayload: remotePayment as Prisma.InputJsonValue,
+      method: "MERCADO_PAGO" as const,
+      amountArs: providerAmountArs ?? current.amountArs,
       referenceNote:
         remotePayment.transaction_details?.external_resource_url ??
         remotePayment.transaction_details?.payment_method_reference_id ??
-        candidate.referenceNote,
-    },
-  });
-
-  if (!candidate.orderId) {
+        current.referenceNote,
+    };
+    // Keep every known operation's identity, including rejected/refunded ones.
+    // Otherwise another attempt can erase the timestamp of a refund, letting
+    // an older approval resurrect money that has already been returned.
+    const updatedPayment =
+      current.providerPaymentId &&
+      current.providerPaymentId !== remotePaymentId
+        ? await tx.payment.upsert({
+            where: { providerPaymentId: remotePaymentId },
+            update: data,
+            create: {
+              ...data,
+              orderId: current.orderId,
+              customerId: current.customerId,
+              kind: current.kind,
+              provider: "mercadopago",
+              customerName: current.customerName,
+              customerPhone: current.customerPhone,
+            },
+          })
+        : await tx.payment.update({ where: { id: current.id }, data });
+    if (candidate.orderId)
+      await recalculateOrderPaymentSummary(candidate.orderId, tx);
     return updatedPayment;
-  }
-
-  await recalculateOrderPaymentSummary(candidate.orderId);
-  if (effectiveStatus === "APPROVED") {
+  };
+  const updated = candidate.orderId
+    ? await withOrderPaymentLock(candidate.orderId, apply)
+    : await apply(prisma);
+  if (
+    options.sendReceipt !== false &&
+    candidate.orderId &&
+    updated?.status === "APPROVED"
+  ) {
     await sendOrderReceiptEmailIfNeeded(candidate.orderId);
   }
-
-  return updatedPayment;
+  return updated;
 }
 
 export async function syncMercadoPagoPayment(
@@ -290,4 +343,34 @@ export async function syncMercadoPagoPaymentsByExternalReference(
     synced: syncedPayments.length,
     payments: syncedPayments,
   };
+}
+
+export async function syncMercadoPagoOrder(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payments: true },
+  });
+  if (!order) throw new Error("ORDER_NOT_FOUND");
+  const references = new Set(
+    [
+      order.mercadoPagoExternalReference,
+      ...order.payments
+        .filter((p) => p.method === "MERCADO_PAGO")
+        .map((p) => p.externalReference),
+    ].filter((ref): ref is string => Boolean(ref)),
+  );
+  let found = 0;
+  for (const reference of references) {
+    const result = await syncMercadoPagoPaymentsByExternalReference(
+      reference,
+      orderId,
+    );
+    found += result.found;
+  }
+  for (const payment of order.payments) {
+    if (payment.method === "MERCADO_PAGO" && payment.providerPaymentId) {
+      await syncMercadoPagoPaymentForOrder(payment.providerPaymentId, orderId);
+    }
+  }
+  return { found };
 }
