@@ -14,9 +14,21 @@ concurrency:
 
 jobs:
   test:
-    name: Lint, smoke and build
+    name: Lint, payment regression and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: natta-test-only
+          POSTGRES_DB: natta_payment_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
 
     steps:
       - name: Checkout
@@ -36,6 +48,11 @@ jobs:
 
       - name: Payment security smoke tests
         run: npm run security:smoke
+
+      - name: Payment regression tests with isolated PostgreSQL
+        run: npm run test:payments
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:natta-test-only@127.0.0.1:5432/natta_payment_test
 
       - name: Build
         run: npm run build

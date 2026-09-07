@@ -30,17 +30,14 @@ export async function getOrCreatePendingPaymentForOrder(
   order: OrderForPendingPayment,
   tx: Prisma.TransactionClient = prisma,
 ) {
+  const amountArs = getAmountRequiredToConfirm(order);
+  if (amountArs < 1) return null;
   const existingPending = order.payments.find(
     (payment) => payment.status === "PENDING",
   );
 
   if (existingPending) {
     return existingPending;
-  }
-
-  const amountArs = getAmountRequiredToConfirm(order);
-  if (amountArs < 1) {
-    return null;
   }
 
   return tx.payment.create({

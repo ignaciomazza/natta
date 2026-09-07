@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDateOnlyString } from "@/lib/date-only";
 import { prisma } from "@/lib/prisma";
-import { syncMercadoPagoPaymentForOrder } from "@/lib/payments/sync";
+import { syncMercadoPagoPaymentForOrder, syncMercadoPagoOrder } from "@/lib/payments/sync";
 import { getBranchByCode } from "@/lib/branches";
 
 export const runtime = "nodejs";
@@ -53,6 +53,7 @@ export async function GET(
   const { orderId } = await params;
   const receiptCode = req.nextUrl.searchParams.get("receiptCode")?.trim();
   const syncPaymentId = req.nextUrl.searchParams.get("syncPaymentId")?.trim();
+  const review = req.nextUrl.searchParams.get("review") === "1";
 
   if (!receiptCode) {
     return NextResponse.json(
@@ -94,11 +95,14 @@ export async function GET(
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   }
 
-  if (syncPaymentId) {
+  let syncError: string | null = null;
+  if (syncPaymentId || review) {
     try {
-      await syncMercadoPagoPaymentForOrder(syncPaymentId, order.id);
+      if (syncPaymentId) await syncMercadoPagoPaymentForOrder(syncPaymentId, order.id);
+      else await syncMercadoPagoOrder(order.id);
       order = await loadOrder();
     } catch (error) {
+      syncError = "No pudimos consultar Mercado Pago. Tu pedido se conserva; volvé a revisar en unos instantes.";
       console.error("No se pudo sincronizar el pago de Mercado Pago", {
         error,
         orderId,
@@ -112,6 +116,7 @@ export async function GET(
   }
 
   return NextResponse.json({
+    syncError,
     order: {
       id: order.id,
       branch: getBranchByCode(order.branchCode),

@@ -18,6 +18,9 @@ export type MercadoPagoPaymentResponse = {
   status_detail?: string;
   date_approved?: string;
   date_created?: string;
+  date_last_updated?: string;
+  currency_id?: string;
+  live_mode?: boolean;
   transaction_amount?: number;
   external_reference?: string;
   payment_method_id?: string;
@@ -39,6 +42,7 @@ export type MercadoPagoPaymentResponse = {
 
 type MercadoPagoPaymentSearchResponse = {
   results?: MercadoPagoPaymentResponse[];
+  paging?: { total: number; offset: number; limit: number };
 };
 
 export class MercadoPagoConfigError extends Error {
@@ -122,6 +126,8 @@ export function getMercadoPagoCheckoutUrl(
 async function mercadoPagoRequest<T>(path: string, init: RequestInit = {}) {
   const response = await fetch(`${MERCADOPAGO_API_BASE}${path}`, {
     ...init,
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(12000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getAccessToken()}`,
@@ -329,17 +335,33 @@ export async function searchMercadoPagoPaymentsByExternalReference(
 ) {
   const params = new URLSearchParams({
     external_reference: externalReference,
+    sort: "date_created",
+    criteria: "asc",
+    limit: "50",
   });
-  const response = await mercadoPagoRequest<MercadoPagoPaymentSearchResponse>(
-    `/v1/payments/search?${params.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${getAccessTokenForEnvironment(environment)}`,
+  const payments: MercadoPagoPaymentResponse[] = [];
+  for (let offset = 0; offset < 1000;) {
+    params.set("offset", String(offset));
+    const response = await mercadoPagoRequest<MercadoPagoPaymentSearchResponse>(
+      `/v1/payments/search?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${getAccessTokenForEnvironment(environment)}` },
       },
-    },
-  );
+    );
+    const page = response.results ?? [];
+    payments.push(...page);
+    offset += page.length;
+    if (!page.length || offset >= (response.paging?.total ?? page.length)) return payments;
+  }
+  throw new Error("PAYMENT_SEARCH_LIMIT_REACHED");
+}
 
-  return response.results ?? [];
+export async function searchRecentMercadoPagoPayments(offset: number, end: string) {
+  const params = new URLSearchParams({
+    range: "date_last_updated", begin_date: new Date(Date.parse(end) - 32 * 86400000).toISOString(),
+    end_date: end, sort: "date_last_updated", criteria: "desc", limit: "50", offset: String(offset),
+  });
+  return mercadoPagoRequest<MercadoPagoPaymentSearchResponse>(`/v1/payments/search?${params}`);
 }
 
 export function mapMercadoPagoPaymentStatus(status: string | null | undefined) {
@@ -387,7 +409,7 @@ export function verifyMercadoPagoWebhookSignature(input: {
   );
   const ts = parts.ts;
   const hash = parts.v1;
-  if (!ts || !hash) {
+  if (!ts || !/^\d+$/.test(ts) || !hash || !/^[a-f0-9]{64}$/i.test(hash)) {
     return false;
   }
 

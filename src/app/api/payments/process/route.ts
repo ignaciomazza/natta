@@ -10,7 +10,7 @@ import {
   mapMercadoPagoPaymentStatus,
   MercadoPagoConfigError,
 } from "@/lib/payments/mercadopago";
-import { applyMercadoPagoPaymentSnapshot } from "@/lib/payments/sync";
+import { applyMercadoPagoPaymentSnapshot, syncMercadoPagoOrder } from "@/lib/payments/sync";
 import { logServerError } from "@/lib/server/log";
 
 const processSchema = z.object({
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = processSchema.parse(await req.json());
 
-    const order = await prisma.order.findFirst({
+    const loadOrder = () => prisma.order.findFirst({
       where: {
         id: body.orderId,
         publicReceiptCode: body.receiptCode,
@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+    let order = await loadOrder();
 
     if (!order) {
       return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
@@ -114,6 +115,12 @@ export async function POST(req: NextRequest) {
 
     if (order.status === "CANCELLED") {
       return NextResponse.json({ error: "Pedido cancelado" }, { status: 409 });
+    }
+
+    await syncMercadoPagoOrder(order.id);
+    order = await loadOrder();
+    if (!order || order.status === "CANCELLED" || order.amountPaidArs >= order.amountDueNowArs) {
+      return NextResponse.json({ error: "El pedido ya no tiene un cobro pendiente. Revisá su estado antes de continuar." }, { status: 409 });
     }
 
     const pendingPayment = order.payments[0];
