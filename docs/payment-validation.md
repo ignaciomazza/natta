@@ -4,7 +4,7 @@ Fecha: 7 de septiembre de 2026. Estado: comprobado localmente; pendiente de publ
 
 ## Qué demuestra la corrección
 
-Se ejecutó el receptor de avisos anterior, extraído del commit `4206335`, contra una base PostgreSQL de prueba. Un aviso firmado con identificadores numéricos produjo el error `Expected String, provided Int`, una respuesta 500 y un pedido que seguía pendiente. El receptor corregido, con el mismo aviso y el mismo pedido ficticio, devolvió 200, confirmó el pedido, conservó la fecha del sábado y generó un solo envío de comprobante simulado. Esto reproduce el defecto concreto encontrado en los logs; no demuestra por sí solo la causa de los cuatro pedidos históricos no identificados.
+Se ejecutó el receptor de avisos anterior, extraído del commit `4206335`, contra una base PostgreSQL de prueba. Un aviso firmado con identificadores numéricos produjo el error `Expected String, provided Int`, una respuesta 500 y un pedido que seguía pendiente. El receptor corregido, con el mismo aviso y el mismo pedido ficticio, devolvió 200 y, al procesar el aviso, confirmó el pedido, conservó la fecha del sábado y generó un solo envío de comprobante simulado. Esto reproduce el defecto concreto encontrado en los logs; no demuestra por sí solo la causa de los cuatro pedidos históricos no identificados.
 
 ## Pruebas en el navegador
 
@@ -23,12 +23,35 @@ En la primera revisión, abrir la pantalla de pago ya emitía un enlace y bloque
 
 ## Pruebas automáticas
 
-La suite contiene 15 escenarios con una base PostgreSQL aislada. Ejecuta las rutas de la aplicación y comprueba los registros resultantes, incluyendo solicitudes simultáneas, pagos repetidos, importes insuficientes, devoluciones, búsquedas globales, pagos con tarjeta en curso y recuperación de varias páginas aunque falle un pago. Mercado Pago y Resend se simulan; no se efectuaron cobros ni envíos reales. La comparación con el receptor anterior es una comprobación adicional opcional mediante `BASELINE_WEBHOOK_PATH`.
+La suite contiene 24 escenarios con una base PostgreSQL aislada. Ejecuta las rutas de la aplicación y comprueba los registros resultantes, incluyendo solicitudes simultáneas, pagos repetidos, importes insuficientes, devoluciones, búsquedas globales, pagos con tarjeta en curso y recuperación de varias páginas aunque falle un pago. Mercado Pago y Resend se simulan; no se efectuaron cobros ni envíos reales. La comparación con el receptor anterior es una comprobación adicional opcional mediante `BASELINE_WEBHOOK_PATH`.
 
-También se ejecutaron las comprobaciones de seguridad existentes, lint, TypeScript y la compilación de producción.
+También se ejecutaron las comprobaciones de seguridad existentes, lint, TypeScript y la compilación de producción. Los nueve escenarios agregados verifican pérdida de la tarea posterior a la respuesta, correo detenido o fallido, reservas vencidas tras una interrupción, recuperación por lotes ante fallos del proveedor, fallo del guardado inicial, validación y renovación de firmas, y reparto de reintentos para evitar que los mismos errores bloqueen avisos posteriores.
+
+## Prueba por HTTP del servidor Next.js
+
+Se levantó una copia local con PostgreSQL aislado. Un aviso firmado ficticio obtuvo **200 en 6 ms**, mientras el correo simulado permanecía detenido durante **25 segundos**. La base mostraba el pedido confirmado por $53.000 y el correo aún pendiente. Después de terminar la demora, el correo figuraba enviado y el evento `PROCESSED`. Los logs confirmaron que el simulador de correo había iniciado y terminado: la medición no depende solamente de configurar una demora. Este tiempo corresponde a la copia local; no es una garantía de latencia en Vercel.
+
+## Contacto con los servicios reales de Mercado Pago
+
+Se utilizó exclusivamente la cuenta de prueba para el checkout y se confirmó por API que está marcada como usuario de prueba argentino. El token respondió 200 a la consulta de medios de pago. Esto acredita acceso de lectura, no permiso para crear todos los tipos de pago.
+
+Se creó un comprador ficticio mediante el endpoint oficial `/users/test`. Mercado Pago exigió autenticar esa creación con la cuenta principal; no se usó su token para crear cobros. Las credenciales ficticias quedaron en la carpeta temporal de verificación, fuera del repositorio.
+
+| Comprobación externa | Resultado |
+| --- | --- |
+| Chrome: cargar el formulario de tarjeta de Natta | Cargaron los campos seguros reales de Mercado Pago; se completaron con los datos de una tarjeta de prueba oficial. |
+| Enviar la tarjeta de prueba al servidor | La solicitud llegó a la creación del pago; Mercado Pago devolvió `Unauthorized use of live credentials`. No se obtuvo un pago aprobado. |
+| Crear una preferencia para el pedido ficticio | Mercado Pago devolvió la preferencia y sus enlaces; la ruta local respondió 200. |
+| Abrir el checkout alojado en navegador aislado | Mercado Pago mostró un error de acceso tanto en el enlace sandbox como en el enlace `init_point`. No se alcanzó el pago. |
+| Recibir un aviso emitido realmente por Mercado Pago por esa compra | Pendiente: no se completó la compra. El aviso usado en la medición HTTP fue simulado. |
+
+La [referencia oficial de creación de pagos](https://www.mercadopago.com.ar/developers/es/reference/online-payments/subscriptions/create-payment/post) relaciona el mensaje de autorización con el alcance `payment` del token. Hay que verificar el par Public Key/Access Token y sus permisos para la integración con `/v1/payments`; no se cambiaron las credenciales productivas. No se presume una causa del error de acceso del navegador a partir del mensaje genérico.
+
+El receptor HTTPS temporal solo exponía la ruta del aviso y el regreso del checkout. Se cerraron el túnel, el receptor, los navegadores de prueba y la copia local. No hubo cobros ni correos reales. La cuenta ficticia y la preferencia de prueba creadas en Mercado Pago permanecen como datos de prueba.
 
 ## Qué falta para darlo por verificado en producción
 
+- Medir la respuesta y comprobar la recuperación del receptor en Vercel una vez desplegado; el cambio y la medición HTTP descrita abajo son locales.
 - Probar el recorrido completo con el entorno de pruebas de Mercado Pago: apertura del checkout, tarjeta, aviso entrante y regreso del cliente.
 - Verificar en Vercel las credenciales, firma y recepción real del aviso para la versión desplegada.
 - Ejecutar el respaldo desde GitHub y comprobar su autenticación real con Vercel; todavía no se ejecutó en GitHub.
@@ -36,3 +59,12 @@ También se ejecutaron las comprobaciones de seguridad existentes, lint, TypeScr
 - Tras publicar, revisar un pedido controlado y los logs de esa operación. Tener preparada la versión anterior para volver atrás si aparece una regresión; revertir código no revierte pagos ni correos ya procesados.
 
 No se hizo una revisión manual de todas las áreas administrativas ajenas al recorrido de pedidos y pagos. La validación reduce riesgos y demuestra correcciones específicas; no garantiza ausencia de cualquier defecto.
+
+## Contraste con la documentación oficial
+
+Consulta realizada el 7 de septiembre de 2026. Natta usa preferencias de Checkout Pro y pagos mediante `/v1/payments`; las instrucciones para la nueva Orders API no deben aplicarse indistintamente.
+
+- [Notificaciones de Checkout Pro](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro-preferences/payment-notifications): validar la firma, responder 200/201 dentro de 22 segundos y consultar el recurso de pago para actualizar el sistema. La separación entre recepción guardada y procesamiento posterior ya está implementada y comprobada localmente, con recuperación por la tarea programada pendiente de desplegar.
+- [IPN](https://www.mercadopago.com.ar/developers/es/docs/checkout-bricks/additional-content/your-integrations/notifications/ipn): Mercado Pago anuncia su discontinuación y aclara que no admite la misma validación con clave secreta que Webhooks. Esto respalda distinguir ambos formatos.
+- [Compras de prueba de Checkout Pro](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro-preferences/integration-test/test-purchases): usar un comprador de prueba, sesión de incógnito y tarjetas de prueba; comprobar también la recepción de notificaciones. Esos recorridos con el servicio real siguen pendientes.
+- [Credenciales](https://www.mercadopago.com.ar/developers/es/docs/checkout-bricks/additional-content/your-integrations/credentials): las credenciales de aplicación permiten operar por API sin compartir la contraseña de los dueños. Localmente existen variables para claves públicas, tokens y secretos de prueba/producción; verificar su presencia no certifica su validez ni la configuración del panel. Las credenciales de comprador de prueba son datos distintos.

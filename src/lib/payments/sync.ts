@@ -126,6 +126,7 @@ export async function recalculateOrderPaymentSummary(
 
 export async function applyMercadoPagoPaymentSnapshot(
   remotePayment: MercadoPagoPaymentResponse,
+  options: { sendReceipt?: boolean } = {},
 ) {
   if (remotePayment.currency_id && remotePayment.currency_id !== "ARS") {
     throw new Error("PAYMENT_CURRENCY_MISMATCH");
@@ -232,7 +233,11 @@ export async function applyMercadoPagoPaymentSnapshot(
   const updated = candidate.orderId
     ? await withOrderPaymentLock(candidate.orderId, apply)
     : await apply(prisma);
-  if (candidate.orderId && updated?.status === "APPROVED") {
+  if (
+    options.sendReceipt !== false &&
+    candidate.orderId &&
+    updated?.status === "APPROVED"
+  ) {
     await sendOrderReceiptEmailIfNeeded(candidate.orderId);
   }
   return updated;

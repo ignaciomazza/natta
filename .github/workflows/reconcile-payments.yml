@@ -33,6 +33,20 @@ jobs:
           const { value: token } = await response.json();
           const end = new Date().toISOString();
           let offset = 0, checked = 0, recovered = 0, attention = 0, errors = 0;
+          let inboxComplete = false;
+          // Bound the inbox sweep so payment searches still run if many old
+          // notices fail. Further notices remain durable for the next run.
+          for (let batch = 0; batch < 10; batch++) {
+            const review = await fetch(endpoint, {
+              method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mode: 'notifications', end }), signal: AbortSignal.timeout(65000),
+            }).catch(() => null);
+            if (!review?.ok) { errors++; break; }
+            const result = await review.json();
+            checked += result.checked; recovered += result.recovered; errors += result.errors.length;
+            if (!result.hasMore) { inboxComplete = true; break; }
+          }
+          if (!inboxComplete) errors++;
           for (let page = 0; page < 100; page++) {
             const review = await fetch(endpoint, {
               method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

@@ -38,7 +38,16 @@ async function main() {
     stdio: "pipe",
   });
   const { prisma } = await import("@/lib/prisma");
-  const { POST: webhook } = await import("@/app/api/payments/webhook/route");
+  const { createWebhookHandler } =
+    await import("@/lib/payments/webhook-handler");
+  const { processWebhookEvent } = await import("@/lib/payments/webhook-inbox");
+  const deferred: Array<() => Promise<void>> = [];
+  const webhook = createWebhookHandler((work) => {
+    deferred.push(work);
+  });
+  const finishDeferred = async () => {
+    await Promise.all(deferred.splice(0).map((work) => work()));
+  };
   const { POST: discard } =
     await import("@/app/api/public/order/[orderId]/discard/route");
   const { POST: checkout } = await import("@/app/api/payments/checkout/route");
@@ -58,6 +67,9 @@ async function main() {
   let failSearch = false;
   const failedPaymentIds = new Set<string>();
   let emails = 0;
+  let failEmail = false;
+  let emailStarted: (() => void) | null = null;
+  let releaseEmail: Promise<void> = Promise.resolve();
   let preferences = 0;
   let cardRequests = 0;
   let cardStarted: (() => void) | null = null;
@@ -69,6 +81,13 @@ async function main() {
     const url = new URL(String(input));
     if (url.origin === "https://api.resend.com" && url.pathname === "/emails") {
       emails++;
+      emailStarted?.();
+      await releaseEmail;
+      if (failEmail)
+        return Response.json(
+          { message: "Simulated mail outage" },
+          { status: 503 },
+        );
       return Response.json({ id: `fake-email-${emails}` });
     }
     assert.equal(
@@ -252,6 +271,21 @@ async function main() {
       );
     }
     assert.equal((await webhook(notification(1001, 7001))).status, 200);
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: first.id } }))
+        .status,
+      "PENDING",
+    );
+    assert.equal(
+      (
+        await prisma.mercadoPagoWebhookEvent.findUniqueOrThrow({
+          where: { eventId: "7001" },
+        })
+      ).status,
+      "RECEIVED",
+    );
+    assert.equal(emails, 0);
+    await finishDeferred();
     let saved = await prisma.order.findUniqueOrThrow({
       where: { id: first.id },
     });
@@ -270,6 +304,7 @@ async function main() {
     await Promise.all(
       Array.from({ length: 5 }, () => webhook(notification(1001, 7001))),
     );
+    await finishDeferred();
     assert.equal(
       await prisma.payment.count({ where: { orderId: first.id } }),
       1,
@@ -338,7 +373,8 @@ async function main() {
       ...payment(first, 1999),
       external_reference: "natta_missing-order",
     });
-    assert.equal((await webhook(notification(1999, 7999))).status, 500);
+    assert.equal((await webhook(notification(1999, 7999))).status, 200);
+    await finishDeferred();
     assert.equal(
       (
         await prisma.mercadoPagoWebhookEvent.findUniqueOrThrow({
@@ -349,7 +385,7 @@ async function main() {
     );
     remote.delete("1999");
     ok(
-      "unmatched payments remain retryable instead of being acknowledged as processed",
+      "unmatched payments are acknowledged as received and remain durably retryable, without being marked processed",
     );
 
     assert.equal(
@@ -783,6 +819,237 @@ async function main() {
     );
     ok(
       "a failed payment is reported while subsequent pages still recover other paid orders",
+    );
+
+    // These tests control the response/background boundary without a Next server.
+    // The real Next after() boundary is also exercised with HTTP in local validation.
+    await prisma.mercadoPagoWebhookEvent.deleteMany({
+      where: { status: { in: ["RECEIVED", "ERROR"] } },
+    });
+    failedPaymentIds.clear();
+    remote.clear();
+    const retry = () =>
+      reconcileRoute(
+        request(
+          "/api/payments/reconcile",
+          {
+            mode: "notifications",
+            end: new Date().toISOString(),
+          },
+          { Authorization: "Bearer test-reconciliation-secret" },
+        ),
+      );
+    const makeDue = async (eventId: string) =>
+      prisma.mercadoPagoWebhookEvent.update({
+        where: { eventId },
+        data: { processedAt: new Date(Date.now() - 180_000) },
+      });
+    const lost = await fixture("lost-callback");
+    remote.set("9101", payment(lost, 9101));
+    assert.equal((await webhook(notification(9101, 91001))).status, 200);
+    deferred.splice(0); // simulate a process ending after the response, before after()
+    const lostResult = await (await retry()).json();
+    assert.equal(lostResult.recovered, 1);
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: lost.id } })).status,
+      "CONFIRMED",
+    );
+    ok(
+      "a lost background callback is recovered from durable storage by the authenticated retry endpoint",
+    );
+
+    const slow = await fixture("slow-email");
+    remote.set("9102", payment(slow, 9102));
+    let resumeEmail!: () => void;
+    releaseEmail = new Promise((resolve) => {
+      resumeEmail = resolve;
+    });
+    const mailStarted = new Promise<void>((resolve) => {
+      emailStarted = resolve;
+    });
+    assert.equal((await webhook(notification(9102, 91002))).status, 200);
+    const background = finishDeferred();
+    await mailStarted;
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: slow.id } })).status,
+      "CONFIRMED",
+    );
+    const attempts = emails;
+    await Promise.all(
+      Array.from({ length: 4 }, () => webhook(notification(9102, 91002))),
+    );
+    await finishDeferred();
+    assert.equal(emails, attempts);
+    resumeEmail();
+    await background;
+    releaseEmail = Promise.resolve();
+    emailStarted = null;
+    assert.equal(
+      (
+        await prisma.mercadoPagoWebhookEvent.findUniqueOrThrow({
+          where: { eventId: "91002" },
+        })
+      ).status,
+      "PROCESSED",
+    );
+    ok(
+      "a blocked mail service cannot delay acknowledgement or confirmation, and concurrent deliveries share one attempt",
+    );
+
+    const mail = await fixture("failed-email");
+    remote.set("9103", payment(mail, 9103));
+    failEmail = true;
+    assert.equal((await webhook(notification(9103, 91003))).status, 200);
+    await finishDeferred();
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: mail.id } })).status,
+      "CONFIRMED",
+    );
+    assert.equal(
+      (
+        await prisma.mercadoPagoWebhookEvent.findUniqueOrThrow({
+          where: { eventId: "91003" },
+        })
+      ).status,
+      "ERROR",
+    );
+    failEmail = false;
+    await makeDue("91003");
+    await prisma.order.update({
+      where: { id: mail.id },
+      data: { receiptEmailLastAttemptAt: new Date(Date.now() - 3600_000) },
+    });
+    assert.equal((await (await retry()).json()).recovered, 1);
+    assert.ok(
+      (await prisma.order.findUniqueOrThrow({ where: { id: mail.id } }))
+        .receiptEmailSentAt,
+    );
+    assert.equal(
+      await prisma.payment.count({ where: { orderId: mail.id } }),
+      1,
+    );
+    ok(
+      "a failed email is retried from the inbox without reversing the paid order or duplicating its payment",
+    );
+
+    const interrupted = await fixture("expired-lease");
+    remote.set("9104", payment(interrupted, 9104));
+    await webhook(notification(9104, 91004));
+    deferred.splice(0);
+    await prisma.mercadoPagoWebhookEvent.update({
+      where: { eventId: "91004" },
+      data: { processedAt: new Date() },
+    });
+    assert.equal((await (await retry()).json()).checked, 0);
+    await makeDue("91004");
+    assert.equal((await (await retry()).json()).recovered, 1);
+    ok(
+      "an active attempt is not stolen, while an expired claim after a crash can be recovered",
+    );
+
+    const failed = await fixture("inbox-provider-down");
+    remote.set("9105", payment(failed, 9105));
+    await webhook(notification(9105, 91005));
+    deferred.splice(0);
+    failedPaymentIds.add("9105");
+    for (const n of [9106, 9107, 9108]) {
+      const o = await fixture("inbox-" + n);
+      remote.set(String(n), payment(o, n));
+      await webhook(notification(n, n * 10));
+    }
+    deferred.splice(0);
+    const batchOne = await (await retry()).json();
+    assert.equal(batchOne.checked, 3);
+    assert.equal(batchOne.errors.length, 1);
+    assert.equal(batchOne.hasMore, true);
+    const batchTwo = await (await retry()).json();
+    assert.equal(batchTwo.recovered, 1);
+    assert.equal(batchTwo.hasMore, false);
+    failedPaymentIds.clear();
+    await makeDue("91005");
+    assert.equal((await (await retry()).json()).recovered, 1);
+    ok(
+      "a provider outage leaves a retryable event and cannot prevent processing later inbox pages",
+    );
+
+    const upsert = prisma.mercadoPagoWebhookEvent.upsert;
+    prisma.mercadoPagoWebhookEvent.upsert = (() => {
+      throw Error("Simulated database outage");
+    }) as typeof upsert;
+    try {
+      assert.equal((await webhook(notification(9101, 91999))).status, 500);
+      assert.equal(deferred.length, 0);
+    } finally {
+      prisma.mercadoPagoWebhookEvent.upsert = upsert;
+    }
+    assert.equal(
+      await prisma.mercadoPagoWebhookEvent.count({
+        where: { eventId: "91999" },
+      }),
+      0,
+    );
+    ok("a database failure never acknowledges an event that was not stored");
+
+    const quarantined = await fixture("untrusted-stored-event");
+    remote.set("9110", payment(quarantined, 9110));
+    await webhook(notification(9110, 91100));
+    deferred.splice(0);
+    const corrupt = await prisma.mercadoPagoWebhookEvent.update({
+      where: { eventId: "91100" },
+      data: { signature: "invalid" },
+    });
+    assert.equal((await processWebhookEvent(corrupt.id)).status, "error");
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: quarantined.id } }))
+        .status,
+      "PENDING",
+    );
+    ok("stored events are authenticated again before any payment is applied");
+    await makeDue("91100");
+    assert.equal((await webhook(notification(9110, 91100))).status, 200);
+    await finishDeferred();
+    assert.equal(
+      (await prisma.order.findUniqueOrThrow({ where: { id: quarantined.id } }))
+        .status,
+      "CONFIRMED",
+    );
+    assert.equal((await webhook(notification(9101, 91100))).status, 400);
+    ok(
+      "a fresh verified retry repairs an old signature but cannot reassign an event to another payment",
+    );
+
+    // A bounded sweep must rotate persistent failures across runs rather than
+    // repeatedly selecting the same oldest IDs and starving the rest.
+    await prisma.mercadoPagoWebhookEvent.deleteMany({
+      where: { status: { in: ["RECEIVED", "ERROR"] } },
+    });
+    const staleAttempt = new Date(Date.now() - 600_000);
+    for (const n of [9201, 9202, 9203, 9204]) {
+      const o = await fixture("fair-retry-" + n);
+      remote.set(String(n), payment(o, n));
+      failedPaymentIds.add(String(n));
+      await webhook(notification(n, n * 10));
+      deferred.splice(0);
+      await prisma.mercadoPagoWebhookEvent.update({
+        where: { eventId: String(n * 10) },
+        data: { status: "ERROR", processedAt: staleAttempt },
+      });
+    }
+    const fairFirst = await (await retry()).json();
+    assert.equal(fairFirst.checked, 3);
+    assert.equal(fairFirst.hasMore, true);
+    const untouched = await prisma.mercadoPagoWebhookEvent.findFirstOrThrow({
+      where: { processedAt: staleAttempt, status: "ERROR" },
+    });
+    // Make the failed first batch eligible again as if another run started later.
+    await prisma.mercadoPagoWebhookEvent.updateMany({
+      where: { id: { in: fairFirst.errors } },
+      data: { processedAt: new Date(Date.now() - 180_000) },
+    });
+    const fairNext = await (await retry()).json();
+    assert.ok(fairNext.errors.includes(untouched.id));
+    ok(
+      "bounded retries prioritize the oldest attempt so persistent failures do not starve later events",
     );
     console.log(
       `${passed} payment regression scenarios passed; no real payments or emails sent.`,
