@@ -14,3 +14,16 @@ export function withOrderPaymentLock<T>(
     { timeout: 20000, maxWait: 10000 },
   );
 }
+
+// Manual collections can be moved between orders; always lock in a stable order.
+export function withOrderPaymentLocks<T>(
+  orderIds: (string | null | undefined)[],
+  action: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  return prisma.$transaction(async (tx) => {
+    for (const id of [...new Set(orderIds.filter((id): id is string => Boolean(id)))].sort()) {
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`;
+    }
+    return action(tx);
+  }, { timeout: 20000, maxWait: 10000 });
+}

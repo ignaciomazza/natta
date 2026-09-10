@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/prisma";
+import { withOrderPaymentLock } from "@/lib/payments/lock";
 import { logServerError } from "@/lib/server/log";
 
 const patchSchema = z.object({
@@ -58,41 +59,37 @@ export async function PATCH(
     const { id } = await params;
     const body = patchSchema.parse(await req.json());
 
-    const existing = await prisma.order.findUnique({
-      where: { id },
-      select: { id: true, status: true },
+    const result = await withOrderPaymentLock(id, async (tx) => {
+      const existing = await tx.order.findUnique({
+        where: { id },
+        include: { payments: { where: { status: "APPROVED" }, select: { amountArs: true } } },
+      });
+      if (!existing) return { error: "Pedido no encontrado", status: 404 } as const;
+      const status = body.status ?? existing.status;
+      if (status !== existing.status && (existing.status === "CANCELLED" || existing.status === "DELIVERED")) {
+        return { error: "El pedido ya está cerrado.", status: 409 } as const;
+      }
+      const paid = existing.payments.reduce((sum, payment) => sum + payment.amountArs, 0);
+      if (status === "DELIVERED" && paid < existing.subtotalArs) {
+        return { error: "Registrá el saldo antes de entregar el pedido.", status: 409 } as const;
+      }
+      const order = await tx.order.update({
+        where: { id },
+        data: {
+          status,
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          amountPaidArs: paid,
+          amountBalanceArs: status === "CANCELLED" ? 0 : Math.max(0, existing.subtotalArs - paid),
+          confirmedAt: status === "CONFIRMED" && existing.status !== "CONFIRMED" ? new Date() : undefined,
+          deliveredAt: status === "DELIVERED" && existing.status !== "DELIVERED" ? new Date() : undefined,
+          cancelledAt: status === "CANCELLED" && existing.status !== "CANCELLED" ? new Date() : undefined,
+        },
+        include: { customer: true, items: true, payments: true },
+      });
+      return { order } as const;
     });
-
-    if (!existing) {
-      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
-    }
-
-    const status = body.status ?? existing.status;
-
-    const order = await prisma.order.update({
-      where: { id },
-      data: {
-        status,
-        ...(body.notes !== undefined ? { notes: body.notes } : {}),
-        confirmedAt:
-          status === "CONFIRMED" && existing.status !== "CONFIRMED"
-            ? new Date()
-            : undefined,
-        deliveredAt:
-          status === "DELIVERED" && existing.status !== "DELIVERED"
-            ? new Date()
-            : undefined,
-        cancelledAt:
-          status === "CANCELLED" && existing.status !== "CANCELLED"
-            ? new Date()
-            : undefined,
-      },
-      include: {
-        customer: true,
-        items: true,
-        payments: true,
-      },
-    });
+    if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    const order = result.order;
 
     return NextResponse.json(order);
   } catch (error) {
@@ -132,9 +129,14 @@ export async function DELETE(
       );
     }
 
-    await prisma.order.delete({
-      where: { id },
+    const deleted = await withOrderPaymentLock(id, async (tx) => {
+      if (await tx.cobotsOrderOperation.count({ where: { orderId: id } })) return false;
+      const current = await tx.order.findUnique({ where: { id }, select: { status: true } });
+      if (current?.status !== "CANCELLED") return false;
+      await tx.order.delete({ where: { id } });
+      return true;
     });
+    if (!deleted) return NextResponse.json({ error: "Conservá este pedido para mantener el historial de operaciones." }, { status: 409 });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

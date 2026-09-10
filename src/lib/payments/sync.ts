@@ -119,7 +119,7 @@ export async function recalculateOrderPaymentSummary(
         currentStatus: order.status,
         totalPaidArs: totalPaid,
       }),
-      amountBalanceArs: Math.max(0, order.subtotalArs - totalPaid),
+      amountBalanceArs: order.status === "CANCELLED" ? 0 : Math.max(0, order.subtotalArs - totalPaid),
     },
   });
 }
