@@ -20,6 +20,7 @@ const requiredTables = [
   "Payment",
   "MercadoPagoWebhookEvent",
   "CobotsOrderOperation",
+  "OrderReceiptDelivery",
   "Supplier",
   "Purchase",
   "Expense",

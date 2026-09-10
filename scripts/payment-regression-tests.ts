@@ -168,6 +168,7 @@ async function main() {
     console.log(`PASS ${description}`);
   };
   try {
+    await prisma.orderReceiptDelivery.deleteMany();
     await prisma.mercadoPagoWebhookEvent.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.orderItem.deleteMany();

@@ -411,3 +411,23 @@ model CobotsOrderOperation {
 
   @@index([orderId, createdAt])
 }
+
+// A frozen message and a permanent send result are shared by Natta and Cobots.
+model OrderReceiptDelivery {
+  id String @id
+  orderId String
+  actorUserId String?
+  origin String
+  connectionId String?
+  body Json
+  status String @default("PENDING")
+  providerId String?
+  lastError String?
+  lockedUntil DateTime?
+  firstAttemptAt DateTime
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([orderId, createdAt])
+  @@index([orderId, status])
+}

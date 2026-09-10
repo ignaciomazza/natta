@@ -41,6 +41,8 @@ const skippedResponses: Record<
     message: "Ya hubo un intento de envio reciente. Espera unos minutos y volve a probar",
     status: 429,
   },
+  REVIEW_REQUIRED: { message: "Revisá el resultado en Resend antes de reenviar.", status: 409 },
+  ORDER_CHANGED: { message: "El pedido cambió. Actualizá los datos antes de reenviar.", status: 409 },
   SEND_FAILED: {
     message: "No se pudo enviar el comprobante",
     status: 502,

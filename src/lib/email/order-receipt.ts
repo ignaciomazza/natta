@@ -2,11 +2,11 @@ import type { Order, OrderStatus, Payment, PaymentMethod, PaymentStatus } from "
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl, siteConfig } from "@/lib/seo";
 import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
-import { logServerError } from "@/lib/server/log";
+import { dispatchOrderReceipt } from "./receipt-delivery";
 import { formatDateOnly } from "@/lib/date-only";
 import { getBranchByCode } from "@/lib/branches";
 
-type ReceiptOrder = Order & {
+export type ReceiptOrder = Order & {
   customer: {
     address: string | null;
     email: string | null;
@@ -29,12 +29,6 @@ type ReceiptOrder = Order & {
   payments: Payment[];
 };
 
-type ResendResponse = {
-  id?: string;
-  message?: string;
-  name?: string;
-};
-
 export type OrderReceiptEmailSkippedReason =
   | "ALREADY_SENT"
   | "AMOUNT_NOT_COVERED"
@@ -43,7 +37,9 @@ export type OrderReceiptEmailSkippedReason =
   | "ORDER_NOT_FOUND"
   | "PAYMENT_NOT_APPROVED"
   | "RECENT_ATTEMPT"
-  | "SEND_FAILED";
+  | "SEND_FAILED"
+  | "REVIEW_REQUIRED"
+  | "ORDER_CHANGED";
 
 export type OrderReceiptEmailResult = {
   error?: string;
@@ -53,12 +49,15 @@ export type OrderReceiptEmailResult = {
   skippedReason?: OrderReceiptEmailSkippedReason;
 };
 
-type SendOrderReceiptEmailOptions = {
+export type SendOrderReceiptEmailOptions = {
   force?: boolean;
   throwOnError?: boolean;
+  requestId?: string;
+  actorUserId?: string;
+  expectedRecipient?: string;
+  expectedUpdatedAt?: string;
+  credentials?: { accessToken: string; from: string; replyTo?: string; connectionId: string };
 };
-
-const RECEIPT_EMAIL_RETRY_AFTER_MS = 10 * 60 * 1000;
 
 function escapeHtml(value: string) {
   return value
@@ -96,7 +95,7 @@ function formatDateTime(value: Date) {
   }).format(value);
 }
 
-function getReceiptEmailFrom() {
+export function getReceiptEmailFrom() {
   const rawFrom = process.env.NATTA_RECEIPT_EMAIL_FROM?.trim();
   if (!rawFrom) {
     throw new Error("Falta NATTA_RECEIPT_EMAIL_FROM");
@@ -104,13 +103,11 @@ function getReceiptEmailFrom() {
   return rawFrom.includes("<") ? rawFrom : `Natta <${rawFrom}>`;
 }
 
-function getReceiptEmailReplyTo() {
+export function getReceiptEmailReplyTo() {
   return process.env.NATTA_RECEIPT_EMAIL_REPLY_TO?.trim() || undefined;
 }
 
-function isValidEmail(value: string | null | undefined) {
-  return Boolean(value?.trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));
-}
+
 
 function getReceiptState(order: {
   amountPaidArs: number;
@@ -146,7 +143,7 @@ function getItemDetail(item: ReceiptOrder["items"][number]) {
   return item.flavor.description;
 }
 
-function getOrderReceiptText(order: ReceiptOrder, pickupHoursLabel: string | null) {
+export function getOrderReceiptText(order: ReceiptOrder, pickupHoursLabel: string | null) {
   const branch = getBranchByCode(order.branchCode);
   const lines = [
     "Comprobante Natta",
@@ -184,7 +181,7 @@ function getOrderReceiptText(order: ReceiptOrder, pickupHoursLabel: string | nul
   return lines.join("\n");
 }
 
-function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | null) {
+export function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | null) {
   const branch = getBranchByCode(order.branchCode);
   const logoUrl = absoluteUrl(siteConfig.logo);
   const receiptUrl = absoluteUrl(`/comprobante/${order.publicReceiptCode}`);
@@ -348,7 +345,7 @@ function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | n
                     </table>
                     <div style="height:28px;line-height:28px;font-size:28px;">&nbsp;</div>
                     ${button}
-                    <p style="margin:20px 0 0 0;font-size:12px;line-height:20px;color:#8e8179;">Este comprobante se genera automáticamente cuando Mercado Pago informa un pago aprobado.${
+                    <p style="margin:20px 0 0 0;font-size:12px;line-height:20px;color:#8e8179;">Este comprobante refleja los cobros aprobados del pedido.${
                       approvedPayment?.kind === "DEPOSIT"
                         ? " Si queda saldo pendiente, Natta lo coordina antes de la entrega."
                         : ""
@@ -369,181 +366,26 @@ function buildOrderReceiptHtml(order: ReceiptOrder, pickupHoursLabel: string | n
 </html>`;
 }
 
-async function sendViaResend(input: {
-  html: string;
-  idempotencyKey: string;
-  subject: string;
-  text: string;
-  to: string;
-}) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("Falta RESEND_API_KEY");
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": input.idempotencyKey,
-    },
-    body: JSON.stringify({
-      from: getReceiptEmailFrom(),
-      html: input.html,
-      reply_to: getReceiptEmailReplyTo(),
-      subject: input.subject,
-      text: input.text,
-      to: input.to,
-    }),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeout));
-  const payload = (await response.json().catch(() => ({}))) as ResendResponse;
-
-  if (!response.ok) {
-    throw new Error(payload.message ?? payload.name ?? "Resend rechazo el envio");
-  }
-
-  return payload.id ?? null;
+export async function loadReceiptOrder(orderId: string) {
+  return prisma.order.findUnique({ where: { id: orderId }, include: {
+    customer: true,
+    items: { include: { flavor: true, size: true }, orderBy: { createdAt: "asc" } },
+    payments: { orderBy: { createdAt: "asc" } },
+  } });
 }
 
-export async function sendOrderReceiptEmailIfNeeded(
-  orderId: string,
-  options: SendOrderReceiptEmailOptions = {},
-): Promise<OrderReceiptEmailResult> {
-  const force = options.force ?? false;
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      customer: true,
-      items: {
-        include: {
-          flavor: true,
-          size: true,
-        },
-        orderBy: { createdAt: "asc" },
-      },
-      payments: {
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
+export async function buildReceiptContent(order: ReceiptOrder) {
+  const hours = order.fulfillmentMode === "PICKUP"
+    ? await getPickupHoursLabelForDate(order.deliveryDate, order.branchCode) : null;
+  return { html: buildOrderReceiptHtml(order, hours), text: getOrderReceiptText(order, hours), subject: `Comprobante Natta ${order.publicReceiptCode}` };
+}
 
-  if (!order) {
-    return { sent: false, skippedReason: "ORDER_NOT_FOUND" };
-  }
-
-  if (order.status === "CANCELLED") {
-    return { sent: false, skippedReason: "ORDER_CANCELLED" };
-  }
-
-  if (order.receiptEmailSentAt && !force) {
-    return {
-      resendId: order.receiptEmailResendId,
-      sent: false,
-      sentTo: order.receiptEmailSentTo ?? undefined,
-      skippedReason: "ALREADY_SENT",
-    };
-  }
-
-  const recipient = order.customer.email?.trim().toLowerCase() ?? "";
-  if (!isValidEmail(recipient)) {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        receiptEmailLastError: "El pedido no tiene email válido para enviar comprobante",
-      },
-    });
-    return { sent: false, skippedReason: "INVALID_EMAIL" };
-  }
-
-  const hasApprovedPayment = order.payments.some((payment) => payment.status === "APPROVED");
-  const hasCoveredDueNow = order.amountPaidArs >= order.amountDueNowArs;
-  if (!hasApprovedPayment) {
-    return { sent: false, skippedReason: "PAYMENT_NOT_APPROVED" };
-  }
-  if (!hasCoveredDueNow) {
-    return { sent: false, skippedReason: "AMOUNT_NOT_COVERED" };
-  }
-
-  const retryThreshold = new Date(Date.now() - RECEIPT_EMAIL_RETRY_AFTER_MS);
-  const attemptAt = new Date();
-  if (force) {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        receiptEmailLastAttemptAt: attemptAt,
-      },
-    });
-  } else {
-    const claimed = await prisma.order.updateMany({
-      where: {
-        id: order.id,
-        receiptEmailSentAt: null,
-        OR: [
-          { receiptEmailLastAttemptAt: null },
-          { receiptEmailLastAttemptAt: { lt: retryThreshold } },
-        ],
-      },
-      data: {
-        receiptEmailLastAttemptAt: attemptAt,
-      },
-    });
-
-    if (claimed.count !== 1) {
-      return { sent: false, skippedReason: "RECENT_ATTEMPT" };
-    }
-  }
-
-  try {
-    const pickupHoursLabel =
-      order.fulfillmentMode === "PICKUP"
-        ? await getPickupHoursLabelForDate(order.deliveryDate, order.branchCode)
-        : null;
-    const resendId = await sendViaResend({
-      html: buildOrderReceiptHtml(order, pickupHoursLabel),
-      idempotencyKey: force
-        ? `order-receipt-manual-${order.id}-${attemptAt.getTime()}`
-        : `order-receipt-${order.id}-${order.amountPaidArs}`,
-      subject: `Comprobante Natta ${order.publicReceiptCode}`,
-      text: getOrderReceiptText(order, pickupHoursLabel),
-      to: recipient,
-    });
-
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        receiptEmailLastError: null,
-        receiptEmailResendId: resendId,
-        receiptEmailSentAt: new Date(),
-        receiptEmailSentTo: recipient,
-      },
-    });
-    return {
-      resendId,
-      sent: true,
-      sentTo: recipient,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo enviar comprobante";
-    await prisma.order
-      .update({
-        where: { id: order.id },
-        data: {
-          receiptEmailLastError: message,
-        },
-      })
-      .catch(() => null);
-    logServerError("email.order-receipt", error);
-    if (options.throwOnError) {
-      throw error;
-    }
-    return {
-      error: message,
-      sent: false,
-      skippedReason: "SEND_FAILED",
-    };
+export async function sendOrderReceiptEmailIfNeeded(orderId: string, options: SendOrderReceiptEmailOptions = {}): Promise<OrderReceiptEmailResult> {
+  try { return await dispatchOrderReceipt(orderId, options); }
+  catch {
+    const error = "No se pudo preparar el comprobante. Revisá la configuración de correo.";
+    await prisma.order.update({ where: { id: orderId }, data: { receiptEmailLastError: error } }).catch(() => null);
+    if (options.throwOnError) throw new Error(error);
+    return { sent: false, skippedReason: "SEND_FAILED", error };
   }
 }
