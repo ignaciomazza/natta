@@ -1,3 +1,4 @@
+import { getCommerceBridge } from "@/lib/integrations/commerce-bridge";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
@@ -110,6 +111,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    if ((await getCommerceBridge())?.enabled) return NextResponse.json({ error: "Los pedidos conectados conservan su historial. Usá Cancelar." }, { status: 409 });
     await requireAuth(req);
     const { id } = await params;
 

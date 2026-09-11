@@ -1,3 +1,4 @@
+import { pushCommerceOrder, CommerceBridgeError } from "@/lib/integrations/commerce-bridge";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
     if (order.status === "CANCELLED") {
       return NextResponse.json({ error: "Pedido cancelado" }, { status: 409 });
     }
+    await pushCommerceOrder(order.id);
 
     return await withOrderPaymentLock(order.id, async (tx) => {
       const currentOrder = await tx.order.findUniqueOrThrow({
@@ -153,6 +155,7 @@ export async function POST(req: NextRequest) {
       });
     });
   } catch (error) {
+    if (error instanceof CommerceBridgeError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
     }

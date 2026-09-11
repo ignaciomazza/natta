@@ -431,3 +431,20 @@ model OrderReceiptDelivery {
   @@index([orderId, createdAt])
   @@index([orderId, status])
 }
+
+// Transition bridge: configuration is per website; no source database credentials
+// are shared with Cobots. The outbox is written by transactional DB triggers.
+model CommerceBridgeConfig {
+  id String @id
+  enabled Boolean @default(false)
+  settings Json
+  updatedAt DateTime @updatedAt
+}
+model CommerceOutbox {
+  orderId String @id
+  version Int @default(1)
+  pushedVersion Int @default(0)
+  lastAttemptAt DateTime?
+  lastError String?
+  updatedAt DateTime @default(now())
+}

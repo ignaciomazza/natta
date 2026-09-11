@@ -39,6 +39,15 @@ jobs:
             return `Bearer ${token}`;
           }
           const end = new Date().toISOString();
+          // The same scheduled identity drains durable order changes and email retries.
+          for (let batch = 0; batch < 10; batch++) {
+            const response = await fetch(endpoint, { method: 'POST', headers: { Authorization: await authorization(), 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'commerce', end }), signal: AbortSignal.timeout(65000) });
+            if (!response.ok) throw new Error(`Commerce synchronization failed: HTTP ${response.status}`);
+            const result = await response.json();
+            if (result.errors) console.error('Some commerce updates remain pending.');
+            if (!result.hasMore || result.errors) break;
+          }
+
           let offset = 0, checked = 0, recovered = 0, attention = 0, errors = 0;
           let inboxComplete = false;
           const inboxDeadline = Date.now() + 90000;

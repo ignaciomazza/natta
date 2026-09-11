@@ -1,3 +1,4 @@
+import { getCommerceBridge, drainCommerceOutbox, cobotsRequest } from "@/lib/integrations/commerce-bridge";
 import { NextRequest, NextResponse } from "next/server";
 import { canReconcilePayments } from "@/lib/payments/reconcile-auth";
 import { reconcilePaymentPage } from "@/lib/payments/reconcile";
@@ -9,7 +10,7 @@ import { z } from "zod";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 const schema = z.object({
-  mode: z.enum(["payments", "notifications"]).default("payments"),
+  mode: z.enum(["payments", "notifications", "commerce"]).default("payments"),
   offset: z.number().int().min(0).max(10000).default(0),
   end: z.string().datetime(),
 });
@@ -26,6 +27,11 @@ export async function POST(req: NextRequest) {
     const { mode, offset, end } = schema.parse(await req.json());
     if (Math.abs(Date.now() - Date.parse(end)) > 3600000)
       return NextResponse.json({ error: "Período inválido" }, { status: 400 });
+    if (mode === "commerce") {
+      const result = await drainCommerceOutbox(5);
+      if ((await getCommerceBridge())?.enabled && !result.hasMore) await cobotsRequest("/api/storefront/commerce/maintenance", {});
+      return NextResponse.json(result);
+    }
     const result =
       mode === "notifications"
         ? await retryWebhookPage(end)

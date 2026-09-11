@@ -1,3 +1,5 @@
+import { getCommerceBridge, pushCommerceOrder, CommerceBridgeError } from "@/lib/integrations/commerce-bridge";
+import { getCommerceCatalog } from "@/lib/integrations/commerce-catalog";
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import type { NextRequest } from "next/server";
@@ -204,6 +206,7 @@ export async function POST(req: NextRequest) {
       ? await prisma.order.findUnique({ where: { id: orderId } })
       : null;
     if (existing) {
+      await pushCommerceOrder(existing.id);
       return NextResponse.json({
         orderId: existing.id,
         publicReceiptCode: existing.publicReceiptCode,
@@ -221,6 +224,7 @@ export async function POST(req: NextRequest) {
     const pairKeys = body.items.map(
       (item) => `${item.flavorId}::${item.sizeId}`,
     );
+    const bridge = await getCommerceBridge();
     const prices = await prisma.price.findMany({
       where: {
         OR: body.items.map((item) => ({
@@ -258,13 +262,12 @@ export async function POST(req: NextRequest) {
       const price = priceByKey.get(`${item.flavorId}::${item.sizeId}`);
       if (
         !price ||
-        !price.flavor.isActive ||
-        !price.size.isActive ||
-        !isCatalogPairAvailableAtBranch(
+        (!bridge?.enabled && (!price.flavor.isActive || !price.size.isActive)) ||
+        (!bridge?.enabled && !isCatalogPairAvailableAtBranch(
           branch,
           price.flavor.slug,
           price.size.slug,
-        )
+        ))
       ) {
         return NextResponse.json(
           { error: "Producto no disponible" },
@@ -273,13 +276,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const commerceCatalog = bridge?.enabled ? await getCommerceCatalog(branch) : null;
     const orderItems = body.items.map((item) => {
       const price = priceByKey.get(`${item.flavorId}::${item.sizeId}`)!;
+      const livePrice = commerceCatalog?.flavors.find((flavor) => flavor.id === item.flavorId)?.prices.find((candidate) => candidate.sizeId === item.sizeId);
+      if (commerceCatalog && !livePrice) throw new CommerceBridgeError("Producto no disponible.", 409);
       return {
         flavorId: item.flavorId,
         sizeId: item.sizeId,
         quantity: item.quantity,
-        unitPriceArs: applyPriceMultiplier(price.amountArs),
+        unitPriceArs: livePrice?.amountArs ?? applyPriceMultiplier(price.amountArs),
       };
     });
 
@@ -287,7 +293,7 @@ export async function POST(req: NextRequest) {
       (sum, item) => sum + item.quantity,
       0,
     );
-    await validateCapacityForOrder({
+    if (!bridge?.enabled) await validateCapacityForOrder({
       branchCode,
       deliveryDate: body.deliveryDate,
       requestedUnits,
@@ -411,8 +417,10 @@ export async function POST(req: NextRequest) {
       },
       { timeout: 15000, maxWait: 10000 },
     );
+    await pushCommerceOrder(result.orderId);
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof CommerceBridgeError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
     }

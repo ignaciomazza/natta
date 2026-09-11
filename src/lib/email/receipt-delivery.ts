@@ -12,6 +12,12 @@ const skip = (skippedReason: NonNullable<OrderReceiptEmailResult["skippedReason"
 export async function dispatchOrderReceipt(orderId: string, options: SendOrderReceiptEmailOptions = {}, fetcher = fetch): Promise<OrderReceiptEmailResult> {
   const id = options.requestId ?? (options.force ? randomUUID() : `automatic:${orderId}`);
   const prepared = await withOrderPaymentLock(orderId, async (tx) => {
+    if (process.env.COBOTS_API_URL || process.env.COBOTS_STOREFRONT_API_KEY) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('commerce-bridge:handover', 0))`;
+      if ((await tx.commerceBridgeConfig.findUnique({ where: { id: "default" }, select: { enabled: true } }))?.enabled) {
+        return { result: skip("REVIEW_REQUIRED", "El comprobante se gestiona desde Cobots.") };
+      }
+    }
     const order = await tx.order.findUnique({ where: { id: orderId }, include: {
       customer: true, items: { include: { flavor: true, size: true }, orderBy: { createdAt: "asc" } }, payments: { orderBy: { createdAt: "asc" } },
     } });

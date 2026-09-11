@@ -21,6 +21,8 @@ const requiredTables = [
   "MercadoPagoWebhookEvent",
   "CobotsOrderOperation",
   "OrderReceiptDelivery",
+  "CommerceBridgeConfig",
+  "CommerceOutbox",
   "Supplier",
   "Purchase",
   "Expense",

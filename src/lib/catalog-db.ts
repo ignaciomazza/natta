@@ -1,3 +1,5 @@
+import { getCommerceBridge } from "@/lib/integrations/commerce-bridge";
+import { getCommerceCatalog } from "@/lib/integrations/commerce-catalog";
 import { prisma } from "@/lib/prisma";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
 import {
@@ -76,6 +78,7 @@ const sizeContentOverrides: Partial<
 };
 
 export async function getActiveCatalog(branch: Branch = defaultBranch) {
+  if ((await getCommerceBridge())?.enabled) return getCommerceCatalog(branch);
   const [flavors, sizes, prices] = await Promise.all([
     prisma.flavor.findMany({
       where: { isActive: true },

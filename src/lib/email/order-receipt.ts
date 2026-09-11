@@ -1,3 +1,4 @@
+import { getCommerceBridge, pushCommerceOrder, cobotsRequest } from "@/lib/integrations/commerce-bridge";
 import type { Order, OrderStatus, Payment, PaymentMethod, PaymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl, siteConfig } from "@/lib/seo";
@@ -381,7 +382,23 @@ export async function buildReceiptContent(order: ReceiptOrder) {
 }
 
 export async function sendOrderReceiptEmailIfNeeded(orderId: string, options: SendOrderReceiptEmailOptions = {}): Promise<OrderReceiptEmailResult> {
-  try { return await dispatchOrderReceipt(orderId, options); }
+  try {
+    if ((await getCommerceBridge())?.enabled) {
+      if (options.force) return { sent: false, skippedReason: "REVIEW_REQUIRED", error: "Reenviá el comprobante desde el pedido en Cobots." };
+      await pushCommerceOrder(orderId);
+      const result = await cobotsRequest("/api/storefront/commerce/receipt-email", { orderId });
+      if (result.sent && result.resendId && result.sentTo) {
+        // Keep the temporary local panel in sync without creating a new revision
+        // every time the same accepted receipt is read again.
+        await prisma.order.updateMany({
+          where: { id: orderId, OR: [{ receiptEmailResendId: null }, { receiptEmailResendId: { not: result.resendId } }, { receiptEmailSentTo: { not: result.sentTo } }] },
+          data: { receiptEmailSentAt: result.sentAt ? new Date(result.sentAt) : new Date(), receiptEmailSentTo: result.sentTo, receiptEmailResendId: result.resendId, receiptEmailLastError: null },
+        });
+      }
+      return { sent: result.sent === true, resendId: result.resendId ?? null, sentTo: result.sentTo, ...(result.sent ? {} : { skippedReason: "SEND_FAILED" as const, error: result.message }) };
+    }
+    return await dispatchOrderReceipt(orderId, options);
+  }
   catch {
     const error = "No se pudo preparar el comprobante. Revisá la configuración de correo.";
     await prisma.order.update({ where: { id: orderId }, data: { receiptEmailLastError: error } }).catch(() => null);

@@ -1,3 +1,4 @@
+import { pushCommerceOrder, CommerceBridgeError } from "@/lib/integrations/commerce-bridge";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
     if (order.status === "CANCELLED") {
       return NextResponse.json({ error: "Pedido cancelado" }, { status: 409 });
     }
+    await pushCommerceOrder(order.id);
 
     await syncMercadoPagoOrder(order.id);
     order = await loadOrder();
@@ -317,6 +319,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof CommerceBridgeError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
     }
