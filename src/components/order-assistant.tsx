@@ -567,7 +567,11 @@ export function OrderAssistant() {
   const snapshotSequence = useRef(0);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
+    let cancelled = false;
+    // Initial URL state must also load in background tabs, where browsers can
+    // suspend animation frames. Keep the deferred update safe on unmount.
+    queueMicrotask(() => {
+      if (cancelled) return;
       const searchParams = new URLSearchParams(window.location.search);
       const orderId = searchParams.get("order");
       const initialBranch = isPublicBranchSelectionEnabled
@@ -584,7 +588,7 @@ export function OrderAssistant() {
       setUrlStateReady(true);
     });
 
-    return () => cancelAnimationFrame(frame);
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
