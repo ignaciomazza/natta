@@ -281,5 +281,36 @@ test(
         );
       },
     );
+    await t.test(
+      "un error al preparar el pedido registra el intento para no bloquear la cola",
+      async () => {
+        const original = await prisma.commerceBridgeConfig.findUniqueOrThrow({
+          where: { id: "default" },
+        });
+        const broken = bridge.bridgeSettingsSchema.parse(original.settings);
+        broken.variants[0].variantId = "";
+        await prisma.commerceBridgeConfig.update({
+          where: { id: "default" },
+          data: { settings: broken },
+        });
+        await prisma.commerceOutbox.update({
+          where: { orderId: order.id },
+          data: { lastAttemptAt: null },
+        });
+        try {
+          await assert.rejects(bridge.pushCommerceOrder(order.id));
+          const queued = await prisma.commerceOutbox.findUniqueOrThrow({
+            where: { orderId: order.id },
+          });
+          assert.ok(queued.lastAttemptAt);
+          assert.ok(queued.lastError);
+        } finally {
+          await prisma.commerceBridgeConfig.update({
+            where: { id: "default" },
+            data: { settings: original.settings! },
+          });
+        }
+      },
+    );
   },
 );

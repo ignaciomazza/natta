@@ -215,8 +215,8 @@ export async function exportCommerceOrder(orderId: string) {
 export async function pushCommerceOrder(orderId: string) {
   const bridge = await getCommerceBridge();
   if (!bridge?.enabled) return null;
-  const { snapshot, version } = await exportCommerceOrder(orderId);
   try {
+    const { snapshot, version } = await exportCommerceOrder(orderId);
     const result = await cobotsRequest(
       "/api/storefront/commerce/orders",
       snapshot,
@@ -246,7 +246,7 @@ export async function drainCommerceOutbox(limit = 10) {
   if (!bridge?.enabled) return { processed: 0, errors: 0, hasMore: false };
   const pending = await prisma.$queryRaw<
     Array<{ orderId: string }>
-  >`SELECT "orderId" FROM "CommerceOutbox" WHERE "version" > "pushedVersion" ORDER BY "lastAttemptAt" ASC NULLS FIRST, "updatedAt" ASC LIMIT ${limit}`;
+  >`SELECT q."orderId" FROM "CommerceOutbox" q JOIN "Order" o ON o.id = q."orderId" WHERE q."version" > q."pushedVersion" ORDER BY q."lastAttemptAt" ASC NULLS FIRST, q."updatedAt" ASC LIMIT ${limit}`;
   let errors = 0;
   for (const row of pending) {
     try {

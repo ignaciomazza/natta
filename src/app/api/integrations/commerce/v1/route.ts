@@ -118,8 +118,16 @@ export async function POST(request: NextRequest) {
       });
       const visible = rows.slice(0, input.limit),
         orders = [];
-      for (const row of visible)
-        orders.push((await exportCommerceOrder(row.id)).snapshot);
+      // Keep each order snapshot consistent while bounding connections and
+      // round trips for recovery pages across regions.
+      for (let offset = 0; offset < visible.length; offset += 4) {
+        const batch = await Promise.all(
+          visible
+            .slice(offset, offset + 4)
+            .map((row) => exportCommerceOrder(row.id)),
+        );
+        orders.push(...batch.map((entry) => entry.snapshot));
+      }
       return NextResponse.json(
         {
           orders,

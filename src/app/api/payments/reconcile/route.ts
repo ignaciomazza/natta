@@ -1,4 +1,4 @@
-import { getCommerceBridge, drainCommerceOutbox, cobotsRequest } from "@/lib/integrations/commerce-bridge";
+import { drainCommerceOutbox } from "@/lib/integrations/commerce-bridge";
 import { NextRequest, NextResponse } from "next/server";
 import { canReconcilePayments } from "@/lib/payments/reconcile-auth";
 import { reconcilePaymentPage } from "@/lib/payments/reconcile";
@@ -29,7 +29,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Período inválido" }, { status: 400 });
     if (mode === "commerce") {
       const result = await drainCommerceOutbox(5);
-      if ((await getCommerceBridge())?.enabled && !result.hasMore) await cobotsRequest("/api/storefront/commerce/maintenance", {});
       return NextResponse.json(result);
     }
     const result =
