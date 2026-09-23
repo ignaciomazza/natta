@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCatalogPairAvailable } from "@/lib/catalog-policy";
 import { prisma } from "@/lib/prisma";
 import type { Branch } from "@/lib/branches";
 import {
@@ -85,7 +86,7 @@ export async function getCommerceCatalog(branch: Branch) {
           variant = product.variants.find(
             (v) => v.id === mapping.variantId && v.isAvailable,
           );
-        return size && variant
+        return size && variant && isCatalogPairAvailable(flavor.slug, size.slug)
           ? [
               {
                 sizeId: size.id,
@@ -144,7 +145,7 @@ export async function getCommerceCalendar(
         v.available &&
         bridge.settings.variants.some(
           (m) =>
-            m.variantId === v.variantId && sizes.some((s) => s.id === m.sizeId),
+            m.variantId === v.variantId && sizes.some((s) => s.id === m.sizeId && flavors.some((f) => f.id === m.flavorId && isCatalogPairAvailable(f.slug, s.slug))),
         ),
     );
     const example = active[0]?.day;
@@ -195,7 +196,7 @@ export async function getCommerceCalendar(
           hasOverride: false,
           overrideNote: null,
           sizes: sizes.map((size) => {
-            const mapping = mapped.find((m) => m.sizeId === size.id),
+            const mapping = mapped.find((m) => m.sizeId === size.id && isCatalogPairAvailable(flavor.slug, size.slug)),
               variant = active.find((v) => v.variantId === mapping?.variantId);
             return {
               sizeId: size.id,

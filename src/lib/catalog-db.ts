@@ -1,5 +1,6 @@
 import { getCommerceBridge } from "@/lib/integrations/commerce-bridge";
 import { getCommerceCatalog } from "@/lib/integrations/commerce-catalog";
+import { isCatalogPairAvailable } from "@/lib/catalog-policy";
 import { prisma } from "@/lib/prisma";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
 import {
@@ -16,11 +17,7 @@ export const sizeSlugToId = {
 
 export type SizeSlug = keyof typeof sizeSlugToId;
 
-const unavailableCatalogPairs = new Set(["brulee::chica", "brulee::grande"]);
-
-export function isCatalogPairAvailable(flavorSlug: string, sizeSlug: string) {
-  return !unavailableCatalogPairs.has(`${flavorSlug}::${sizeSlug}`);
-}
+export { isCatalogPairAvailable } from "@/lib/catalog-policy";
 
 export function isCatalogPairAvailableAtBranch(
   branch: Branch,

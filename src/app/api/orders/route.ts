@@ -263,11 +263,11 @@ export async function POST(req: NextRequest) {
       if (
         !price ||
         (!bridge?.enabled && (!price.flavor.isActive || !price.size.isActive)) ||
-        (!bridge?.enabled && !isCatalogPairAvailableAtBranch(
+        !isCatalogPairAvailableAtBranch(
           branch,
           price.flavor.slug,
           price.size.slug,
-        ))
+        )
       ) {
         return NextResponse.json(
           { error: "Producto no disponible" },
