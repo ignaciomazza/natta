@@ -29,7 +29,6 @@ async function main() {
   process.env.NEXT_PUBLIC_APP_URL = "https://natta.example.test";
   process.env.RESEND_API_KEY = "test-fake";
   process.env.NATTA_RECEIPT_EMAIL_FROM = "receipts@example.test";
-  process.env.JWT_SECRET = "test-only-jwt-secret-longer-than-32-characters";
   process.env.CRON_SECRET = "test-reconciliation-secret";
   process.env.DOTENV_CONFIG_PATH = "/dev/null";
 
@@ -53,7 +52,7 @@ async function main() {
   const { POST: checkout } = await import("@/app/api/payments/checkout/route");
   const { POST: processPayment } =
     await import("@/app/api/payments/process/route");
-  const { POST: createOrder, GET: listOrders } =
+  const { POST: createOrder } =
     await import("@/app/api/orders/route");
   const { POST: reconcileRoute } =
     await import("@/app/api/payments/reconcile/route");
@@ -62,7 +61,6 @@ async function main() {
   const { reconcilePaymentPage } = await import("@/lib/payments/reconcile");
   const { canReconcilePayments, isReconciliationWorkflow } =
     await import("@/lib/payments/reconcile-auth");
-  const { signToken, AUTH_COOKIE_NAME } = await import("@/lib/auth/jwt");
   const remote = new Map<string, MercadoPagoPaymentResponse>();
   let failSearch = false;
   const failedPaymentIds = new Set<string>();
@@ -631,36 +629,6 @@ async function main() {
     );
     ok(
       "distinct real payments are counted separately; refunds target their operation, stale updates cannot reverse them and intentional cancellations remain cancelled",
-    );
-
-    const user = await prisma.user.create({
-      data: { email: "admin@example.test", passwordHash: "unused" },
-    });
-    const token = await signToken({ userId: user.id, email: user.email });
-    const hiddenFilters =
-      "status=confirmed&from=2025-01-01&to=2025-01-02&branch=nordelta";
-    for (const q of [cancelled.publicReceiptCode, "3001"]) {
-      const response = await listOrders(
-        new NextRequest(
-          `https://natta.example.test/api/orders?${hiddenFilters}&q=${q}`,
-          { headers: { cookie: `${AUTH_COOKIE_NAME}=${token}` } },
-        ),
-      );
-      const body = await response.json();
-      assert.equal(response.status, 200);
-      assert.equal(body.items[0].id, cancelled.id);
-      assert.equal(body.searchAll, true);
-    }
-    assert.equal(
-      (
-        await listOrders(
-          new NextRequest("https://natta.example.test/api/orders?q=3001"),
-        )
-      ).status,
-      401,
-    );
-    ok(
-      "authenticated receipt and operation searches find cancelled orders outside the selected date and branch",
     );
 
     const flavor = await prisma.flavor.upsert({

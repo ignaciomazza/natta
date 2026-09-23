@@ -45,6 +45,9 @@ async function run({ slowInbox = false, inboxUnavailable = false, paymentError =
         assert.equal(init.headers.Authorization, `Bearer fake-token-${identities}`);
         assert.ok(now - tokenCreatedAt < 180000, "The worker must renew its short-lived identity");
         const body = JSON.parse(init.body);
+        if (body.mode === "commerce") {
+          return Response.json({ processed: 0, errors: 0, hasMore: false });
+        }
         if (body.mode === "notifications") {
           notifications++;
           if (inboxUnavailable) return new Response(null, { status: 503 });

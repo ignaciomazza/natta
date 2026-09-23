@@ -80,7 +80,7 @@ npm run db:push
 npm run prisma:seed
 ```
 
-Esto deja catálogo, cupos y usuario admin inicial listos para operar.
+Esto prepara la base transitoria del checkout público. El catálogo y los cupos publicados se gestionan en Cobots.
 
 ## WhatsApp
 
@@ -94,8 +94,8 @@ El flujo de pedido asistido genera un mensaje con tamaño, sabor, cantidad, fech
 
 ## Backoffice
 
-- Login interno: `/interno/login`
-- Módulos: pedidos, cupos, clientes, compras, gastos y cobros
+- La gestión interna se realiza en Cobots. Las rutas antiguas `/interno` redirigen a Cobots.
+- Natta conserva su web pública. El checkout y los pagos todavía usan la base transitoria de este proyecto hasta completar el traslado a Cobots.
 - Comprobante público por código: `/comprobante/{codigo}`
 
 ## Sucursales

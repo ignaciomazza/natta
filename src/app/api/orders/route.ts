@@ -6,7 +6,6 @@ import type { NextRequest } from "next/server";
 import { BranchCode, FulfillmentMode, PaymentMethod } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth/tenant";
 import { logServerError } from "@/lib/server/log";
 import {
   calculateOrderTotals,
@@ -15,15 +14,13 @@ import {
   paymentKindByOrderPaymentOption,
   resolveOrderPaymentOption,
 } from "@/lib/orders";
-import { getDateOnlyString } from "@/lib/date-only";
 import {
   getDateAtNoon,
-  getDateRange,
   validateCapacityForOrder,
 } from "@/lib/capacity";
 import { applyPriceMultiplier } from "@/lib/price-adjustments";
 import { isCatalogPairAvailableAtBranch } from "@/lib/catalog-db";
-import { getBranchByCode, getBranchBySlug } from "@/lib/branches";
+import { getBranchBySlug } from "@/lib/branches";
 
 const orderCreateSchema = z
   .object({
@@ -67,133 +64,6 @@ export const runtime = "nodejs";
 
 function mapFulfillmentMode(value: "pickup" | "delivery"): FulfillmentMode {
   return value === "pickup" ? "PICKUP" : "DELIVERY";
-}
-
-export async function GET(req: NextRequest) {
-  try {
-    await requireAuth(req);
-    const q = req.nextUrl.searchParams.get("q")?.trim().slice(0, 180);
-    const status = req.nextUrl.searchParams.get("status")?.trim();
-    const mode = req.nextUrl.searchParams.get("mode")?.trim();
-    const branch = req.nextUrl.searchParams.get("branch")?.trim();
-    const branchFilter = branch ? getBranchBySlug(branch) : null;
-    const from = req.nextUrl.searchParams.get("from")?.trim();
-    const to = req.nextUrl.searchParams.get("to")?.trim();
-    const page = Math.max(
-      0,
-      Math.min(
-        100,
-        Number.parseInt(req.nextUrl.searchParams.get("page") ?? "0", 10) || 0,
-      ),
-    );
-
-    if (branch && !branchFilter) {
-      return NextResponse.json({ error: "Sucursal inválida" }, { status: 400 });
-    }
-
-    const where: Record<string, unknown> = {
-      ...(branchFilter && !q ? { branchCode: branchFilter.code } : {}),
-      ...(status && !q
-        ? {
-            status: status.toUpperCase() as
-              "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED",
-          }
-        : {}),
-      ...(mode && !q
-        ? {
-            fulfillmentMode:
-              mode === "pickup"
-                ? "PICKUP"
-                : mode === "delivery"
-                  ? "DELIVERY"
-                  : undefined,
-          }
-        : {}),
-      ...(!q && (from || to)
-        ? {
-            deliveryDate: {
-              ...(from ? { gte: getDateRange(from).gte } : {}),
-              ...(to ? { lte: getDateRange(to).lte } : {}),
-            },
-          }
-        : {}),
-      ...(q
-        ? {
-            OR: [
-              { publicReceiptCode: { contains: q, mode: "insensitive" } },
-              { customer: { name: { contains: q, mode: "insensitive" } } },
-              { customer: { phone: { contains: q, mode: "insensitive" } } },
-              { payments: { some: { providerPaymentId: q } } },
-            ],
-          }
-        : {}),
-    };
-
-    const orders = await prisma.order.findMany({
-      where,
-      include: {
-        customer: true,
-        items: {
-          include: {
-            flavor: true,
-            size: true,
-          },
-        },
-        payments: true,
-      },
-      orderBy: [{ deliveryDate: "asc" }, { createdAt: "desc" }],
-      take: 200,
-      skip: page * 200,
-    });
-
-    return NextResponse.json({
-      total: await prisma.order.count({ where }),
-      page,
-      searchAll: Boolean(q),
-      items: orders.map((order) => ({
-        id: order.id,
-        branch: getBranchByCode(order.branchCode),
-        status: order.status,
-        fulfillmentMode: order.fulfillmentMode,
-        deliveryDate: getDateOnlyString(order.deliveryDate),
-        publicReceiptCode: order.publicReceiptCode,
-        subtotalArs: order.subtotalArs,
-        amountDueNowArs: order.amountDueNowArs,
-        amountPaidArs: order.amountPaidArs,
-        amountBalanceArs: order.amountBalanceArs,
-        receiptEmailLastError: order.receiptEmailLastError,
-        receiptEmailSentAt: order.receiptEmailSentAt,
-        receiptEmailSentTo: order.receiptEmailSentTo,
-        mercadoPagoExternalReference: order.mercadoPagoExternalReference,
-        mercadoPagoPreferenceId: order.mercadoPagoPreferenceId,
-        customer: {
-          id: order.customer.id,
-          name: order.customer.name,
-          phone: order.customer.phone,
-          email: order.customer.email,
-        },
-        items: order.items.map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          unitPriceArs: item.unitPriceArs,
-          subtotalArs: item.subtotalArs,
-          flavor: item.flavor.name,
-          size: item.size.name,
-        })),
-        payments: order.payments,
-      })),
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    logServerError("api.orders.get", error);
-    return NextResponse.json(
-      { error: "No se pudieron listar los pedidos" },
-      { status: 500 },
-    );
-  }
 }
 
 export async function POST(req: NextRequest) {

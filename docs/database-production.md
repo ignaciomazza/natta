@@ -75,7 +75,6 @@ Cargar al menos estas variables:
 ```bash
 DATABASE_URL=
 DIRECT_URL=
-JWT_SECRET=
 NEXT_PUBLIC_APP_URL=
 NEXT_PUBLIC_WHATSAPP_NUMBER=
 MERCADOPAGO_ENV=production

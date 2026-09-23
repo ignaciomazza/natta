@@ -1,6 +1,4 @@
-import { randomBytes } from "node:crypto";
 import { BranchCode, PrismaClient } from "@prisma/client";
-import { hashPassword } from "../src/lib/auth/password";
 
 const prisma = new PrismaClient();
 
@@ -106,10 +104,6 @@ const flavorCatalog = [
     prices: { latta: 13000 },
   },
 ] as const;
-
-function createPassword() {
-  return randomBytes(12).toString("base64url");
-}
 
 async function main() {
   const sizeBySlug = new Map<string, { id: string }>();
@@ -227,34 +221,8 @@ async function main() {
     }
   }
 
-  const adminEmail = "admin@natta.local";
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail },
-    select: { id: true },
-  });
-
-  let generatedPassword: string | null = null;
-
-  if (!existingAdmin) {
-    generatedPassword = createPassword();
-    await prisma.user.create({
-      data: {
-        email: adminEmail,
-        name: "Natta Admin",
-        passwordHash: await hashPassword(generatedPassword),
-        isActive: true,
-      },
-    });
-  }
-
   console.log("Seed completado.");
-  console.log(`Admin email: ${adminEmail}`);
-  if (generatedPassword) {
-    console.log(`Admin password generado: ${generatedPassword}`);
-    console.log("Guardalo ahora; no vuelve a mostrarse.");
-  } else {
-    console.log("Admin existente: contraseña sin cambios.");
-  }
+
 }
 
 main()

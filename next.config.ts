@@ -1,6 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    const cobots = "https://www.cobots.studio";
+    return [
+      { source: "/interno", destination: `${cobots}/app/production`, permanent: false },
+      { source: "/interno/login", destination: `${cobots}/login`, permanent: false },
+      { source: "/interno/pedidos", destination: `${cobots}/app/production`, permanent: false },
+      { source: "/interno/foco-hoy", destination: `${cobots}/app/production`, permanent: false },
+      { source: "/interno/cobros", destination: `${cobots}/app/sales`, permanent: false },
+      { source: "/interno/cupos", destination: `${cobots}/app/availability`, permanent: false },
+      { source: "/interno/precios", destination: `${cobots}/app/products`, permanent: false },
+      { source: "/interno/clientes", destination: `${cobots}/app/customers`, permanent: false },
+      { source: "/interno/proveedores", destination: `${cobots}/app/suppliers`, permanent: false },
+      { source: "/interno/compras", destination: `${cobots}/app/purchases`, permanent: false },
+      { source: "/interno/gastos", destination: `${cobots}/app/purchases`, permanent: false },
+      { source: "/interno/:path*", destination: `${cobots}/app/production`, permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

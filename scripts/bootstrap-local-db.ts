@@ -117,7 +117,6 @@ function main() {
   const dbName = "natta_app";
   const dbUser = `natta_app_${randomBytes(4).toString("hex")}`;
   const dbPassword = randomToken(12);
-  const jwtSecret = randomToken(24);
 
   const roleExists = runPsql(
     config,
@@ -158,7 +157,6 @@ function main() {
   envContent = ensureLineBreak(envContent);
   envContent = upsertEnv(envContent, "DATABASE_URL", databaseUrl);
   envContent = upsertEnv(envContent, "DIRECT_URL", databaseUrl);
-  envContent = upsertEnv(envContent, "JWT_SECRET", jwtSecret);
   envContent = upsertEnv(envContent, "NEXT_PUBLIC_APP_URL", "http://localhost:3000");
 
   if (!/MERCADOPAGO_ACCESS_TOKEN=/.test(envContent)) {
@@ -187,7 +185,6 @@ function main() {
   console.log(`DB_NAME=${dbName}`);
   console.log(`DATABASE_URL=${databaseUrl}`);
   console.log(`DIRECT_URL=${databaseUrl}`);
-  console.log(`JWT_SECRET=${jwtSecret}`);
   console.log("Archivo .env actualizado.");
 }
 
