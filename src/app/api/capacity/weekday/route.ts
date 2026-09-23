@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth/tenant";
+import { legacyAdminWriteGuard } from "@/lib/integrations/legacy-admin-guard";
 import { logServerError } from "@/lib/server/log";
 
 const weekdaySchema = z
@@ -33,6 +34,8 @@ export const runtime = "nodejs";
 export async function PATCH(req: NextRequest) {
   try {
     await requireAuth(req);
+    const guard = await legacyAdminWriteGuard("capacity");
+    if (guard) return guard;
     const body = weekdaySchema.parse(await req.json());
 
     const rule = await prisma.weekdayCapacityRule.upsert({

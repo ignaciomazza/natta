@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/tenant";
+import { legacyAdminWriteGuard } from "@/lib/integrations/legacy-admin-guard";
 import { getDateAtNoon, isCapacitySchemaUnavailableError } from "@/lib/capacity";
 import { prisma } from "@/lib/prisma";
 import { logServerError } from "@/lib/server/log";
@@ -21,6 +22,8 @@ export const runtime = "nodejs";
 export async function PATCH(req: NextRequest) {
   try {
     await requireAuth(req);
+    const guard = await legacyAdminWriteGuard("capacity");
+    if (guard) return guard;
     const body = flavorOverrideSchema.parse(await req.json());
     const date = getDateAtNoon(body.date);
 

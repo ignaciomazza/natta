@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/tenant";
+import { legacyAdminWriteGuard } from "@/lib/integrations/legacy-admin-guard";
 import { isCatalogPairAvailable } from "@/lib/catalog-db";
 import { prisma } from "@/lib/prisma";
 import { logServerError } from "@/lib/server/log";
@@ -83,6 +84,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     await requireAuth(req);
+    const guard = await legacyAdminWriteGuard("prices");
+    if (guard) return guard;
     const body = pricePatchSchema.parse(await req.json());
 
     await prisma.$transaction(
