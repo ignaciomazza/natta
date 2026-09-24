@@ -62,6 +62,7 @@ function formatDateTime(value: string | Date) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Argentina/Buenos_Aires",
   }).format(new Date(value));
 }
 
@@ -389,7 +390,7 @@ export default async function ComprobantePage({
                     <div className="flex items-center gap-3">
                       <CreditCard className="h-5 w-5 text-zinc-500" strokeWidth={1.9} />
                       <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                        Cobro registrado
+                        Estado de los pagos
                       </h2>
                     </div>
 
