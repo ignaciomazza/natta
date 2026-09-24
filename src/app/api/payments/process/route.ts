@@ -1,3 +1,4 @@
+import { isCobotsDirect } from "@/lib/cobots-api";
 import { pushCommerceOrder, CommerceBridgeError } from "@/lib/integrations/commerce-bridge";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
@@ -90,6 +91,11 @@ function buildIdempotencyKey(parts: Array<string | number | null | undefined>) {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    if (await isCobotsDirect()) return NextResponse.json({ error: "Este pago ahora se realiza desde Mercado Pago. Actualizá la página para continuar." }, { status: 410 });
+  } catch {
+    return NextResponse.json({ error: "No pudimos comprobar el estado del pedido. Intentá nuevamente." }, { status: 503 });
+  }
   let processingPaymentId: string | null = null;
   let processingMarker: string | null = null;
 

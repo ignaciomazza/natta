@@ -1,64 +1,17 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getDateOnlyString } from "@/lib/date-only";
-import { prisma } from "@/lib/prisma";
-import { getBranchByCode } from "@/lib/branches";
+import * as legacy from "./legacy";
+import { type NextRequest } from "next/server";
+import { cobotsApi, cobotsErrorResponse, cobotsResponse } from "@/lib/cobots-api";
+import { isCobotsDirect } from "@/lib/cobots-api";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ code: string }> },
-) {
-  const { code } = await params;
-
-  const order = await prisma.order.findUnique({
-    where: { publicReceiptCode: code },
-    include: {
-      items: {
-        include: {
-          flavor: true,
-          size: true,
-        },
-      },
-      payments: {
-        orderBy: [{ createdAt: "asc" }],
-      },
-    },
-  });
-
-  if (!order) {
-    return NextResponse.json({ error: "Comprobante no encontrado" }, { status: 404 });
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+  try {
+    if (!(await isCobotsDirect())) return legacy.GET(_request, { params });
+    const { code } = await params;
+    return cobotsResponse(await cobotsApi(`/api/storefront/natta/receipts/${encodeURIComponent(code)}`));
+  } catch (error) {
+    return cobotsErrorResponse(error);
   }
-
-  return NextResponse.json({
-    order: {
-      id: order.id,
-      branch: getBranchByCode(order.branchCode),
-      code: order.publicReceiptCode,
-      status: order.status,
-      deliveryDate: getDateOnlyString(order.deliveryDate),
-      fulfillmentMode: order.fulfillmentMode,
-      subtotalArs: order.subtotalArs,
-      amountPaidArs: order.amountPaidArs,
-      amountBalanceArs: order.amountBalanceArs,
-      createdAt: order.createdAt,
-      items: order.items.map((item) => ({
-        flavor: item.flavor.name,
-        size: item.size.name,
-        quantity: item.quantity,
-        unitPriceArs: item.unitPriceArs,
-        subtotalArs: item.subtotalArs,
-      })),
-    },
-    payments: order.payments.map((payment) => ({
-      id: payment.id,
-      kind: payment.kind,
-      status: payment.status,
-      method: payment.method,
-      amountArs: payment.amountArs,
-      paidAt: payment.paidAt,
-      referenceNote: payment.referenceNote,
-    })),
-  });
 }

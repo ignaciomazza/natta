@@ -1,4 +1,3 @@
-import LegacyComprobantePage from "./legacy";
 import type { Metadata } from "next";
 import {
   BadgeCheck,
@@ -15,35 +14,9 @@ import {
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { formatDateOnly } from "@/lib/date-only";
-import { cobotsApi, CobotsApiError, isCobotsDirect } from "@/lib/cobots-api";
-
-type NattaReceiptPageOrder = {
-  publicReceiptCode: string;
-  status: string;
-  amountPaidArs: number;
-  amountBalanceArs: number;
-  subtotalArs: number;
-  fulfillmentMode: "PICKUP" | "DELIVERY";
-  deliveryDate: string;
-  notes: string | null;
-  branch: { name: string; addressLine: string };
-  pickupHoursLabel: string | null;
-  customer: { name: string; phone: string };
-  items: Array<{
-    id: string;
-    flavor: { slug: string; name: string };
-    size: { slug: string; name: string };
-    quantity: number;
-  }>;
-  payments: Array<{
-    id: string;
-    method: string;
-    status: string;
-    paidAt: string | null;
-    createdAt: string;
-    providerPaymentId: string | null;
-  }>;
-};
+import { getPickupHoursLabelForDate } from "@/lib/pickup-hours-db";
+import { prisma } from "@/lib/prisma";
+import { getBranchByCode } from "@/lib/branches";
 
 const formatMoney = (value: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -52,18 +25,18 @@ const formatMoney = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-function formatDate(value: string | Date) {
+function formatDate(value: Date) {
   return formatDateOnly(value);
 }
 
-function formatDateTime(value: string | Date) {
+function formatDateTime(value: Date) {
   return new Intl.DateTimeFormat("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+  }).format(value);
 }
 
 function getReceiptState(order: {
@@ -193,15 +166,23 @@ export default async function ComprobantePage({
 }: {
   params: Promise<{ code: string }>;
 }) {
-  if (!(await isCobotsDirect())) return LegacyComprobantePage({ params });
   const { code } = await params;
 
-  let order: NattaReceiptPageOrder | null = null;
-  try {
-    order = await cobotsApi(`/api/storefront/natta/receipt-page/${encodeURIComponent(code)}`) as NattaReceiptPageOrder;
-  } catch (error) {
-    if (!(error instanceof CobotsApiError) || error.status !== 404) throw error;
-  }
+  const order = await prisma.order.findUnique({
+    where: { publicReceiptCode: code },
+    include: {
+      customer: true,
+      items: {
+        include: {
+          flavor: true,
+          size: true,
+        },
+      },
+      payments: {
+        orderBy: [{ createdAt: "asc" }],
+      },
+    },
+  });
 
   if (!order) {
     return (
@@ -232,8 +213,10 @@ export default async function ComprobantePage({
   const customerPhone = order.customer?.phone?.trim() || "Sin teléfono cargado";
   const firstPayment = order.payments[0] ?? null;
   const isPickup = order.fulfillmentMode === "PICKUP";
-  const branch = order.branch;
-  const pickupHoursLabel = order.pickupHoursLabel;
+  const branch = getBranchByCode(order.branchCode);
+  const pickupHoursLabel = isPickup
+    ? await getPickupHoursLabelForDate(order.deliveryDate, order.branchCode)
+    : null;
 
   return (
     <>

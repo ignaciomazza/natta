@@ -1,3 +1,4 @@
+import { isCobotsDirect } from "@/lib/cobots-api";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { applyCobotsOrderCommand, isCobotsOperationsAuthorized } from "@/lib/integrations/cobots-operations";
@@ -11,6 +12,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
   try {
+    if (await isCobotsDirect()) return NextResponse.json({ error: "El pedido se gestiona desde Cobots." }, { status: 410 });
     const body = await request.text();
     if (body.length > 8192) return NextResponse.json({ error: "Solicitud demasiado grande" }, { status: 413 });
     const command = nattaOrderCommandSchema.parse(JSON.parse(body));

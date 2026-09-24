@@ -1,3 +1,4 @@
+import { isCobotsDirect } from "@/lib/cobots-api";
 import { drainCommerceOutbox } from "@/lib/integrations/commerce-bridge";
 import { NextRequest, NextResponse } from "next/server";
 import { canReconcilePayments } from "@/lib/payments/reconcile-auth";
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
     const { mode, offset, end } = schema.parse(await req.json());
     if (!(await canReconcilePayments(authorization, mode)))
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (await isCobotsDirect()) return NextResponse.json(mode === "commerce"
+      ? { processed: 0, errors: 0, hasMore: false }
+      : mode === "notifications"
+        ? { checked: 0, recovered: 0, errors: [], hasMore: false }
+        : { checked: 0, recovered: 0, attention: [], errors: [], receiptAttention: [], nextOffset: null });
     if (mode !== "commerce" && getMercadoPagoEnvironment() !== "production")
       return NextResponse.json(
         { error: "La revisión automática requiere el entorno productivo" },

@@ -14,7 +14,6 @@ import {
   MapPin,
   Minus,
   Plus,
-  QrCode,
   ReceiptText,
   RefreshCw,
   ShoppingBag,
@@ -23,7 +22,6 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { MercadoPagoCardForm } from "@/components/mercadopago-card-form";
 import { getFlavorNotice } from "@/lib/flavor-notices";
 import {
   getAvailablePickupCopyForDate,
@@ -162,25 +160,10 @@ type OrderPaymentsSnapshot = {
   }>;
 };
 
-type ProcessPaymentResponse = {
-  payment: {
-    id: string;
-    providerPaymentId: string;
-    method: string;
-    status: string;
-    statusDetail: string | null;
-    amountArs: number;
-    receiptUrl: string | null;
-    reference: string | null;
-    financialInstitution: string | null;
-  };
-};
-
 type FulfillmentMode = "pickup" | "delivery";
 type QuantityMap = Record<string, number>;
 type StepIndex = 0 | 1 | 2 | 3;
 type AssistantView = "builder" | "payment" | "success";
-type PaymentChoice = "wallet" | "card";
 type PaymentAmountChoice = "deposit" | "full";
 type FlavorPhoto = {
   src: string;
@@ -553,12 +536,8 @@ export function OrderAssistant() {
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [checkoutSession, setCheckoutSession] = useState<CheckoutSession | null>(null);
   const [paymentSnapshot, setPaymentSnapshot] = useState<OrderPaymentsSnapshot | null>(null);
-  const [paymentResult, setPaymentResult] = useState<ProcessPaymentResponse["payment"] | null>(
-    null,
-  );
   const [returnPaymentState, setReturnPaymentState] = useState<string | null>(null);
   const [returnPaymentId, setReturnPaymentId] = useState<string | null>(null);
-  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("wallet");
   const [photoFlavor, setPhotoFlavor] = useState<CatalogFlavor | null>(null);
   const [datePage, setDatePage] = useState(0);
   const creatingOrderRef = useRef(false);
@@ -731,9 +710,9 @@ export function OrderAssistant() {
 
   const receiptCode = paymentSnapshot?.order.publicReceiptCode ?? submittedCode;
   const paymentReceiptUrl =
-    paymentResult?.receiptUrl ?? primaryPayment?.receiptUrl ?? null;
-  const currentPaymentStatus = paymentResult?.status ?? primaryPayment?.status ?? null;
-  const currentPaymentDetail = paymentResult?.statusDetail ?? primaryPayment?.statusDetail ?? null;
+    primaryPayment?.receiptUrl ?? null;
+  const currentPaymentStatus = primaryPayment?.status ?? null;
+  const currentPaymentDetail = primaryPayment?.statusDetail ?? null;
   const hasApprovedPayment =
     Boolean(paymentSnapshot && paymentSnapshot.order.status !== "CANCELLED" &&
       paymentSnapshot.order.amountPaidArs >= paymentSnapshot.order.amountDueNowArs &&
@@ -771,9 +750,7 @@ export function OrderAssistant() {
     : null;
   const summaryDueNowArs =
     checkoutSession?.amountArs ?? snapshotAmountRequiredArs ?? dueNowArs;
-  const summaryPaidArs =
-    paymentSnapshot?.order.amountPaidArs ??
-    (paymentResult?.status === "APPROVED" ? paymentResult.amountArs : 0);
+  const summaryPaidArs = paymentSnapshot?.order.amountPaidArs ?? 0;
   const currentView: AssistantView = createdOrderId
     ? hasApprovedPayment
       ? "success"
@@ -1112,13 +1089,11 @@ export function OrderAssistant() {
     setCreatedOrderId(null);
     setCheckoutSession(null);
     setPaymentSnapshot(null);
-    setPaymentResult(null);
     setSubmittedCode(null);
     setReturnPaymentState(null);
     setReturnPaymentId(null);
     setLoadingPaymentView(false);
     setCheckingStatus(false);
-    setPaymentChoice("wallet");
     setSubmitError(message);
     setStep(targetStep);
 
@@ -1209,9 +1184,7 @@ export function OrderAssistant() {
     setSubmittedCode(null);
     setCheckoutSession(null);
     setPaymentSnapshot(null);
-    setPaymentResult(null);
     setReturnPaymentState(null);
-    setPaymentChoice("wallet");
     setLoadingPaymentView(true);
     scrollPageToTop();
 
@@ -1325,23 +1298,6 @@ export function OrderAssistant() {
     } catch (error) {
       setSubmitError(error instanceof Error ? sanitizeUiMessage(error.message) : "No pudimos verificar el pago. Tu pedido se conserva.");
     } finally { checkingPaymentRef.current = false; }
-  }
-
-  async function handlePaymentResult(result: ProcessPaymentResponse) {
-    setPaymentResult(result.payment);
-    if (!createdOrderId) return;
-
-    try {
-      await refreshPaymentSnapshot(createdOrderId, {
-        syncPaymentId: result.payment.providerPaymentId,
-      });
-    } catch (error) {
-      setSubmitError(
-        sanitizeUiMessage(
-          error instanceof Error ? error.message : "No se pudo actualizar el pago",
-        ),
-      );
-    }
   }
 
   function handleBuilderSubmit(event: FormEvent<HTMLFormElement>) {
@@ -2117,88 +2073,26 @@ export function OrderAssistant() {
                   </p>
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <button
-                      className={`rounded-[1rem] p-4 text-left transition sm:rounded-[1.35rem] ${
-                        paymentChoice === "wallet"
-                          ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
-                          : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
-                      }`}
-                      onClick={() => setPaymentChoice("wallet")}
-                      type="button"
-                    >
-                      <span className="flex items-center gap-2">
-                        <QrCode className="h-5 w-5 shrink-0" />
-                        <span className="font-semibold">Dinero en cuenta o QR</span>
-                      </span>
-                      <span className="mt-1 block text-sm opacity-80">
-                        Se abre Mercado Pago para terminar el pago.
-                      </span>
-                    </button>
-
-                    <button
-                      className={`rounded-[1rem] p-4 text-left transition sm:rounded-[1.35rem] ${
-                        paymentChoice === "card"
-                          ? "bg-[var(--chocolate)] text-[var(--milk)] shadow-[0_10px_24px_rgba(43,26,24,0.16)]"
-                          : "bg-white/66 shadow-[0_7px_18px_rgba(43,26,24,0.075)] hover:bg-white/84 hover:shadow-[0_10px_22px_rgba(43,26,24,0.105)]"
-                      }`}
-                      onClick={() => setPaymentChoice("card")}
-                      type="button"
-                    >
-                      <span className="flex items-center gap-2">
-                        <CreditCard className="h-5 w-5 shrink-0" />
-                        <span className="font-semibold">Tarjeta</span>
-                      </span>
-                      <span className="mt-1 block text-sm opacity-80">
-                        Pagás sin salir de Natta.
-                      </span>
-                    </button>
-                  </div>
-
                   {checkoutSession ? (
-                    paymentChoice === "wallet" ? (
-                      <section className="mt-5 rounded-[24px] bg-[linear-gradient(145deg,#413935_0%,#2b2521_100%)] p-5 text-[var(--milk)] shadow-[0_12px_26px_rgba(43,26,24,0.16)]">
-                        <div className="flex items-center gap-3">
-                          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10">
-                            <QrCode className="h-5 w-5" />
-                          </span>
-                          <h3 className="text-2xl font-semibold">Abrir Mercado Pago</h3>
-                        </div>
-                        <p className="mt-2 max-w-md text-sm leading-6 text-[var(--milk)]/75">
-                          Se abre Mercado Pago para terminar el pago con saldo en cuenta o con el QR disponible.
-                        </p>
-                        <button
-                          className="mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--milk)] px-5 text-sm font-semibold text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
-                          onClick={openWalletPayment}
-                          type="button"
-                        >
-                          <QrCode className="h-4 w-4" />
-                          <span>Abrir Mercado Pago</span>
-                          <ArrowRight className="h-4 w-4" />
-                        </button>
-                      </section>
-                    ) : (
-                      <section className="mt-5 rounded-[24px] bg-white/82 p-4 shadow-[0_8px_22px_rgba(43,26,24,0.075)] sm:p-5">
-                        <div className="mb-4 flex items-start gap-3">
-                          <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--cream)] text-[var(--chocolate-deep)]">
-                            <CreditCard className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sage)]">
-                              Tarjeta
-                            </p>
-                          </div>
-                        </div>
-
-                        <MercadoPagoCardForm
-                          checkout={checkoutSession}
-                          onPaymentResult={(result) => {
-                            void handlePaymentResult(result);
-                          }}
-                          payerEmail={customer.email}
-                        />
-                      </section>
-                    )
+                    <section className="mt-5 rounded-[24px] bg-[linear-gradient(145deg,#413935_0%,#2b2521_100%)] p-5 text-[var(--milk)] shadow-[0_12px_26px_rgba(43,26,24,0.16)]">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10">
+                          <CreditCard className="h-5 w-5" />
+                        </span>
+                        <h3 className="text-2xl font-semibold">Pagar con Mercado Pago</h3>
+                      </div>
+                      <p className="mt-2 max-w-md text-sm leading-6 text-[var(--milk)]/75">
+                        Elegí tarjeta o saldo en Mercado Pago para completar el pago.
+                      </p>
+                      <button
+                        className="mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--milk)] px-5 text-sm font-semibold text-[var(--chocolate-deep)] transition hover:bg-[var(--caramel-soft)]"
+                        onClick={openWalletPayment}
+                        type="button"
+                      >
+                        <span>Continuar al pago</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </section>
                   ) : (
                     <section className="mt-5 rounded-2xl bg-white/70 p-4 text-sm text-[var(--chocolate)] shadow-[0_5px_14px_rgba(43,26,24,0.055)]">
                       <p>No se pudo preparar el pago todavía.</p>

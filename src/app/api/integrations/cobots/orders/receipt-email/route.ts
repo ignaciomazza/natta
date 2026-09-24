@@ -1,3 +1,4 @@
+import { isCobotsDirect } from "@/lib/cobots-api";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isCobotsOperationsAuthorized } from "@/lib/integrations/cobots-operations";
@@ -16,6 +17,7 @@ const commandSchema = z.object({
 
 export async function GET(request: NextRequest) {
   if (!isCobotsOperationsAuthorized(request.headers.get("authorization"))) return json({ error: "No autorizado" }, 401);
+  if (await isCobotsDirect()) return json({ error: "El comprobante se gestiona desde Cobots." }, 410);
   const id = idSchema.safeParse(request.nextUrl.searchParams.get("orderId"));
   if (!id.success) return json({ error: "Pedido inválido" }, 400);
   const order = await loadReceiptOrder(id.data);
@@ -33,6 +35,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!isCobotsOperationsAuthorized(request.headers.get("authorization"))) return json({ error: "No autorizado" }, 401);
   try {
+    if (await isCobotsDirect()) return json({ error: "El comprobante se gestiona desde Cobots." }, 410);
     const text = await request.text();
     if (text.length > 14000) return json({ error: "Solicitud demasiado grande" }, 413);
     const command = commandSchema.parse(JSON.parse(text));

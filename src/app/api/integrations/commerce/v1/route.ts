@@ -1,3 +1,4 @@
+import { isCobotsDirect } from "@/lib/cobots-api";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
   if (!authorizeCommerce(request.headers.get("authorization")))
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   try {
+    if (await isCobotsDirect()) return NextResponse.json({ error: "La conexión antigua está retirada." }, { status: 410 });
     const text = await request.text();
     if (text.length > 100000)
       return NextResponse.json(
