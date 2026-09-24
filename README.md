@@ -1,15 +1,8 @@
 # Natta Vascas
 
-Web comercial + pedido asistido para Natta Vascas, construida con Next.js App Router, TypeScript, Tailwind CSS, Prisma y PostgreSQL.
+Web pública de Natta, construida con Next.js, React, TypeScript y Tailwind CSS.
 
-## Stack
-
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- Prisma ORM
-- PostgreSQL local por Docker Compose
+Cobots gestiona el catálogo, los cupos, los pedidos, los comprobantes y los pagos. Las credenciales de Mercado Pago pertenecen al canal de Natta y se guardan cifradas en la base de Cobots. Este repositorio no tiene base de datos ni panel interno. Las rutas antiguas de `/interno` redirigen a Cobots.
 
 ## Desarrollo
 
@@ -19,103 +12,20 @@ cp .env.example .env
 npm run dev
 ```
 
-La web queda disponible en `http://localhost:3000`.
+Configurar `COBOTS_API_URL` y `COBOTS_STOREFRONT_API_KEY` para el canal de Natta. La clave queda solo en el servidor. `NEXT_PUBLIC_WHATSAPP_NUMBER` es opcional para los enlaces de consulta.
 
-## Mercado Pago
+## Recorrido del pedido
 
-El flujo de `/pedido` usa un checkout embebido con:
+- `/pedido` consulta el catálogo y los cupos de Cobots y crea allí los pedidos.
+- Mercado Pago Checkout Pro se prepara con las credenciales del canal guardadas en Cobots.
+- `/api/payments/webhook` reenvía la notificación firmada a Cobots sin modificarla.
+- `/comprobante/{codigo}` y `/estado-pedido` consultan los pedidos en Cobots, incluidos los históricos migrados.
 
-- Tarjetas de crédito y débito
-- Cuenta Mercado Pago / wallet
-- Rapipago y Pago Fácil
-
-Variables requeridas en `.env`:
-
-```bash
-DATABASE_URL="postgresql://..."
-DIRECT_URL="postgresql://..."
-NEXT_PUBLIC_APP_URL="https://tu-dominio-o-tunnel.ngrok-free.app"
-MERCADOPAGO_ENV="test"
-NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_TEST="APP_USR-..."
-MERCADOPAGO_ACCESS_TOKEN_TEST="TEST-..."
-MERCADOPAGO_WEBHOOK_SECRET_TEST="..."
-NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY_PRODUCTION="APP_USR-..."
-MERCADOPAGO_ACCESS_TOKEN_PRODUCTION="APP_USR-..."
-MERCADOPAGO_WEBHOOK_SECRET_PRODUCTION="..."
-MERCADOPAGO_TICKET_EXPIRATION_DAYS="18"
-NEXT_PUBLIC_PRICE_MULTIPLIER="1"
-```
-
-Notas:
-
-- `DATABASE_URL` debería usar pool en producción.
-- `DIRECT_URL` debería usar conexión directa del cluster para Prisma.
-- `MERCADOPAGO_ENV` define qué credenciales usa la app en ese entorno (`test` o `production`).
-- `NEXT_PUBLIC_APP_URL` no debería ser `localhost` si querés probar el retorno desde wallet/QR.
-- `MERCADOPAGO_TICKET_EXPIRATION_DAYS` controla el vencimiento de Rapipago/Pago Fácil.
-- `NEXT_PUBLIC_PRICE_MULTIPLIER` permite bajar temporalmente todos los importes sin tocar la base. Ejemplo: `0.1` deja una Latta de `$ 13.000` en `$ 1.300`.
-- La guía operativa para crear la app y cargar credenciales quedó en `docs/mercadopago-checkout.md`.
-- La guía para dejar PostgreSQL bien armada en producción quedó en `docs/database-production.md`.
-
-## Base de datos local
+## Verificación
 
 ```bash
-docker compose up -d
-npm run prisma:generate
-npm run db:push
-npm run prisma:seed
+npm run lint
+npm run build
 ```
 
-Para bootstrap local completo (DB user + `.env` con credenciales generadas):
-
-```bash
-npm run bootstrap:local-db
-```
-
-Luego:
-
-```bash
-npm run prisma:generate
-npm run db:push
-npm run prisma:seed
-```
-
-Esto prepara la base transitoria del checkout público. El catálogo y los cupos publicados se gestionan en Cobots.
-
-## WhatsApp
-
-Configurar el numero real en `.env`:
-
-```bash
-NEXT_PUBLIC_WHATSAPP_NUMBER="54911XXXXXXXX"
-```
-
-El flujo de pedido asistido genera un mensaje con tamaño, sabor, cantidad, fecha, modalidad, total estimado y regla de pago.
-
-## Backoffice
-
-- La gestión interna se realiza en Cobots. Las rutas antiguas `/interno` redirigen a Cobots.
-- Natta conserva su web pública. El checkout y los pagos todavía usan la base transitoria de este proyecto hasta completar el traslado a Cobots.
-- Comprobante público por código: `/comprobante/{codigo}`
-
-## Sucursales
-
-- Devoto: Av. Francisco Beiró 5015, timbre 302, Villa Devoto, CABA.
-- Nordelta: Boulevard de Todos los Santos 4380, Vila Marina 1, Dique Luján,
-  Tigre, Buenos Aires.
-- El catálogo, los cupos y los pedidos se separan por sucursal. Nordelta ofrece
-  inicialmente sólo Lattas.
-- El contrato de transición a Cobots Gestión y el orden seguro de despliegue
-  están en `docs/branches-and-cobots.md`.
-
-## Assets
-
-Los PNG de `public/images` son placeholders generados para validar composición visual. Reemplazarlos por fotos reales de Natta cuando Cami comparta el material.
-
-```bash
-npm run assets:placeholder
-```
-
-## Brief
-
-El contexto de marca, menu, reglas operativas y roadmap esta documentado en `docs/natta-brief.md`.
+El contexto de marca y el material comercial están en `docs`.
