@@ -37,6 +37,7 @@ export async function reconcilePaymentPage(offset: number, end: string) {
   let recovered = 0;
   const attention: string[] = [];
   const errors: string[] = [];
+  const receiptAttention: string[] = [];
   await Promise.all(remote.map(async (payment) => {
     const current =
       local.find((p) => p.providerPaymentId === String(payment.id)) ??
@@ -48,6 +49,7 @@ export async function reconcilePaymentPage(offset: number, end: string) {
         attention.push(String(payment.id));
       return;
     }
+    let approved = payment.status === "approved";
     try {
       const saved = current.providerPayload as Record<string, unknown> | null;
       const needsSnapshot =
@@ -56,7 +58,6 @@ export async function reconcilePaymentPage(offset: number, end: string) {
         saved?.transaction_amount !== payment.transaction_amount ||
         saved?.date_last_updated !== payment.date_last_updated ||
         (payment.status === "approved" && current.status !== "APPROVED");
-      let approved = payment.status === "approved";
       if (needsSnapshot) {
         // Search finds candidates; a direct GET gives the authoritative current state.
         const updated = await applyMercadoPagoPaymentSnapshot(
@@ -77,18 +78,20 @@ export async function reconcilePaymentPage(offset: number, end: string) {
           );
         }
       }
-      if (approved && !current.order?.receiptEmailSentAt) {
-        const receipt = await sendOrderReceiptEmailIfNeeded(current.orderId);
-        if (receipt.error) throw new Error(receipt.error);
-      }
-      if (
-        current.order?.status === "CANCELLED" &&
-        approved
-      )
-        attention.push(String(payment.id));
     } catch {
       errors.push(String(payment.id));
+      return;
     }
+    if (approved && !current.order?.receiptEmailSentAt) {
+      try {
+        const receipt = await sendOrderReceiptEmailIfNeeded(current.orderId);
+        if (receipt.error) receiptAttention.push(String(payment.id));
+      } catch {
+        receiptAttention.push(String(payment.id));
+      }
+    }
+    if (current.order?.status === "CANCELLED" && approved)
+      attention.push(String(payment.id));
   }));
   const nextOffset = offset + consumed;
   return {
@@ -96,6 +99,7 @@ export async function reconcilePaymentPage(offset: number, end: string) {
     recovered,
     attention: attention.sort(),
     errors: errors.sort(),
+    receiptAttention: receiptAttention.sort(),
     nextOffset:
       page.length && nextOffset < (result.paging?.total ?? nextOffset)
         ? nextOffset

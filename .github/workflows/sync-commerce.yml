@@ -1,0 +1,60 @@
+name: Sync Natta orders to Cobots
+
+on:
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: natta-payment-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      id-token: write
+    steps:
+      - name: Deliver pending order changes
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoint = 'https://www.nattavascas.com/api/payments/reconcile';
+          const identity = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          identity.searchParams.set('audience', endpoint);
+          let token, tokenAt = 0;
+          async function authorization() {
+            if (!token || Date.now() - tokenAt >= 120000) {
+              const response = await fetch(identity, {
+                headers: { Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
+                signal: AbortSignal.timeout(15000),
+              });
+              if (!response.ok) throw new Error(`GitHub identity request failed: ${response.status}`);
+              ({ value: token } = await response.json());
+              tokenAt = Date.now();
+            }
+            return `Bearer ${token}`;
+          }
+
+          let processed = 0;
+          for (let batch = 0; batch < 20; batch++) {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { Authorization: await authorization(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mode: 'commerce', end: new Date().toISOString() }),
+              signal: AbortSignal.timeout(65000),
+            });
+            if (!response.ok) throw new Error(`Order synchronization failed: HTTP ${response.status}`);
+            const result = await response.json();
+            processed += result.processed;
+            if (result.errors) throw new Error(`Order synchronization failed for ${result.errors} order(s)`);
+            if (!result.hasMore) {
+              console.log(JSON.stringify({ processed, pending: false }));
+              process.exit(0);
+            }
+          }
+          throw new Error('Order synchronization still has pending batches.');
+          NODE

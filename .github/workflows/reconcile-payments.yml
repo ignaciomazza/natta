@@ -48,7 +48,7 @@ jobs:
             if (!result.hasMore || result.errors) break;
           }
 
-          let offset = 0, checked = 0, recovered = 0, attention = 0, errors = 0;
+          let offset = 0, checked = 0, recovered = 0, attention = 0, errors = 0, receiptAttention = 0;
           let inboxComplete = false;
           const inboxDeadline = Date.now() + 90000;
           // Bound the inbox sweep so payment searches still run if many old
@@ -76,10 +76,12 @@ jobs:
             const result = await review.json();
             checked += result.checked; recovered += result.recovered; attention += result.attention.length;
             errors += result.errors.length;
+            receiptAttention += result.receiptAttention?.length ?? 0;
             if (result.nextOffset === null) {
-              console.log(JSON.stringify({ checked, recovered, attention, errors }));
+              console.log(JSON.stringify({ checked, recovered, attention, errors, receiptAttention }));
               if (errors) throw new Error('Some payment checks failed. See the Natta server logs.');
               if (attention) throw new Error('Some payments require review in the Natta server logs.');
+              if (receiptAttention) throw new Error('Some receipts require review in Cobots before sending again.');
               process.exit(0);
             }
             offset = result.nextOffset;

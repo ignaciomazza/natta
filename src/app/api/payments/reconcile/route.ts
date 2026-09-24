@@ -16,15 +16,18 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  if (!(await canReconcilePayments(req.headers.get("authorization"))))
+  const authorization = req.headers.get("authorization");
+  if (!authorization)
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (getMercadoPagoEnvironment() !== "production")
-    return NextResponse.json(
-      { error: "La revisión automática requiere el entorno productivo" },
-      { status: 503 },
-    );
   try {
     const { mode, offset, end } = schema.parse(await req.json());
+    if (!(await canReconcilePayments(authorization, mode)))
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (mode !== "commerce" && getMercadoPagoEnvironment() !== "production")
+      return NextResponse.json(
+        { error: "La revisión automática requiere el entorno productivo" },
+        { status: 503 },
+      );
     if (Math.abs(Date.now() - Date.parse(end)) > 3600000)
       return NextResponse.json({ error: "Período inválido" }, { status: 400 });
     if (mode === "commerce") {

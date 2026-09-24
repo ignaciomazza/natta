@@ -9,7 +9,7 @@ const workflow = readFileSync(
 const source = workflow.match(/<<'NODE'\n([\s\S]*?)\n\s+NODE\s*$/)?.[1];
 assert.ok(source, "The workflow must contain the executable worker being tested");
 
-async function run({ slowInbox = false, inboxUnavailable = false, paymentError = false } = {}) {
+async function run({ slowInbox = false, inboxUnavailable = false, paymentError = false, receiptReview = false } = {}) {
   let now = Date.parse("2026-09-07T12:00:00Z");
   let tokenCreatedAt = 0;
   let identities = 0;
@@ -60,6 +60,7 @@ async function run({ slowInbox = false, inboxUnavailable = false, paymentError =
         return Response.json({
           checked: 3, recovered: 3, attention: [],
           errors: paymentError && body.offset === 0 ? ["fake-failed-payment"] : [],
+          receiptAttention: receiptReview && body.offset === 0 ? ["fake-receipt-review"] : [],
           nextOffset: body.offset === 300 ? null : body.offset + 3,
         });
       },
@@ -92,3 +93,9 @@ const failedPayment = await run({ paymentError: true });
 assert.equal(failedPayment.report.errors, 1);
 assert.match(failedPayment.failure?.message ?? "", /Some payment checks failed/);
 console.log("PASS individual failures are reported after all subsequent pages are visited");
+
+const receiptReview = await run({ receiptReview: true });
+assert.equal(receiptReview.report.errors, 0);
+assert.equal(receiptReview.report.receiptAttention, 1);
+assert.match(receiptReview.failure?.message ?? "", /Some receipts require review/);
+console.log("PASS uncertain receipt delivery is reported separately from payment failures");

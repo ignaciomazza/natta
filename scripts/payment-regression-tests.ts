@@ -717,6 +717,14 @@ async function main() {
       event_name: "schedule",
     };
     assert.equal(isReconciliationWorkflow(claims), true);
+    const commerceClaims = {
+      ...claims,
+      workflow_ref:
+        "ignaciomazza/natta/.github/workflows/sync-commerce.yml@refs/heads/main",
+    };
+    assert.equal(isReconciliationWorkflow(commerceClaims, "commerce"), true);
+    assert.equal(isReconciliationWorkflow(commerceClaims, "payments"), false);
+    assert.equal(isReconciliationWorkflow(commerceClaims, "notifications"), false);
     assert.equal(
       isReconciliationWorkflow({ ...claims, event_name: "pull_request" }),
       false,
