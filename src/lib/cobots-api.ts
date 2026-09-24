@@ -75,10 +75,3 @@ export async function forwardMercadoPagoWebhook(request: NextRequest) {
   return NextResponse.json(data, { status: response.status, headers: { "Cache-Control": "no-store" } });
 }
 
-export async function isCobotsDirect() {
-  const result = await cobotsApi("/api/storefront/natta/mode") as { mode?: string };
-  if (result.mode !== "remote" && result.mode !== "direct") {
-    throw new CobotsApiError(503, { error: "La conexión con Cobots no informó el estado de Natta." });
-  }
-  return result.mode === "direct";
-}

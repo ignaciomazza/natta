@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { isPublicBranchSelectionEnabled } from "@/lib/branches";
-import { cakeSizes, flavors, type SizeId } from "@/lib/catalog";
+import { cakeSizes, type SizeId } from "@/lib/catalog";
 
 export const siteConfig = {
   name: "Natta Vascas",
@@ -84,7 +84,7 @@ const faqId = `${siteConfig.url}/#faq`;
 
 export function buildHomeStructuredData(
   faq: FaqItem[],
-  menuFlavors: StructuredMenuFlavor[] = flavors,
+  menuFlavors: StructuredMenuFlavor[],
 ) {
   const business = {
     "@type": "Bakery",
@@ -132,7 +132,7 @@ export function buildHomeStructuredData(
     "@id": `${siteConfig.url}/#menu-${flavor.slug ?? flavor.id}`,
     name: `Tarta vasca ${flavor.name}`,
     description: flavor.description,
-    menuAddOn: cakeSizes.map((size) => ({
+    menuAddOn: cakeSizes.filter((size) => flavor.prices[size.id] !== null).map((size) => ({
       "@type": "MenuItem",
       name: size.label,
       description: `${size.detail}. ${size.servings}.`,

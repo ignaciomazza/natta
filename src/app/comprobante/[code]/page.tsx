@@ -1,4 +1,3 @@
-import LegacyComprobantePage from "./legacy";
 import type { Metadata } from "next";
 import {
   BadgeCheck,
@@ -15,7 +14,7 @@ import {
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { formatDateOnly } from "@/lib/date-only";
-import { cobotsApi, CobotsApiError, isCobotsDirect } from "@/lib/cobots-api";
+import { cobotsApi, CobotsApiError } from "@/lib/cobots-api";
 
 type NattaReceiptPageOrder = {
   publicReceiptCode: string;
@@ -193,7 +192,6 @@ export default async function ComprobantePage({
 }: {
   params: Promise<{ code: string }>;
 }) {
-  if (!(await isCobotsDirect())) return LegacyComprobantePage({ params });
   const { code } = await params;
 
   let order: NattaReceiptPageOrder | null = null;

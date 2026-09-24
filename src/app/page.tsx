@@ -13,7 +13,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { StructuredData } from "@/components/structured-data";
 import { isPublicBranchSelectionEnabled } from "@/lib/branches";
 import { cakeSizes } from "@/lib/catalog";
-import { getActiveCatalog } from "@/lib/catalog-db";
+import { cobotsApi } from "@/lib/cobots-api";
 import { buildHomeStructuredData } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -121,8 +121,16 @@ const menuFlavorOrder = [
   "brulee",
 ];
 
+type HomeCatalogFlavor = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  prices: Array<{ sizeSlug: string; amountArs: number }>;
+};
+
 function buildMenuFlavors(
-  catalogFlavors: Awaited<ReturnType<typeof getActiveCatalog>>["flavors"],
+  catalogFlavors: HomeCatalogFlavor[],
 ): MenuTableFlavor[] {
   const order = new Map(menuFlavorOrder.map((slug, index) => [slug, index]));
 
@@ -161,7 +169,7 @@ function buildMenuFlavors(
 }
 
 export default async function Home() {
-  const catalog = await getActiveCatalog();
+  const catalog = await cobotsApi("/api/storefront/natta/catalog?branch=devoto") as { flavors: HomeCatalogFlavor[] };
   const menuFlavors = buildMenuFlavors(catalog.flavors);
 
   return (
